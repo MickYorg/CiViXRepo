@@ -1,7 +1,4 @@
 {
   "name": "dig-selfhosted",
-  "private": true,
-  "dependencies": {
-    "@netlify/blobs": "^8.0.0"
-  }
+  "private": true
 }
