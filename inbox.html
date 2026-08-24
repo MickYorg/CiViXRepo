@@ -260,6 +260,7 @@
   .card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .act {
     appearance: none;
+    display: inline-block;
     background: none;
     border: 1px solid var(--line);
     color: var(--paper-dim);
@@ -267,6 +268,7 @@
     font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    text-decoration: none;
     padding: 6px 11px;
     border-radius: 20px;
     cursor: pointer;
@@ -519,7 +521,7 @@
           '<div class="card-meta">' + bits.join(' &nbsp;&middot;&nbsp; ') + '</div>' +
           (i.note ? '<p class="card-body">' + esc(i.note) + '</p>' : '') +
           '<div class="card-actions">' +
-            '<button class="act act-dig" data-do="dig" type="button">Send to DIG &#8599;</button>' +
+            '<a class="act act-dig" data-do="dig" href="' + esc(digUrl(i)) + '" target="_blank" rel="noopener">Send to DIG &#8599;</a>' +
             (i.state === 'docket'
               ? '<button class="act" data-do="adopt" type="button">Adopt</button>'
               : '<button class="act" data-do="return" type="button">Return to inbox</button>') +
@@ -609,10 +611,13 @@
     if (!item) return;
 
     if (btn) {
+      // "dig" is a real <a target="_blank"> now -- native navigation
+      // handles it (reliably, unlike window.open, which some browsers
+      // -- notably mobile Safari -- silently fall back to same-tab on).
+      // Just stop it from also opening the focus overlay below.
       e.stopPropagation();
       var act = btn.getAttribute('data-do');
-      if (act === 'dig') window.open(digUrl(item), '_blank', 'noopener');
-      else if (act === 'adopt') setItemState(item, 'adopted');
+      if (act === 'adopt') setItemState(item, 'adopted');
       else if (act === 'return') setItemState(item, 'docket');
       else if (act === 'strike') strikeItem(item);
       return;
@@ -669,7 +674,7 @@
         (item.note ? esc(item.note) : 'Nothing more was captured with this one — just the link.') +
       '</p>' +
       '<div class="focus-actions">' +
-        '<button class="act act-dig" data-focus-do="dig" type="button">Send to DIG &#8599;</button>' +
+        '<a class="act act-dig" href="' + esc(digUrl(item)) + '" target="_blank" rel="noopener">Send to DIG &#8599;</a>' +
         (item.state === 'docket'
           ? '<button class="act" data-focus-do="adopt" type="button">Adopt</button>'
           : '<button class="act" data-focus-do="return" type="button">Return to inbox</button>') +
@@ -679,13 +684,12 @@
 
   focusCardEl.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-focus-do]');
-    if (!btn) return;
+    if (!btn) return; // "dig" is a real <a target="_blank"> now -- let it navigate natively
     var rows = visible();
     var item = rows[state.focusIndex];
     if (!item) return;
     var act = btn.getAttribute('data-focus-do');
-    if (act === 'dig') window.open(digUrl(item), '_blank', 'noopener');
-    else if (act === 'adopt') { setItemState(item, 'adopted'); closeFocus(); }
+    if (act === 'adopt') { setItemState(item, 'adopted'); closeFocus(); }
     else if (act === 'return') { setItemState(item, 'docket'); closeFocus(); }
     else if (act === 'strike') { strikeItem(item); closeFocus(); }
   });
