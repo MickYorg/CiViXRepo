@@ -2,19 +2,19 @@ name = "mycivix"
 pages_build_output_dir = "."
 compatibility_date = "2026-08-24"
 
-# Cloudflare Pages applies root-level (non `env.production`) vars to the
-# PREVIEW environment specifically for a git-connected project — confirmed by
-# the dashboard locking Preview's non-secret vars to this file the moment it
-# existed, while Production's vars stayed dashboard-managed. But KV/binding
-# management is locked file-wide the moment ANY kv_namespaces block exists
-# here, for BOTH environments — so Production's binding has to be declared
-# below via env.production, even though its vars/secrets stay dashboard-set.
-# ANTHROPIC_API_KEY is a secret and stays out of this file entirely — it's
+# Explicit env.preview / env.production blocks only -- no root-level
+# fallback. A root-level [[kv_namespaces]] plus a separate
+# env.production.kv_namespaces override was tried first and did NOT work:
+# Production kept resolving to the root-level (preview) namespace even
+# after a fresh deploy. Scoping both environments explicitly, with nothing
+# left ambiguous at the root, is the fix being tested here.
+#
+# ANTHROPIC_API_KEY is a secret and stays out of this file entirely -- it's
 # set as an encrypted var directly in the dashboard for both environments.
-[vars]
+[env.preview.vars]
 DIG_DAILY_BUDGET_USD = "2"
 
-[[kv_namespaces]]
+[[env.preview.kv_namespaces]]
 binding = "DIG_KV"
 id = "c1e1b859de3a4685b112c23f340be38c"
 
