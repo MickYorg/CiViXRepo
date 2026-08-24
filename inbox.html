@@ -138,26 +138,49 @@
     margin: 0 0 28px;
   }
 
-  .wip {
+  /* ---- filter tabs ---- */
+  .filters {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    border: 1px solid var(--strike);
-    background: rgba(200, 68, 58, 0.08);
-    border-radius: 9px;
-    padding: 12px 16px;
-    margin: 0 0 36px;
-    font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.03em;
-    line-height: 1.6;
-    color: var(--paper-dim);
+    gap: 4px;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 6px;
   }
-  .wip strong {
-    color: var(--strike);
-    text-transform: uppercase;
+  .filter {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
     letter-spacing: 0.1em;
-    font-weight: 500;
+    text-transform: uppercase;
+    padding: 9px 12px;
+    margin-bottom: -1px;
+    cursor: pointer;
+  }
+  .filter[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--amber); }
+  .filter .count { color: var(--paper-dim); }
+  .filter[aria-selected="true"] .count { color: var(--amber-ink); }
+
+  /* ---- error / loading / empty ---- */
+  .errbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border: 1px solid var(--strike); border-left-width: 3px; border-radius: 9px;
+    padding: 13px 16px; margin: 18px 0;
+  }
+  .errbar[hidden] { display: none; }
+  .errbar p { margin: 0; flex: 1; min-width: 200px; font-size: 15px; }
+  .errbar button {
+    appearance: none; background: none; border: 1px solid var(--strike); color: var(--strike);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 7px 13px; border-radius: 7px; cursor: pointer;
+  }
+  .loading {
+    padding: 32px 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper-dim);
   }
 
   .section-label {
@@ -172,11 +195,25 @@
   }
   .section-label:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 
+  .empty { padding: 40px 0 8px; }
+  .empty h2 { font-size: 24px; font-weight: 600; margin: 0 0 10px; letter-spacing: -0.01em; }
+  .empty p { color: var(--paper-dim); margin: 0 0 14px; max-width: 50ch; line-height: 1.55; }
+  .empty a.setup-link {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); text-decoration: none;
+    border: 1px solid var(--amber); border-radius: 20px; padding: 8px 16px;
+  }
+  .empty a.setup-link:hover { background: var(--amber-wash); }
+
+  /* ---- filings ---- */
   .card {
     border: 1px solid var(--line);
     border-radius: 9px;
     padding: 16px 18px;
     margin-bottom: 10px;
+    cursor: pointer;
     transition: border-color 0.15s ease;
   }
   .card:hover { border-color: var(--paper-dim); }
@@ -211,37 +248,34 @@
     color: var(--paper-dim);
     margin-bottom: 8px;
   }
+  .card-meta a { color: var(--paper-dim); text-decoration: none; border-bottom: 1px solid var(--line); }
+  .card-meta a:hover { color: var(--amber-ink); border-bottom-color: var(--amber-ink); }
   .card-body {
     font-size: 14.5px;
     line-height: 1.6;
     color: var(--paper-dim);
+    margin: 0 0 10px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-  .stat {
+  .card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .act {
+    appearance: none;
+    background: none;
     border: 1px solid var(--line);
-    border-radius: 9px;
-    padding: 16px 18px;
-  }
-  .stat-num {
-    font-weight: 700;
-    font-size: 28px;
-    letter-spacing: -0.01em;
-    color: var(--amber-ink);
-  }
-  .stat-label {
+    color: var(--paper-dim);
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--paper-dim);
-    margin-top: 4px;
+    padding: 6px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
+  .act:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .act.act-dig { color: var(--amber-ink); border-color: var(--amber); }
+  .act.act-dig:hover { background: var(--amber-wash); }
+  .act.act-strike:hover { color: var(--strike); border-color: var(--strike); }
 
   .home-link {
     display: inline-flex;
@@ -259,6 +293,70 @@
     margin-top: 40px;
   }
   .home-link:hover { background: var(--amber-wash); }
+
+  /* ---- focus overlay: click a filing to read the full capture, jump
+     between filings without closing, or hand it to DIG. Same interaction
+     shape as DIG's own source-focus view (overlay + prev/next + counter),
+     restyled to this page's tokens. ---- */
+  .focus-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(10, 15, 28, 0.72);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: clamp(12px, 4vw, 40px);
+  }
+  .focus-overlay[hidden] { display: none; }
+  :root[data-theme="light"] .focus-overlay { background: rgba(20, 25, 43, 0.6); }
+
+  .focus-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: clamp(20px, 4vw, 32px);
+    max-width: 620px;
+    width: 100%;
+    max-height: 82vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .focus-counter {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--paper-dim); margin-bottom: 10px;
+  }
+  .focus-title { font-size: clamp(20px, 3vw, 26px); font-weight: 700; line-height: 1.25; margin: 0 0 8px; }
+  .focus-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.06em; color: var(--paper-dim); margin-bottom: 16px;
+  }
+  .focus-meta a { color: var(--paper-dim); border-bottom: 1px solid var(--line); text-decoration: none; }
+  .focus-meta a:hover { color: var(--amber-ink); border-bottom-color: var(--amber-ink); }
+  .focus-body { font-size: 16px; line-height: 1.65; margin: 0 0 22px; white-space: pre-wrap; }
+  .focus-body.is-empty { color: var(--paper-dim); font-style: italic; }
+  .focus-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .focus-close {
+    position: fixed; top: clamp(12px, 3vw, 24px); right: clamp(12px, 3vw, 24px);
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--ink-raised); border: 1px solid var(--line); color: var(--paper-dim);
+    font-size: 20px; line-height: 1; cursor: pointer; z-index: 101;
+  }
+  .focus-close:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .focus-nav {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--ink-raised); border: 1px solid var(--line); color: var(--paper-dim);
+    font-size: 22px; line-height: 1; cursor: pointer; z-index: 101;
+  }
+  .focus-nav:hover:not(:disabled) { color: var(--amber-ink); border-color: var(--amber); }
+  .focus-nav:disabled { opacity: 0.3; cursor: default; }
+  .focus-prev { left: clamp(8px, 3vw, 24px); }
+  .focus-next { right: clamp(8px, 3vw, 24px); }
+  @media (max-width: 640px) {
+    .focus-nav { width: 36px; height: 36px; font-size: 18px; }
+  }
+
+  :focus-visible { outline: 2px solid var(--amber-ink); outline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -281,38 +379,28 @@
 <div class="wrap">
   <p class="crumb"><span class="sec">§ 02</span> · get fired up</p>
   <h1>Inbox</h1>
-  <p class="dek">Everything you've sent to CiViX — from wherever you stumbled on it — lands here first, before it's sorted into your profile.</p>
+  <p class="dek">Everything you've sent to CiViX — from wherever you stumbled on it — lands here. Click one to read it back, send it to DIG, or file it away.</p>
 
-  <div class="wip">
-    <span>&#9888;</span>
-    <span><strong>Work in progress —</strong> Inbox isn't built yet. Everything below is sample content standing in for what this module will eventually pull in from your profile, sources, and inbox. Thanks for poking around — check back as CiViX takes shape.</span>
-  </div>
-
-<p class="section-label">Recently captured</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Op-ed: 'The permitting fight nobody's watching'</span><span class="tag">Article</span></div>
-    <div class="card-meta">Forwarded from Mail · 2 days ago · Local news</div>
-    <div class="card-body">Shared via the CiViX capture address after showing up in a friend's newsletter — flagged for the housing/zoning topic in your profile.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">City council votes Tuesday on transit funding</span><span class="tag">Article</span></div>
-    <div class="card-meta">Forwarded from Mail · 4 days ago · Municipal</div>
-    <div class="card-body">Landed in the inbox from a share-sheet forward; matched against your transit and infrastructure interests.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Thread: neighbors debating the new bike lane</span><span class="tag">Discussion</span></div>
-    <div class="card-meta">Forwarded from Mail · 6 days ago · Community</div>
-    <div class="card-body">Captured from a community board post. Sits in the inbox until you triage it into a profile topic or dismiss it.</div>
-  </div>
-<p class="section-label">What this becomes</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Auto-sorted by topic</span><span class="tag">Coming</span></div>
-    <div class="card-meta">—</div>
-    <div class="card-body">Captured items will eventually route themselves toward matching profile topics instead of sitting in one flat list.</div>
+  <div class="errbar" id="err-bar" hidden>
+    <p id="err-text">Couldn't reach your inbox.</p>
+    <button type="button" id="retry-btn">Retry</button>
   </div>
 
+  <div class="filters" role="tablist">
+    <button class="filter" role="tab" data-view="docket" aria-selected="true" type="button">Inbox <span class="count" id="count-docket">0</span></button>
+    <button class="filter" role="tab" data-view="adopted" aria-selected="false" type="button">Adopted <span class="count" id="count-adopted">0</span></button>
+  </div>
+
+  <main id="list" aria-live="polite"><div class="loading">Loading your inbox&hellip;</div></main>
 
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
+</div>
+
+<div class="focus-overlay" id="focus-overlay" hidden>
+  <button class="focus-close" id="focus-close" type="button" aria-label="Close">&times;</button>
+  <button class="focus-nav focus-prev" id="focus-prev" type="button" aria-label="Previous">&lsaquo;</button>
+  <div class="focus-card" id="focus-card"></div>
+  <button class="focus-nav focus-next" id="focus-next" type="button" aria-label="Next">&rsaquo;</button>
 </div>
 
 <script>
@@ -330,6 +418,300 @@
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
+
+  // ---------------------------------------------------------------
+  // Docket data -- same backend and token as capture.html ("Send to
+  // CiViX"), so whatever's been mailed in from the share sheet shows up
+  // here too. civix.token is shared via localStorage on this origin.
+  // ---------------------------------------------------------------
+  var API = 'https://civix-capture.mycivix.workers.dev';
+  var TOKEN_KEY = 'civix.token';
+  var state = { token: null, items: [], view: 'docket', focusIndex: 0 };
+
+  var listEl = document.getElementById('list');
+  var errBar = document.getElementById('err-bar');
+  var errText = document.getElementById('err-text');
+
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: {} };
+    if (opts.body) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(API + path, init).then(function (r) {
+      return r.text().then(function (txt) {
+        var data;
+        try { data = txt ? JSON.parse(txt) : {}; } catch (e) { data = { error: txt }; }
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      });
+    });
+  }
+
+  function showError(msg) {
+    errText.textContent = msg;
+    errBar.hidden = false;
+  }
+  function clearError() { errBar.hidden = true; }
+
+  function readToken() {
+    try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+  }
+  function ensureToken() {
+    var t = readToken();
+    if (t) return Promise.resolve(t);
+    return api('/api/docket', { method: 'POST' }).then(function (d) {
+      try { localStorage.setItem(TOKEN_KEY, d.token); } catch (e) {}
+      return d.token;
+    });
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function since(ts) {
+    var s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return 'just now';
+    var m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+    var h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+    var d = Math.floor(h / 24); if (d < 7) return d + 'd ago';
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function digUrl(item) {
+    var topic = (item.title || item.note || item.url || '').slice(0, 200);
+    return '../dig/?topic=' + encodeURIComponent(topic);
+  }
+
+  // ---------------------------------------------------------------
+  // List rendering
+  // ---------------------------------------------------------------
+  function visible() {
+    return state.items
+      .filter(function (i) { return i.state === state.view; })
+      .sort(function (a, b) { return b.at - a.at; });
+  }
+
+  function render() {
+    document.getElementById('count-docket').textContent =
+      state.items.filter(function (i) { return i.state === 'docket'; }).length;
+    document.getElementById('count-adopted').textContent =
+      state.items.filter(function (i) { return i.state === 'adopted'; }).length;
+
+    var rows = visible();
+    if (!rows.length) { listEl.innerHTML = emptyMarkup(); return; }
+
+    listEl.innerHTML = rows.map(function (i, idx) {
+      var bits = [];
+      if (i.host) bits.push('<a href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">' + esc(i.host) + '</a>');
+      bits.push(esc(since(i.at)));
+      if (i.source === 'mail') bits.push('by mail');
+
+      return '' +
+        '<article class="card" data-id="' + esc(i.id) + '" data-idx="' + idx + '">' +
+          '<div class="card-top"><span class="card-title">' + esc(i.title) + '</span>' +
+            (i.state === 'adopted' ? '<span class="tag">Adopted</span>' : '') +
+          '</div>' +
+          '<div class="card-meta">' + bits.join(' &nbsp;&middot;&nbsp; ') + '</div>' +
+          (i.note ? '<p class="card-body">' + esc(i.note) + '</p>' : '') +
+          '<div class="card-actions">' +
+            '<button class="act act-dig" data-do="dig" type="button">Send to DIG &#8599;</button>' +
+            (i.state === 'docket'
+              ? '<button class="act" data-do="adopt" type="button">Adopt</button>'
+              : '<button class="act" data-do="return" type="button">Return to inbox</button>') +
+            '<button class="act act-strike" data-do="strike" type="button">Strike</button>' +
+          '</div>' +
+        '</article>';
+    }).join('');
+  }
+
+  function emptyMarkup() {
+    if (state.view === 'adopted') {
+      return '<div class="empty">' +
+        '<h2>Nothing adopted yet</h2>' +
+        '<p>Adopt something from your inbox and it becomes part of what CiViX works on for you.</p>' +
+        '</div>';
+    }
+    return '<div class="empty">' +
+      '<h2>Your inbox is clear</h2>' +
+      '<p>Next time something irks or interests you, send it here instead of losing it in a tab — share it to CiViX from any app, or set up a capture address to forward things by mail.</p>' +
+      '<a class="setup-link" href="capture.html">Set up capture &#8594;</a>' +
+      '</div>';
+  }
+
+  function load() {
+    return api('/api/filings?token=' + encodeURIComponent(state.token))
+      .then(function (d) {
+        clearError();
+        state.items = d.items || [];
+        render();
+      })
+      .catch(function (e) {
+        showError('Couldn’t reach your inbox — ' + e.message);
+        if (!state.items.length) listEl.innerHTML = '';
+      });
+  }
+
+  document.getElementById('retry-btn').addEventListener('click', function () {
+    listEl.innerHTML = '<div class="loading">Loading your inbox&hellip;</div>';
+    load();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.filter'), function (b) {
+    b.addEventListener('click', function () {
+      state.view = b.getAttribute('data-view');
+      Array.prototype.forEach.call(document.querySelectorAll('.filter'), function (o) {
+        o.setAttribute('aria-selected', String(o === b));
+      });
+      render();
+    });
+  });
+
+  function findItem(id) {
+    for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
+    return null;
+  }
+
+  function setItemState(item, next) {
+    var prev = item.state;
+    item.state = next;
+    render();
+    api('/api/filing?token=' + encodeURIComponent(state.token),
+        { method: 'PATCH', body: { id: item.id, state: next } })
+      .catch(function (err) {
+        item.state = prev; render();
+        showError('That didn’t save — ' + err.message);
+      });
+  }
+
+  function strikeItem(item) {
+    state.items = state.items.filter(function (i) { return i.id !== item.id; });
+    render();
+    api('/api/filing?token=' + encodeURIComponent(state.token),
+        { method: 'DELETE', body: { id: item.id } })
+      .catch(function (err) {
+        state.items.push(item);
+        render();
+        showError('Couldn’t strike that — ' + err.message);
+      });
+  }
+
+  listEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-do]');
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var id = card.getAttribute('data-id');
+    var item = findItem(id);
+    if (!item) return;
+
+    if (btn) {
+      e.stopPropagation();
+      var act = btn.getAttribute('data-do');
+      if (act === 'dig') window.open(digUrl(item), '_blank', 'noopener');
+      else if (act === 'adopt') setItemState(item, 'adopted');
+      else if (act === 'return') setItemState(item, 'docket');
+      else if (act === 'strike') strikeItem(item);
+      return;
+    }
+
+    openFocus(visible().indexOf(item));
+  });
+
+  // ---------------------------------------------------------------
+  // Focus overlay -- click a filing to read the full capture, step
+  // between filings with the arrows (or Left/Right/Escape), and act on
+  // whichever one is currently in focus.
+  // ---------------------------------------------------------------
+  var focusOverlay = document.getElementById('focus-overlay');
+  var focusCardEl = document.getElementById('focus-card');
+  var focusPrevBtn = document.getElementById('focus-prev');
+  var focusNextBtn = document.getElementById('focus-next');
+  var focusCloseBtn = document.getElementById('focus-close');
+
+  function openFocus(index) {
+    var rows = visible();
+    if (!rows.length) return;
+    state.focusIndex = Math.max(0, Math.min(rows.length - 1, index));
+    renderFocus();
+    focusOverlay.hidden = false;
+  }
+  function closeFocus() { focusOverlay.hidden = true; }
+  function moveFocus(delta) {
+    var rows = visible();
+    var next = state.focusIndex + delta;
+    if (next < 0 || next >= rows.length) return;
+    state.focusIndex = next;
+    renderFocus();
+  }
+
+  function renderFocus() {
+    var rows = visible();
+    var item = rows[state.focusIndex];
+    if (!item) { closeFocus(); return; }
+
+    focusPrevBtn.disabled = state.focusIndex === 0;
+    focusNextBtn.disabled = state.focusIndex === rows.length - 1;
+
+    var bits = [];
+    if (item.host) bits.push('<a href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer">' + esc(item.host) + ' &#8599;</a>');
+    bits.push(esc(since(item.at)));
+    if (item.source === 'mail') bits.push('by mail');
+
+    focusCardEl.innerHTML =
+      '<div class="focus-counter">' + (state.focusIndex + 1) + ' / ' + rows.length + '</div>' +
+      '<h2 class="focus-title">' + esc(item.title) + '</h2>' +
+      '<div class="focus-meta">' + bits.join(' &nbsp;&middot;&nbsp; ') + '</div>' +
+      '<p class="focus-body' + (item.note ? '' : ' is-empty') + '">' +
+        (item.note ? esc(item.note) : 'Nothing more was captured with this one — just the link.') +
+      '</p>' +
+      '<div class="focus-actions">' +
+        '<button class="act act-dig" data-focus-do="dig" type="button">Send to DIG &#8599;</button>' +
+        (item.state === 'docket'
+          ? '<button class="act" data-focus-do="adopt" type="button">Adopt</button>'
+          : '<button class="act" data-focus-do="return" type="button">Return to inbox</button>') +
+        '<button class="act act-strike" data-focus-do="strike" type="button">Strike</button>' +
+      '</div>';
+  }
+
+  focusCardEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-focus-do]');
+    if (!btn) return;
+    var rows = visible();
+    var item = rows[state.focusIndex];
+    if (!item) return;
+    var act = btn.getAttribute('data-focus-do');
+    if (act === 'dig') window.open(digUrl(item), '_blank', 'noopener');
+    else if (act === 'adopt') { setItemState(item, 'adopted'); closeFocus(); }
+    else if (act === 'return') { setItemState(item, 'docket'); closeFocus(); }
+    else if (act === 'strike') { strikeItem(item); closeFocus(); }
+  });
+
+  focusCloseBtn.addEventListener('click', closeFocus);
+  focusPrevBtn.addEventListener('click', function () { moveFocus(-1); });
+  focusNextBtn.addEventListener('click', function () { moveFocus(1); });
+  focusOverlay.addEventListener('click', function (e) {
+    if (e.target === focusOverlay) closeFocus();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (focusOverlay.hidden) return;
+    if (e.key === 'Escape') closeFocus();
+    else if (e.key === 'ArrowLeft') moveFocus(-1);
+    else if (e.key === 'ArrowRight') moveFocus(1);
+  });
+
+  // ---------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------
+  ensureToken()
+    .then(function (t) { state.token = t; return load(); })
+    .catch(function (err) {
+      showError('Couldn’t start your inbox — ' + err.message);
+      listEl.innerHTML = '';
+    });
 })();
 </script>
 </body>

@@ -70,6 +70,18 @@
 
   .wd-title span { color: var(--paper-dim); font-weight: 400; letter-spacing: 0.1em; }
 
+  .wd-header-left { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .wd-back-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--paper-dim);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .wd-back-link:hover { color: var(--amber); border-bottom-color: var(--amber); }
+
   .wd-gear {
     background: none;
     border: 1px solid var(--line);
@@ -1257,7 +1269,10 @@
 
 <div id="dig-root">
   <div class="wd-header">
-    <div class="wd-title">DIG <span>/ stance by source</span></div>
+    <div class="wd-header-left">
+      <a class="wd-back-link" href="../" title="Back to CiViX">&larr; CiViX</a>
+      <div class="wd-title">DIG <span>/ stance by source</span></div>
+    </div>
     <div class="wd-header-btns">
       <button class="wd-gear wd-home-gear" id="wd-home-btn" style="display:none;" title="Clear results and start a new search">⌂ NEW</button>
       <button class="wd-gear" id="wd-profile-btn" style="display:none;">PROFILE</button>
@@ -1760,6 +1775,10 @@
   let topicHistory = []; // [{ topic, timestamp }]
   const TOPIC_HISTORY_MAX = 50;
 
+  // Populated from ?topic=... on load (e.g. a "Send to DIG" link from the
+  // inbox) and consumed once, inside showApp() -- see there for why.
+  let pendingTopicFromQuery = new URLSearchParams(window.location.search).get('topic') || '';
+
   async function loadSources() {
     let hasSavedProfile = false;
     try {
@@ -1793,6 +1812,16 @@
     renderSourceEditor();
     renderEmptyGrid();
     renderRecentTopics();
+
+    // A caller (e.g. the inbox's "Send to DIG") can hand off a topic via
+    // ?topic=..., landing here whether a profile already existed or this
+    // is the first run finishing onboarding. Pre-fills only — never
+    // auto-runs the check, since that spends real API budget.
+    if (pendingTopicFromQuery) {
+      topicInput.value = pendingTopicFromQuery;
+      pendingTopicFromQuery = '';
+      topicInput.focus();
+    }
   }
 
   function showOnboarding() {
