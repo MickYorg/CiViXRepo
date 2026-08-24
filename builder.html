@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0F1C" id="theme-color-meta">
+<title>CiViX — build your profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  (function () {
+    var stored = null;
+    try { stored = localStorage.getItem('civix-theme'); } catch (e) {}
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<style>
+  /* ============================================================
+     CiViX — profile builder ("the demo" / manifesto)
+
+     Carries the splash's concept into the product: the profile IS a
+     document. It renders as a bill with numbered sections, and every
+     change is logged as an amendment — struck language for what you
+     removed, underlined for what you added. Editing your values and
+     amending a bill are the same gesture.
+
+     Same token system as the splash: navy/paper grounds, editorial
+     serif display, mono for labels and data, amber for action,
+     amendment red reserved for strikes and insertions.
+     ============================================================ */
+
+  :root,
+  :root[data-theme="dark"] {
+    --ink:        #0A0F1C;
+    --ink-raised: #121A2C;
+    --ink-sunk:   #070B15;
+    --line:       #222C42;
+    --line-soft:  #1A2338;
+    --paper:      #ECEAE2;
+    --paper-dim:  #8792A8;
+    --amber:      #E0A93F;
+    --amber-ink:  #E0A93F;
+    --amber-wash: rgba(224, 169, 63, 0.12);
+    --strike:     #C8443A;
+    --btn-ink:    #0A0F1C;
+    --field:      #0D1424;
+  }
+
+  :root[data-theme="light"] {
+    --ink:        #FBFAF7;
+    --ink-raised: #FFFFFF;
+    --ink-sunk:   #F3F1EB;
+    --line:       #E2E0D8;
+    --line-soft:  #EDEBE4;
+    --paper:      #14192B;
+    --paper-dim:  #636B80;
+    --amber:      #E0A93F;
+    --amber-ink:  #8F6111;
+    --amber-wash: rgba(224, 169, 63, 0.16);
+    --strike:     #BE3B31;
+    --btn-ink:    #16110A;
+    --field:      #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Newsreader', Georgia, serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    background: var(--ink-raised);
+    border-bottom: 1px solid var(--line);
+    padding: 12px clamp(14px, 3vw, 30px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+  .mark { font-weight: 700; font-size: clamp(16px, 2vw, 20px); letter-spacing: -0.01em; }
+  .mark em { font-style: normal; color: var(--amber-ink); }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .icon-btn {
+    appearance: none;
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    color: var(--paper-dim);
+    width: 34px; height: 34px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .icon-btn svg { width: 15px; height: 15px; display: block; }
+  :root[data-theme="dark"] .icon-moon,
+  :root[data-theme="light"] .icon-sun { display: none; }
+
+  .saved-flag {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    white-space: nowrap;
+  }
+  .saved-flag.is-on { opacity: 1; }
+
+  /* ---- Layout ---- */
+  .shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: clamp(16px, 2.5vw, 30px);
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: clamp(16px, 2.4vw, 32px);
+    align-items: start;
+  }
+
+  .panes-tab { display: none; }
+
+  /* ---- Section cards ---- */
+  .sec {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 15px 18px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .sec-num {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--paper-dim);
+    flex-shrink: 0;
+  }
+  .sec-title { font-weight: 600; font-size: clamp(16px, 1.8vw, 19px); flex: 1; }
+  .sec-count {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--paper-dim);
+    white-space: nowrap;
+  }
+  .sec-caret { color: var(--paper-dim); font-size: 12px; transition: transform 0.2s ease; }
+  .sec.is-open .sec-caret { transform: rotate(90deg); }
+  .sec-body { display: none; padding: 0 18px 18px; }
+  .sec.is-open .sec-body { display: block; }
+  .sec-note {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--paper-dim);
+    margin: 0 0 14px;
+  }
+
+  /* ---- Form primitives ---- */
+  .field {
+    width: 100%;
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    color: var(--paper);
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 15px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  .field:focus { border-color: var(--amber); }
+  .field::placeholder { color: var(--paper-dim); opacity: 0.75; }
+  .field.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    padding: 9px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--paper-dim); }
+  .btn-primary {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--btn-ink);
+    font-weight: 500;
+  }
+  .btn-primary:hover { filter: brightness(1.06); border-color: var(--amber); }
+  .btn-quiet { color: var(--paper-dim); border-color: transparent; padding-left: 6px; padding-right: 6px; }
+
+  /* Completion block — the builder used to stop dead after § 06, with only
+     a delete button below it. This closes the loop: what you've declared,
+     what's still thin, and the way through to the finished document. */
+  .finish {
+    margin-top: 22px;
+    border: 1px solid var(--amber);
+    border-radius: 9px;
+    background: var(--amber-wash);
+    padding: 18px 18px 16px;
+  }
+  .finish-kicker {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 7px;
+  }
+  .finish-head {
+    font-size: 21px; line-height: 1.3; margin: 0 0 8px; font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .finish-note { margin: 0 0 14px; color: var(--paper-dim); font-size: 15px; max-width: 52ch; }
+  .finish-tally {
+    display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 15px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.04em; color: var(--paper-dim);
+  }
+  .finish-tally b { color: var(--paper); font-weight: 500; }
+  .finish-tally .gap { color: var(--amber-ink); }
+  .finish-row { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+  .btn-quiet:hover { color: var(--paper); border-color: transparent; }
+  .btn-danger { color: var(--strike); border-color: var(--strike); }
+
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* ---- Chips (issue picker) ---- */
+  .cat { margin-bottom: 14px; }
+  .cat-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 7px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    appearance: none;
+    background: var(--ink-sunk);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    padding: 7px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  }
+  .chip:hover { border-color: var(--paper-dim); }
+  .chip.is-on {
+    background: var(--amber-wash);
+    border-color: var(--amber);
+    color: var(--amber-ink);
+  }
+
+  /* ---- Priority rows ---- */
+  .prow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .prow:last-child { border-bottom: none; }
+  .prow-name { font-size: 16px; font-weight: 600; }
+  .prow-stance { grid-column: 1 / -1; }
+  .weight { display: flex; gap: 4px; align-items: center; }
+  .weight-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-right: 4px;
+  }
+  .wbtn {
+    appearance: none;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .wbtn.is-on { background: var(--amber); border-color: var(--amber); color: var(--btn-ink); }
+
+  /* ---- Source rows ---- */
+  .srow {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+
+  /* ---- Action grid ---- */
+  .acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .act {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 11px 12px;
+    background: var(--ink-sunk);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .act.is-on { border-color: var(--amber); background: var(--amber-wash); }
+  .act input { accent-color: var(--amber); margin: 2px 0 0; flex-shrink: 0; cursor: pointer; }
+  .act-name { font-size: 14.5px; font-weight: 600; display: block; }
+  .act-desc {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--paper-dim);
+    line-height: 1.45;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* ---- Inbox ---- */
+  .drop {
+    background: var(--ink-sunk);
+    border: 1px dashed var(--amber);
+    border-radius: 9px;
+    padding: 13px 14px;
+    margin-bottom: 14px;
+  }
+  .drop-addr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 9px 0 8px;
+  }
+  .drop-addr code {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--amber-ink);
+    background: var(--field);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 10px;
+    word-break: break-all;
+  }
+  .drop-warn {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: var(--paper-dim);
+    margin: 0;
+  }
+
+  .item {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 13px;
+    margin-bottom: 8px;
+    background: var(--ink-sunk);
+  }
+  .item-src {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 4px;
+  }
+  .item-title { font-size: 15.5px; font-weight: 600; line-height: 1.35; margin-bottom: 9px; }
+  .item-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .empty {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--paper-dim);
+    padding: 14px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  /* ---- The manifesto document ----
+     Set as a bill: ruled margin, section marks, serif body. This is the
+     thing the agents will read, so it's shown as a real document rather
+     than a settings summary. */
+  .doc-pane { position: sticky; top: 74px; }
+  .doc {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: clamp(18px, 2.2vw, 26px);
+    max-height: calc(100dvh - 108px);
+    overflow-y: auto;
+  }
+  .doc-head { border-bottom: 1px solid var(--line); padding-bottom: 13px; margin-bottom: 16px; }
+  .doc-kicker {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+  }
+  .doc-title { font-weight: 700; font-size: clamp(20px, 2.4vw, 27px); margin: 5px 0 7px; letter-spacing: -0.01em; }
+  .doc-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--paper-dim);
+  }
+
+  .dsec { margin-bottom: 17px; padding-left: 34px; position: relative; }
+  .dsec-num {
+    position: absolute;
+    left: 0; top: 0.2em;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    color: var(--paper-dim);
+  }
+  .dsec-title {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 6px;
+  }
+  .dsec-body { font-size: 15.5px; line-height: 1.55; }
+  .dsec-body ol { margin: 0; padding-left: 19px; }
+  .dsec-body li { margin-bottom: 5px; }
+  .dsec-body .unset { color: var(--paper-dim); font-style: italic; }
+  .stance-note { color: var(--paper-dim); }
+  .wt {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--amber-ink);
+    margin-left: 6px;
+  }
+
+  /* ---- Amendment log: the concept from the splash, carried through ---- */
+  .log { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 14px; }
+  .log-title {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-bottom: 9px;
+  }
+  .log-item {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    margin-bottom: 5px;
+    display: flex;
+    gap: 8px;
+  }
+  .log-when { color: var(--paper-dim); flex-shrink: 0; }
+  .log-add { color: var(--paper); text-decoration: underline; text-decoration-color: var(--strike); text-underline-offset: 3px; }
+  .log-del { color: var(--paper-dim); text-decoration: line-through; text-decoration-color: var(--strike); text-decoration-thickness: 2px; }
+
+  .doc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  /* ---- Responsive: builder and document become tabs on narrow screens ---- */
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .panes-tab {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      grid-column: 1 / -1;
+      position: sticky;
+      top: 58px;
+      z-index: 30;
+      background: var(--ink);
+    }
+    .panes-tab button {
+      appearance: none;
+      flex: 1;
+      background: var(--ink-raised);
+      border: none;
+      color: var(--paper-dim);
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 11px 8px;
+      cursor: pointer;
+    }
+    .panes-tab button.is-on { background: var(--amber); color: var(--btn-ink); }
+    .doc-pane { position: static; }
+    .doc { max-height: none; }
+    body[data-pane="build"] .doc-pane { display: none; }
+    body[data-pane="doc"] .build-pane { display: none; }
+    .field { font-size: 16px; } /* stops iOS zooming the field on focus */
+    .srow { grid-template-columns: 1fr; }
+    .srow .btn { justify-self: start; }
+  }
+
+  /* Handoff to DIG — the "get informed" agent. Lives at /dig on this same
+     origin, which is what will let the two share browser storage later. */
+  .dig-link {
+    color: var(--amber-ink);
+    border-color: var(--amber);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .dig-link:hover { background: var(--amber-wash); border-color: var(--amber); }
+  .handoff {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .handoff .btn { text-decoration: none; display: inline-flex; }
+  @media (max-width: 560px) {
+    .dig-link { display: none; } /* the in-context one in § 04 still covers it */
+  }
+
+  :focus-visible { outline: 2px solid var(--amber-ink); outline-offset: 2px; }
+</style>
+</head>
+<body data-pane="build">
+
+<header class="topbar">
+  <a class="mark" href="index.html" style="text-decoration:none;color:inherit;">C<em>i</em>V<em>i</em>X</a>
+  <div class="topbar-right">
+    <span class="saved-flag mono" id="saved-flag">Saved</span>
+    <a class="btn dig-link" href="dig/">Get informed &#8599;</a>
+    <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch color theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <div class="panes-tab">
+    <button type="button" data-pane-btn="build" class="is-on">Build</button>
+    <button type="button" data-pane-btn="doc">Manifesto</button>
+  </div>
+
+  <div class="build-pane">
+    <!-- INBOX -->
+    <section class="sec is-open" data-sec="inbox">
+      <div class="sec-head">
+        <span class="sec-num">§ 01</span>
+        <span class="sec-title">Inbox</span>
+        <span class="sec-count" id="inbox-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">Things you share to your CiViX address land here. Adopt what still matters and it becomes a priority below; strike the rest.</p>
+
+        <div class="drop">
+          <div class="doc-kicker">Send things here</div>
+          <div class="drop-addr">
+            <code id="drop-addr">—</code>
+            <button class="btn" id="copy-drop" type="button">Copy</button>
+            <button class="btn btn-quiet" id="rotate-drop" type="button">New address</button>
+          </div>
+          <div class="finish-row" style="margin-top:10px;">
+            <a class="btn btn-primary" id="vcard-drop" href="#">Add CiViX to contacts</a>
+          </div>
+          <p class="drop-warn">Save the contact, then share to it from any app — Mail, and pick CiViX. The address is your account: no login, no name, nothing of yours on file. Anyone holding it can read what you send, so keep it to yourself.</p>
+        </div>
+
+        <div id="inbox-list"></div>
+      </div>
+    </section>
+
+    <!-- PRIORITIES -->
+    <section class="sec is-open" data-sec="issues">
+      <div class="sec-head">
+        <span class="sec-num">§ 02</span>
+        <span class="sec-title">What moves you</span>
+        <span class="sec-count" id="issues-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">Pick the areas you want watched. Add your own if it's missing.</p>
+        <div id="catalog"></div>
+        <div class="row" style="margin-top:12px;">
+          <input class="field mono" id="custom-issue" type="text" placeholder="Add your own issue" style="flex:1;min-width:180px;">
+          <button class="btn" id="add-issue" type="button">Add</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- POSITIONS -->
+    <section class="sec is-open" data-sec="positions">
+      <div class="sec-head">
+        <span class="sec-num">§ 03</span>
+        <span class="sec-title">Where you stand</span>
+        <span class="sec-count" id="positions-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">Weight each one, and say in your own words what a win looks like. Your wording is what the agents match against — plain language beats a label.</p>
+        <div id="positions-list"></div>
+      </div>
+    </section>
+
+    <!-- SOURCES -->
+    <section class="sec" data-sec="sources">
+      <div class="sec-head">
+        <span class="sec-num">§ 04</span>
+        <span class="sec-title">Who you trust</span>
+        <span class="sec-count" id="sources-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">Outlets and voices you want weighted when CiViX reads coverage.</p>
+        <div id="sources-list"></div>
+        <button class="btn" id="add-source" type="button" style="margin-top:6px;">Add a source</button>
+        <div class="handoff">
+          <p class="sec-note" style="margin:0 0 9px;">DIG checks how each of these is covering a topic, side by side.</p>
+          <a class="btn btn-primary" href="dig/">Open DIG &#8599;</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- JURISDICTION -->
+    <section class="sec" data-sec="place">
+      <div class="sec-head">
+        <span class="sec-num">§ 05</span>
+        <span class="sec-title">Where you vote</span>
+        <span class="sec-count" id="place-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">Bills are local before they're national. A ZIP is enough to match your council, legislature, and delegation — CiViX never asks for your address or name.</p>
+        <input class="field mono" id="place-zip" type="text" inputmode="numeric" maxlength="5" placeholder="ZIP code" style="max-width:180px;">
+      </div>
+    </section>
+
+    <!-- ACTION AUTHORITY -->
+    <section class="sec" data-sec="actions">
+      <div class="sec-head">
+        <span class="sec-num">§ 06</span>
+        <span class="sec-title">What you'll authorize</span>
+        <span class="sec-count" id="actions-count"></span>
+        <span class="sec-caret">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="sec-note">What agents may prepare on your behalf. Nothing is sent without your say-so.</p>
+        <div class="acts" id="acts-grid"></div>
+        <div class="row" style="margin-top:13px;">
+          <span class="weight-label">Time you have</span>
+          <select class="field mono" id="time-budget" style="max-width:210px;">
+            <option value="">Not set</option>
+            <option value="A few minutes a week">A few minutes a week</option>
+            <option value="About an hour a week">About an hour a week</option>
+            <option value="Several hours a week">Several hours a week</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <div class="finish" id="finish"></div>
+
+    <div class="row" style="margin-top:18px;">
+      <button class="btn btn-danger" id="wipe" type="button">Delete everything on this device</button>
+    </div>
+  </div>
+
+  <div class="doc-pane">
+    <div class="doc" id="doc"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const root = document.documentElement;
+  const KEY = 'civix-profile';
+
+  // ---- Issue catalog -------------------------------------------------
+  // Policy areas rather than headlines: these have to stay meaningful for
+  // months, since they're what gets matched against legislative calendars.
+  const CATALOG = [
+    ['Economy & work', ['Wages and labor', 'Taxes', 'Cost of living', 'Small business', 'Trade and tariffs']],
+    ['Health', ['Healthcare access', 'Drug pricing', 'Public health', 'Reproductive health', 'Mental health']],
+    ['Housing & land', ['Housing affordability', 'Zoning and development', 'Homelessness', 'Tenant rights']],
+    ['Education', ['Public schools', 'Higher education cost', 'Curriculum and books', 'Childcare']],
+    ['Environment & energy', ['Climate policy', 'Energy costs', 'Water and air quality', 'Public lands']],
+    ['Justice & safety', ['Policing', 'Criminal justice reform', 'Gun policy', 'Courts']],
+    ['Democracy', ['Voting access', 'Redistricting', 'Campaign finance', 'Government transparency']],
+    ['Tech & privacy', ['Data privacy', 'AI regulation', 'Platform accountability', 'Broadband access']],
+    ['Movement', ['Transit', 'Roads and bridges', 'Immigration', 'Rural access']]
+  ];
+
+  const ACTIONS = [
+    ['email', 'Write to reps', 'Draft messages to your delegation'],
+    ['call', 'Call scripts', 'Prepare talking points before you dial'],
+    ['comment', 'Public comment', 'File on open rulemakings and dockets'],
+    ['testify', 'Testimony', 'Draft remarks for hearings you can attend'],
+    ['attend', 'Show up', 'Flag hearings, town halls, council meetings'],
+    ['share', 'Spread it', 'Prepare posts and explainers to circulate']
+  ];
+
+  const BLANK = {
+    version: 1,
+    rev: 0,
+    drop: '',
+    token: '',
+    place: { zip: '' },
+    issues: [],        // { id, name, weight 1-3, stance }
+    sources: [],       // { name, hint }
+    actions: [],       // action keys
+    time: '',
+    log: [],           // { at, kind: 'add'|'del', text }
+    updated: null
+  };
+
+  let P = load();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return Object.assign({}, BLANK, JSON.parse(raw));
+    } catch (e) {}
+    const fresh = Object.assign({}, BLANK);
+    return fresh;   // the address is issued by the worker — see ensureDrop()
+  }
+
+  let saveTimer = null;
+  function save() {
+    P.updated = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {}
+    const flag = document.getElementById('saved-flag');
+    flag.classList.add('is-on');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => flag.classList.remove('is-on'), 1400);
+  }
+
+  // The capture address is issued by the CiViX worker, not invented here —
+  // a locally-generated string would look right and silently swallow
+  // everything sent to it. P.token is the docket's only credential; losing
+  // it loses the docket, which is why rotating warns before it replaces one.
+  const API = 'https://civix-capture.mycivix.workers.dev';
+
+  async function newDocket() {
+    const r = await fetch(API + '/api/docket', { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();  // { token, address }
+  }
+
+  // The docket lives on the server, so it is never written into the saved
+  // profile — INBOX is a cache of what the worker last told us, and the
+  // worker stays the source of truth.
+  let INBOX = [];
+  let inboxState = 'idle';   // 'idle' | 'loading' | 'error'
+
+  async function loadInbox() {
+    if (!P.token) return;
+    inboxState = 'loading';
+    renderInbox(); counts();
+    try {
+      const r = await fetch(API + '/api/filings?token=' + encodeURIComponent(P.token));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      INBOX = (d.items || []).filter(i => i.state === 'docket');
+      inboxState = 'idle';
+    } catch (e) {
+      inboxState = 'error';
+    }
+    renderInbox(); counts();
+  }
+
+  // Called on load and after a rotate. Failure is survivable: the section
+  // says so rather than showing a dash that looks like a bug.
+  async function ensureDrop(force) {
+    if (P.token && P.drop && !force) return;
+    const el = document.getElementById('drop-addr');
+    if (el) el.textContent = 'issuing…';
+    try {
+      const d = await newDocket();
+      P.token = d.token;
+      P.drop = d.address;
+      save();
+      renderAll();
+      loadInbox();
+    } catch (e) {
+      if (el) el.textContent = 'could not reach CiViX — reload to retry';
+    }
+  }
+
+  // Every substantive change is recorded as an amendment. This is the
+  // splash's concept carried into the product: the profile is a document,
+  // and revising it is amending it.
+  function amend(kind, text) {
+    P.log.unshift({ at: Date.now(), kind: kind, text: text });
+    if (P.log.length > 40) P.log.length = 40;
+    P.rev++;
+  }
+
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function findIssue(id) { return P.issues.find(i => i.id === id); }
+
+  // ---- Issue add/remove ----------------------------------------------
+  function addIssue(name) {
+    const clean = String(name || '').trim();
+    if (!clean) return false;
+    const id = slug(clean);
+    if (!id || findIssue(id)) return false;
+    P.issues.push({ id: id, name: clean, weight: 2, stance: '' });
+    amend('add', clean);
+    return true;
+  }
+  function removeIssue(id) {
+    const i = P.issues.findIndex(x => x.id === id);
+    if (i < 0) return;
+    amend('del', P.issues[i].name);
+    P.issues.splice(i, 1);
+  }
+
+  // ---- Renderers ------------------------------------------------------
+  function renderCatalog() {
+    const el = document.getElementById('catalog');
+    el.innerHTML = CATALOG.map(([cat, items]) => `
+      <div class="cat">
+        <div class="cat-label">${esc(cat)}</div>
+        <div class="chips">
+          ${items.map(n => `<button type="button" class="chip ${findIssue(slug(n)) ? 'is-on' : ''}" data-issue="${esc(n)}">${esc(n)}</button>`).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderPositions() {
+    const el = document.getElementById('positions-list');
+    if (!P.issues.length) {
+      el.innerHTML = `<div class="empty">Nothing picked yet. Choose what moves you above, or keep something from your inbox.</div>`;
+      return;
+    }
+    el.innerHTML = P.issues.map(i => `
+      <div class="prow">
+        <div class="prow-name">${esc(i.name)}</div>
+        <div class="weight">
+          <span class="weight-label">Weight</span>
+          ${[1, 2, 3].map(w => `<button type="button" class="wbtn ${i.weight === w ? 'is-on' : ''}" data-weight="${i.id}" data-w="${w}" aria-label="Weight ${w}">${w}</button>`).join('')}
+          <button type="button" class="btn btn-quiet" data-drop-issue="${i.id}" aria-label="Remove ${esc(i.name)}">✕</button>
+        </div>
+        <div class="prow-stance">
+          <input class="field" type="text" data-stance="${i.id}" value="${esc(i.stance)}" placeholder="What would count as a win here?">
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderSources() {
+    const el = document.getElementById('sources-list');
+    if (!P.sources.length) {
+      el.innerHTML = `<div class="empty">No sources yet. Add the outlets and voices you actually read.</div>`;
+      return;
+    }
+    el.innerHTML = P.sources.map((s, idx) => `
+      <div class="srow">
+        <input class="field" type="text" data-src-name="${idx}" value="${esc(s.name)}" placeholder="Name">
+        <input class="field mono" type="text" data-src-hint="${idx}" value="${esc(s.hint)}" placeholder="Where to find them">
+        <button type="button" class="btn btn-quiet" data-drop-src="${idx}" aria-label="Remove source">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function renderActions() {
+    const el = document.getElementById('acts-grid');
+    el.innerHTML = ACTIONS.map(([key, name, desc]) => `
+      <label class="act ${P.actions.includes(key) ? 'is-on' : ''}">
+        <input type="checkbox" data-act="${key}" ${P.actions.includes(key) ? 'checked' : ''}>
+        <span>
+          <span class="act-name">${esc(name)}</span>
+          <span class="act-desc">${esc(desc)}</span>
+        </span>
+      </label>
+    `).join('');
+  }
+
+  function renderInbox() {
+    const el = document.getElementById('inbox-list');
+
+    if (!P.token) {
+      el.innerHTML = `<div class="empty">Setting up your address…</div>`;
+      return;
+    }
+    if (inboxState === 'loading' && !INBOX.length) {
+      el.innerHTML = `<div class="empty">Checking your docket…</div>`;
+      return;
+    }
+    if (inboxState === 'error') {
+      el.innerHTML = `<div class="empty">Couldn't reach your docket. <button type="button" class="btn btn-quiet" id="inbox-retry">Retry</button></div>`;
+      return;
+    }
+    if (!INBOX.length) {
+      el.innerHTML = `<div class="empty">Docket clear. Share something to your CiViX address and it'll show up here.</div>`;
+      return;
+    }
+
+    el.innerHTML = INBOX.map(it => {
+      const bits = [];
+      if (it.host) bits.push(esc(it.host));
+      if (it.source === 'mail') bits.push('by mail');
+      if (it.repeats > 1) bits.push('sent ' + it.repeats + '\u00d7');
+      return `
+      <div class="item">
+        <div class="item-src">${bits.join(' · ') || 'filed'}</div>
+        <div class="item-title">${esc(it.title)}</div>
+        <div class="item-acts">
+          <button type="button" class="btn btn-primary" data-adopt="${esc(it.id)}">Adopt</button>
+          <button type="button" class="btn btn-quiet" data-strike="${esc(it.id)}">Strike</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function fmtTime(ts) {
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function renderDoc() {
+    const el = document.getElementById('doc');
+    const ranked = P.issues.slice().sort((a, b) => b.weight - a.weight);
+    const wt = w => w === 3 ? 'HIGHEST' : w === 1 ? 'BACKGROUND' : 'STANDARD';
+
+    const sections = [
+      ['01', 'Jurisdiction', P.place.zip
+        ? `ZIP ${esc(P.place.zip)} — municipal, state, and federal bodies serving it.`
+        : `<span class="unset">Not set. Without it, only federal matters can be matched.</span>`],
+
+      ['02', 'Priorities', ranked.length
+        ? `<ol>${ranked.map(i => `<li>${esc(i.name)}<span class="wt">${wt(i.weight)}</span></li>`).join('')}</ol>`
+        : `<span class="unset">Nothing declared yet.</span>`],
+
+      ['03', 'Positions', ranked.filter(i => i.stance).length
+        ? `<ol>${ranked.filter(i => i.stance).map(i => `<li>${esc(i.name)} — <span class="stance-note">${esc(i.stance)}</span></li>`).join('')}</ol>`
+        : `<span class="unset">No positions written. Priorities alone tell agents what to watch, not what you want.</span>`],
+
+      ['04', 'Trusted sources', P.sources.filter(s => s.name).length
+        ? `<ol>${P.sources.filter(s => s.name).map(s => `<li>${esc(s.name)}${s.hint ? ` <span class="stance-note">(${esc(s.hint)})</span>` : ''}</li>`).join('')}</ol>`
+        : `<span class="unset">None named. Coverage will be weighted evenly.</span>`],
+
+      ['05', 'Action authority', P.actions.length
+        ? `Agents may prepare: ${P.actions.map(k => esc((ACTIONS.find(a => a[0] === k) || [, k])[1])).join(', ')}.${P.time ? ` Time available: ${esc(P.time)}.` : ''} Nothing is sent without your approval.`
+        : `<span class="unset">Nothing authorized. Agents will watch and report only.</span>`]
+    ];
+
+    el.innerHTML = `
+      <div class="doc-head">
+        <div class="doc-kicker">Personal manifesto</div>
+        <div class="doc-title">A declaration of what you want changed</div>
+        <div class="doc-meta">Rev. ${P.rev} · ${P.updated ? 'updated ' + fmtDate(P.updated) : 'unsaved'} · held on this device only</div>
+      </div>
+      ${sections.map(([n, t, body]) => `
+        <div class="dsec">
+          <div class="dsec-num">§ ${n}</div>
+          <div class="dsec-title">${t}</div>
+          <div class="dsec-body">${body}</div>
+        </div>
+      `).join('')}
+      ${P.log.length ? `
+        <div class="log">
+          <div class="log-title">Amendments</div>
+          ${P.log.slice(0, 8).map(l => `
+            <div class="log-item">
+              <span class="log-when">${fmtTime(l.at)}</span>
+              <span class="${l.kind === 'del' ? 'log-del' : 'log-add'}">${esc(l.text)}</span>
+            </div>
+          `).join('')}
+        </div>` : ''}
+      <div class="doc-actions">
+        <button class="btn" id="copy-doc" type="button">Copy as text</button>
+      </div>
+    `;
+  }
+
+  function counts() {
+    const set = (id, v) => { document.getElementById(id).textContent = v; };
+    const n = INBOX.length;
+    set('inbox-count', inboxState === 'error' ? 'unreachable' : (n ? n + ' waiting' : 'clear'));
+    set('issues-count', P.issues.length ? P.issues.length + ' picked' : '');
+    set('positions-count', P.issues.filter(i => i.stance).length + ' / ' + P.issues.length);
+    set('sources-count', P.sources.length ? P.sources.length : '');
+    set('place-count', P.place.zip || 'not set');
+    set('actions-count', P.actions.length ? P.actions.length + ' allowed' : 'none');
+  }
+
+  function renderAll() {
+    renderCatalog();
+    renderPositions();
+    renderSources();
+    renderActions();
+    renderInbox();
+    renderDoc();
+    renderFinish();
+    counts();
+    document.getElementById('drop-addr').textContent = P.drop || '—';
+    const vc = document.getElementById('vcard-drop');
+    if (vc) {
+      vc.href = P.token ? API + '/api/vcard?token=' + encodeURIComponent(P.token) : '#';
+      vc.style.opacity = P.token ? '' : '.5';
+    }
+  }
+
+  // Closing panel. Deliberately not blanket praise: it reports what's
+  // actually declared and names what's still thin, because a manifesto
+  // with no positions tells agents what to watch but not what you want,
+  // and congratulating someone into that is worse than saying so.
+  function renderFinish() {
+    const el = document.getElementById('finish');
+    if (!el) return;
+
+    const issues = P.issues.length;
+    const positions = P.issues.filter(i => i.stance).length;
+    const sources = P.sources.filter(s => s.name).length;
+    const hasPlace = !!P.place.zip;
+    const acts = P.actions.length;
+
+    const gaps = [];
+    if (!issues) gaps.push('what moves you');
+    if (issues && !positions) gaps.push('a position on at least one');
+    if (!hasPlace) gaps.push('your ZIP');
+    if (!acts) gaps.push('what agents may prepare');
+
+    let kicker, head, note;
+    if (!issues) {
+      kicker = 'Nothing on the record yet';
+      head = 'Your manifesto is still blank';
+      note = 'Pick a few priorities in § 02 and it starts writing itself on the right.';
+    } else if (gaps.length) {
+      kicker = 'Draft on the record';
+      head = 'Good start — it\u2019s already usable';
+      const list = gaps.length > 1
+        ? gaps.slice(0, -1).join(', ') + ' and ' + gaps[gaps.length - 1]
+        : gaps[0];
+      note = 'Still missing: ' + list + '. Fill those in and agents can act on this rather than only watch.';
+    } else {
+      kicker = 'Complete';
+      head = 'That\u2019s a manifesto';
+      note = 'Priorities, positions, sources, jurisdiction, and authority are all on the record. Read it through — every line is amendable, and revising it is how it stays yours.';
+    }
+
+    const tally = [
+      ['priorities', issues],
+      ['positions', positions],
+      ['sources', sources],
+      ['actions', acts]
+    ].map(([label, n]) =>
+      '<span class="' + (n ? '' : 'gap') + '"><b>' + n + '</b> ' + label + '</span>'
+    ).join('');
+
+    el.innerHTML =
+      '<div class="finish-kicker">' + kicker + '</div>' +
+      '<h2 class="finish-head">' + head + '</h2>' +
+      '<div class="finish-tally">' + tally +
+        '<span class="' + (hasPlace ? '' : 'gap') + '">' +
+        (hasPlace ? 'ZIP ' + esc(P.place.zip) : 'no ZIP') + '</span>' +
+      '</div>' +
+      '<p class="finish-note">' + note + '</p>' +
+      '<div class="finish-row">' +
+        '<button class="btn btn-primary" id="review-doc" type="button">Review your manifesto</button>' +
+        (P.rev ? '<span class="finish-tally" style="margin:0;">Rev. ' + P.rev + '</span>' : '') +
+      '</div>';
+  }
+
+  // ---- Events ---------------------------------------------------------
+  // Delegated from document so every re-render keeps working without
+  // rewiring individual controls.
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+
+    const secHead = t.closest('.sec-head');
+    if (secHead) { secHead.parentElement.classList.toggle('is-open'); return; }
+
+    const chip = t.closest('[data-issue]');
+    if (chip) {
+      const name = chip.dataset.issue;
+      const existing = findIssue(slug(name));
+      if (existing) removeIssue(existing.id); else addIssue(name);
+      save(); renderAll(); return;
+    }
+
+    const wbtn = t.closest('[data-weight]');
+    if (wbtn) {
+      const i = findIssue(wbtn.dataset.weight);
+      if (i) { i.weight = Number(wbtn.dataset.w); save(); renderPositions(); renderDoc(); }
+      return;
+    }
+
+    const dropIssue = t.closest('[data-drop-issue]');
+    if (dropIssue) { removeIssue(dropIssue.dataset.dropIssue); save(); renderAll(); return; }
+
+    const dropSrc = t.closest('[data-drop-src]');
+    if (dropSrc) {
+      const idx = Number(dropSrc.dataset.dropSrc);
+      const s = P.sources[idx];
+      if (s && s.name) amend('del', s.name);
+      P.sources.splice(idx, 1);
+      save(); renderSources(); renderDoc(); counts(); return;
+    }
+
+    if (t.closest('#inbox-retry')) { loadInbox(); return; }
+
+    // Adopt: the filing becomes a declared priority here, and is marked
+    // adopted on the docket so it stops showing up as untriaged. Strike
+    // deletes it outright — same two verbs as the docket page, so the
+    // same act means the same thing wherever you do it.
+    const adopt = t.closest('[data-adopt]');
+    if (adopt) {
+      const id = adopt.dataset.adopt;
+      const it = INBOX.find(x => x.id === id);
+      if (!it) return;
+      addIssue(it.title);
+      INBOX = INBOX.filter(x => x.id !== id);
+      save(); renderAll();
+      fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, state: 'adopted' })
+      }).catch(() => { loadInbox(); });
+      return;
+    }
+
+    const strike = t.closest('[data-strike]');
+    if (strike) {
+      const id = strike.dataset.strike;
+      INBOX = INBOX.filter(x => x.id !== id);
+      renderInbox(); counts();
+      fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      }).catch(() => { loadInbox(); });
+      return;
+    }
+
+    if (t.closest('#add-source')) {
+      P.sources.push({ name: '', hint: '' });
+      save(); renderSources(); counts();
+      const inputs = document.querySelectorAll('[data-src-name]');
+      if (inputs.length) inputs[inputs.length - 1].focus();
+      return;
+    }
+
+    if (t.closest('#add-issue')) {
+      const input = document.getElementById('custom-issue');
+      if (addIssue(input.value)) { input.value = ''; save(); renderAll(); }
+      return;
+    }
+
+    if (t.closest('#copy-drop')) { copy(P.drop, t.closest('#copy-drop')); return; }
+
+    if (t.closest('#rotate-drop')) {
+      if (confirm('Issue a new address? The old one stops working — which is how you cut off anything spamming it — and anything already sent to it stays on the old docket.')) {
+        ensureDrop(true);
+      }
+      return;
+    }
+
+    if (t.closest('#review-doc')) {
+      // Mobile shows one pane at a time, so switch tabs; desktop shows both,
+      // so just bring the document into view.
+      const docTab = document.querySelector('[data-pane-btn="doc"]');
+      if (docTab && getComputedStyle(docTab).display !== 'none') docTab.click();
+      const pane = document.querySelector('.doc-pane');
+      if (pane) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    if (t.closest('#copy-doc')) { copy(asText(), t.closest('#copy-doc')); return; }
+
+    if (t.closest('#wipe')) {
+      if (confirm('Delete your profile from this device? Priorities, positions, sources, and your capture address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
+        try { localStorage.removeItem(KEY); } catch (e) {}
+        P = Object.assign({}, BLANK);
+        save(); renderAll(); ensureDrop(true);
+      }
+      return;
+    }
+
+    const paneBtn = t.closest('[data-pane-btn]');
+    if (paneBtn) {
+      document.body.dataset.pane = paneBtn.dataset.paneBtn;
+      document.querySelectorAll('[data-pane-btn]').forEach(b => b.classList.toggle('is-on', b === paneBtn));
+      return;
+    }
+  });
+
+  // Text inputs write on the way out rather than per keystroke — an
+  // amendment per character would bury the log.
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.matches('[data-stance]')) {
+      const i = findIssue(t.dataset.stance);
+      if (i) { i.stance = t.value; queueSave(); }
+    } else if (t.matches('[data-src-name]')) {
+      P.sources[Number(t.dataset.srcName)].name = t.value; queueSave();
+    } else if (t.matches('[data-src-hint]')) {
+      P.sources[Number(t.dataset.srcHint)].hint = t.value; queueSave();
+    } else if (t.id === 'place-zip') {
+      P.place.zip = t.value.replace(/\D/g, '').slice(0, 5);
+      if (t.value !== P.place.zip) t.value = P.place.zip;
+      queueSave();
+    }
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.matches('[data-act]')) {
+      const key = t.dataset.act;
+      if (t.checked) { if (!P.actions.includes(key)) P.actions.push(key); }
+      else P.actions = P.actions.filter(k => k !== key);
+      save(); renderActions(); renderDoc(); renderFinish(); counts();
+    } else if (t.id === 'time-budget') {
+      P.time = t.value; save(); renderDoc(); renderFinish();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'custom-issue') {
+      e.preventDefault();
+      const input = e.target;
+      if (addIssue(input.value)) { input.value = ''; save(); renderAll(); }
+    }
+  });
+
+  let queueTimer = null;
+  function queueSave() {
+    clearTimeout(queueTimer);
+    queueTimer = setTimeout(() => { save(); renderDoc(); renderFinish(); counts(); }, 500);
+  }
+
+  function copy(text, btn) {
+    const done = () => {
+      if (!btn) return;
+      const was = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = was; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => fallback(text, done));
+    } else fallback(text, done);
+  }
+  function fallback(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  // Plain-text export — this is the shape an agent would actually be
+  // handed, so it doubles as a preview of what gets passed downstream.
+  function asText() {
+    const ranked = P.issues.slice().sort((a, b) => b.weight - a.weight);
+    const wt = w => w === 3 ? 'highest' : w === 1 ? 'background' : 'standard';
+    const L = [];
+    L.push('CIVIX — PERSONAL MANIFESTO');
+    L.push('Rev. ' + P.rev + (P.updated ? ' · updated ' + fmtDate(P.updated) : ''));
+    L.push('');
+    L.push('§ 01  JURISDICTION');
+    L.push('  ' + (P.place.zip ? 'ZIP ' + P.place.zip : 'not set'));
+    L.push('');
+    L.push('§ 02  PRIORITIES');
+    L.push(ranked.length ? ranked.map((i, n) => '  ' + (n + 1) + '. ' + i.name + '  [' + wt(i.weight) + ']').join('\n') : '  none');
+    L.push('');
+    L.push('§ 03  POSITIONS');
+    const withStance = ranked.filter(i => i.stance);
+    L.push(withStance.length ? withStance.map(i => '  ' + i.name + ' — ' + i.stance).join('\n') : '  none');
+    L.push('');
+    L.push('§ 04  TRUSTED SOURCES');
+    const named = P.sources.filter(s => s.name);
+    L.push(named.length ? named.map(s => '  ' + s.name + (s.hint ? ' (' + s.hint + ')' : '')).join('\n') : '  none');
+    L.push('');
+    L.push('§ 05  ACTION AUTHORITY');
+    L.push(P.actions.length
+      ? '  may prepare: ' + P.actions.map(k => (ACTIONS.find(a => a[0] === k) || [, k])[1]).join(', ') + (P.time ? '\n  time available: ' + P.time : '')
+      : '  none authorized');
+    return L.join('\n');
+  }
+
+  // ---- Theme ----------------------------------------------------------
+  const THEME_COLORS = { dark: '#0A0F1C', light: '#FBFAF7' };
+  const themeMeta = document.getElementById('theme-color-meta');
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    themeMeta.setAttribute('content', THEME_COLORS[next]);
+    try { localStorage.setItem('civix-theme', next); } catch (e) {}
+  });
+  themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
+
+  // ---- Boot -----------------------------------------------------------
+  document.getElementById('place-zip').value = P.place.zip || '';
+  document.getElementById('time-budget').value = P.time || '';
+  renderAll();
+  // Issued asynchronously so a slow or unreachable worker never blocks the
+  // builder — everything else on this page works without an address.
+  // ensureDrop() only loads the inbox itself when it has to mint a brand
+  // new docket; a returning visit with an existing token used to skip
+  // loading the inbox entirely, so we always follow up here once we know
+  // whether a token exists.
+  ensureDrop(false).then(() => { if (P.token) loadInbox(); });
+})();
+</script>
+</body>
+</html>

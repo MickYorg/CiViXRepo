@@ -1,0 +1,3117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12201B">
+<title>DIG — stance by source</title>
+<style>
+  /* Page-level reset — #dig-root below carries its own theme vars, but the
+     surrounding page (outside the widget's own box) needs a matching dark
+     background too, or phones/tablets show a flash/margin of white around
+     it, and momentum-scroll bounce on iOS reveals white at the edges. */
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #12201B;
+    -webkit-text-size-adjust: 100%;
+  }
+</style>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap');
+
+  #dig-root {
+    --bg: #12201B;
+    --panel: #192A22;
+    --panel-alt: #21362C;
+    --line: #30463C;
+    --paper: #ECE4CE;
+    --paper-dim: #93A092;
+    --amber: #D4A24C;
+    --rust: #B75A3E;
+    --teal: #6FA893;
+
+    /* This is a self-styled dark UI, not a light page — without this,
+       browsers/OSes with a "force dark" or auto-dark-theme setting (common
+       on Android Chrome) will try to auto-invert elements that don't carry
+       an explicit background of their own (e.g. table cells), which can
+       leave text dark-on-dark. This opts the whole widget out of that. */
+    color-scheme: dark;
+
+    background: var(--bg);
+    color: var(--paper);
+    font-family: 'Source Serif 4', serif;
+    padding: 28px 20px 40px;
+    border-radius: 4px;
+    min-height: 400px;
+  }
+
+  #dig-root * { box-sizing: border-box; }
+
+  .wd-mono { font-family: 'JetBrains Mono', monospace; }
+
+  .wd-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+  }
+
+  .wd-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+
+  .wd-title span { color: var(--paper-dim); font-weight: 400; letter-spacing: 0.1em; }
+
+  .wd-gear {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .wd-gear:hover { border-color: var(--amber); color: var(--amber); }
+  /* Toggle state — set via JS whenever the corresponding panel (SOURCES /
+     STATS / PROFILE) is currently open, so the button itself shows the
+     on/off state instead of you having to notice the panel below it. */
+  .wd-gear.wd-toggle-on {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--bg);
+  }
+  .wd-gear.wd-toggle-on:hover { color: var(--bg); }
+  .wd-home-gear { color: var(--teal); border-color: var(--teal); }
+  .wd-home-gear:hover { border-color: var(--amber); color: var(--amber); }
+
+  .wd-query-row {
+    display: flex;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .wd-query-row:focus-within {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(212, 162, 76, 0.15);
+  }
+
+  .wd-prompt-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: var(--amber);
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    margin-right: 12px;
+    white-space: nowrap;
+  }
+
+  .wd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    caret-color: var(--amber);
+    position: relative;
+    z-index: 2;
+  }
+  .wd-input::placeholder { color: var(--paper-dim); opacity: 0.6; }
+
+  .wd-topic-field { position: relative; flex: 1; display: flex; align-items: center; }
+  .wd-topic-field .wd-input { width: 100%; }
+  .wd-trending-ghost {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    color: var(--paper-dim);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.5s ease;
+    z-index: 1;
+  }
+  .wd-trending-ghost.wd-ghost-visible { opacity: 0.7; }
+
+  @keyframes wd-attn-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 162, 76, 0); border-color: var(--line); }
+    50% { box-shadow: 0 0 0 6px rgba(212, 162, 76, 0.22); border-color: var(--amber); }
+  }
+  .wd-attention-pulse { animation: wd-attn-pulse 0.8s ease-in-out 2; }
+
+  .wd-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    background: var(--amber);
+    margin-left: 2px;
+    animation: wd-blink 1s step-end infinite;
+    vertical-align: text-bottom;
+  }
+  @keyframes wd-blink { 50% { opacity: 0; } }
+
+  .wd-run-btn {
+    background: var(--amber);
+    color: var(--bg);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    padding: 11px 16px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-bottom: 22px;
+    width: 100%;
+    transition: filter 0.15s;
+  }
+  .wd-run-btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .wd-run-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .wd-topic-flag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+    margin-bottom: 18px;
+    letter-spacing: 0.04em;
+  }
+  .wd-topic-flag b { color: var(--paper); }
+
+  .wd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+  }
+
+  .wd-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    position: relative;
+    padding: 16px 16px 18px;
+    -webkit-mask-image: linear-gradient(#000, #000);
+  }
+
+  .wd-card::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 6px;
+    background-image: radial-gradient(circle at 6px 0, transparent 3px, var(--bg) 3.5px);
+    background-size: 12px 6px;
+    background-repeat: repeat-x;
+  }
+
+  .wd-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .wd-source-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--paper);
+    letter-spacing: 0.03em;
+  }
+
+  .wd-timestamp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--paper-dim);
+  }
+
+  .wd-stance-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    color: var(--rust);
+    border: 1px solid var(--rust);
+    border-radius: 2px;
+    padding: 2px 7px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  /* Table view reuses the exact same pill, just without the card's
+     bottom margin — the table row's own padding already gives it room. */
+  .wd-table .wd-stance-tag { margin-bottom: 0; }
+
+  .wd-summary {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--paper);
+  }
+
+  .wd-summary.wd-dim { color: var(--paper-dim); font-style: italic; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .wd-retry-btn {
+    background: none;
+    border: 1px solid var(--rust);
+    color: var(--rust);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    padding: 4px 10px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .wd-retry-btn:hover { background: var(--rust); color: var(--paper); }
+
+  .wd-empty {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--paper-dim);
+    font-size: 12px;
+    padding: 30px 4px;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+  }
+
+  /* Settings panel */
+  .wd-settings {
+    background: var(--panel-alt);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 14px;
+    margin-bottom: 18px;
+  }
+  .wd-settings-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .wd-source-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    /* Subtle card grouping so name/hint/find/remove read as one unit even
+       when the row wraps onto multiple lines on narrow screens. */
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 6px;
+  }
+  .wd-source-row input {
+    background: var(--panel-alt);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 2px;
+    outline: none;
+    min-width: 0; /* lets flex-basis actually shrink instead of overflowing */
+  }
+  .wd-source-row input:focus { border-color: var(--amber); }
+  .wd-source-row input.wd-name { flex: 1; }
+  .wd-source-row input.wd-hint { flex: 1.4; }
+  .wd-remove-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--rust);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    border-radius: 2px;
+    padding: 0 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .wd-remove-btn:hover { border-color: var(--rust); }
+  .wd-add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .wd-add-btn, .wd-save-btn {
+    background: none;
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  .wd-add-btn:hover, .wd-save-btn:hover { background: var(--teal); color: var(--bg); }
+  .wd-find-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--amber);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    border-radius: 2px;
+    padding: 6px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .wd-find-btn:hover { border-color: var(--amber); }
+  .wd-find-btn:disabled { opacity: 0.6; cursor: default; }
+  .wd-save-row { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  .wd-save-note { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--paper-dim); }
+
+  /* Onboarding / profile builder */
+  .wd-onboard { max-width: 640px; }
+  .wd-onboard-intro {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--paper-dim);
+    margin-bottom: 6px;
+  }
+  .wd-privacy-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--teal);
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+    padding: 9px 11px;
+    margin: 12px 0 20px;
+    line-height: 1.6;
+  }
+
+  /* Short icon + one-liner, with a "more" toggle for the full explanation —
+     used for the onboarding/profile transparency notes instead of long
+     paragraphs up front. */
+  .wd-info-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 8px;
+  }
+  .wd-info-icon { font-size: 19px; line-height: 1; flex-shrink: 0; }
+  .wd-info-text { flex: 1; font-size: 13px; color: var(--paper); }
+  .wd-info-toggle {
+    background: none;
+    border: none;
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .wd-info-toggle:hover { color: var(--amber); }
+  .wd-info-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--teal);
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+    padding: 9px 11px;
+    margin: -2px 0 12px;
+    line-height: 1.6;
+  }
+
+  /* Rotating short encouragement shown only while a check is actually
+     fetching (not on cache-only reruns, which finish instantly). */
+  .wd-wait-splash {
+    font-size: 13px;
+    color: var(--paper-dim);
+    text-align: center;
+    padding: 10px 0 2px;
+  }
+  .wd-wait-splash .wd-info-icon { font-size: 16px; margin-right: 6px; }
+  .wd-onboard-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .wd-onboard-tab {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 8px 12px;
+    border-radius: 3px 3px 0 0;
+    cursor: pointer;
+  }
+  .wd-onboard-tab.wd-tab-active {
+    background: var(--panel-alt);
+    color: var(--amber);
+    border-bottom-color: var(--panel-alt);
+  }
+  .wd-onboard-tab .wd-tab-count {
+    color: var(--teal);
+    margin-left: 4px;
+  }
+  .wd-onboard-panel {
+    background: var(--panel-alt);
+    border: 1px solid var(--line);
+    border-radius: 0 3px 3px 3px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .wd-onboard-blurb {
+    font-size: 13px;
+    color: var(--paper-dim);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .wd-chip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+  }
+  .wd-chip {
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .wd-chip:hover { border-color: var(--paper-dim); }
+  .wd-chip.wd-chip-selected {
+    border-color: var(--amber);
+    background: rgba(212, 162, 76, 0.12);
+  }
+  .wd-chip-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .wd-chip-check {
+    color: var(--amber);
+    font-weight: 700;
+    visibility: hidden;
+  }
+  .wd-chip.wd-chip-selected .wd-chip-check { visibility: visible; }
+  .wd-chip-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--paper-dim);
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+  .wd-onboard-custom {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .wd-onboard-custom input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 3px;
+    outline: none;
+  }
+  .wd-onboard-custom input:focus { border-color: var(--amber); }
+  .wd-onboard-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .wd-onboard-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+  }
+  .wd-onboard-count b { color: var(--amber); }
+  .wd-build-btn {
+    background: var(--amber);
+    color: var(--bg);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    padding: 10px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .wd-build-btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .wd-build-btn:disabled { opacity: 0.4; cursor: default; }
+  .wd-skip-link {
+    background: none;
+    border: none;
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+  .wd-skip-link:hover { color: var(--paper); }
+  .wd-rebuild-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    border-radius: 2px;
+    padding: 5px 10px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .wd-rebuild-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* Header button group */
+  .wd-header-btns { display: flex; gap: 8px; }
+
+  /* Stats panel */
+  .wd-stats-title-note { color: var(--paper-dim); font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .wd-stats-section { margin-bottom: 16px; }
+  .wd-stats-section:last-child { margin-bottom: 0; }
+  .wd-stats-heading {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--paper);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .wd-stats-row {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    padding: 3px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .wd-stats-row span:first-child { color: var(--paper); }
+  .wd-stats-row .wd-stats-count { color: var(--teal); white-space: nowrap; }
+
+  /* Profile panel */
+  .wd-profile-intro {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--paper-dim);
+    margin-bottom: 14px;
+  }
+  .wd-profile-summary {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--teal);
+    letter-spacing: 0.02em;
+    margin-bottom: 16px;
+  }
+  .wd-profile-section { margin-bottom: 18px; }
+  .wd-profile-section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--paper);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .wd-topic-history-row {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    padding: 4px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .wd-topic-history-row:last-child { border-bottom: none; }
+  .wd-topic-history-row span:first-child { color: var(--paper); }
+  .wd-topic-history-time { color: var(--paper-dim); white-space: nowrap; margin-right: 8px; }
+  .wd-topic-history-remove {
+    background: none;
+    border: none;
+    color: var(--rust);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+  }
+  .wd-profile-empty { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--paper-dim); padding: 4px 0; }
+  .wd-profile-danger {
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .wd-profile-danger-note {
+    font-size: 12px;
+    color: var(--paper-dim);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .wd-delete-btn {
+    background: none;
+    border: 1px solid var(--rust);
+    color: var(--rust);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    border-radius: 2px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .wd-delete-btn:hover { background: var(--rust); color: var(--paper); }
+
+  /* Recent-topics quick-repeat chips */
+  .wd-recent-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -6px 0 12px;
+  }
+  .wd-recent-topics-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--paper-dim);
+    letter-spacing: 0.04em;
+    align-self: center;
+    margin-right: 2px;
+  }
+  .wd-recent-topic-chip {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    border-radius: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .wd-recent-topic-chip:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* Results toolbar */
+  .wd-results-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  /* Groups CARDS/TABLE and (when relevant) SORT BY together on the left
+     side of the toolbar, so SORT BY sits immediately to the right of the
+     view toggle rather than off on its own row — FOCUS MODE stays pinned
+     to the far right via the toolbar's own space-between. */
+  .wd-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .wd-view-toggle { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .wd-view-btn {
+    background: var(--panel);
+    border: none;
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .wd-view-btn + .wd-view-btn { border-left: 1px solid var(--line); }
+  .wd-view-btn.wd-view-active { background: var(--amber); color: var(--bg); }
+  .wd-focus-btn {
+    background: none;
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 7px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .wd-focus-btn:hover { background: var(--teal); color: var(--bg); }
+
+  /* Card expand/collapse */
+  .wd-read-more {
+    background: none;
+    border: none;
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 8px 0 0;
+    display: inline-block;
+  }
+  .wd-summary-full { display: none; }
+  .wd-summary-full.wd-open { display: block; margin-top: 2px; }
+  .wd-summary-brief.wd-hidden { display: none; }
+
+  /* Table view */
+  .wd-table-wrap { overflow-x: auto; }
+  .wd-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg); }
+  .wd-table th, .wd-table td {
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+    background: var(--panel);
+    color: var(--paper);
+  }
+  .wd-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--teal);
+    text-transform: uppercase;
+    background: var(--panel-alt);
+  }
+  .wd-table td.wd-table-source { font-family: 'JetBrains Mono', monospace; font-weight: 700; white-space: nowrap; }
+  .wd-table td.wd-table-topic { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--paper); }
+  .wd-table ul.wd-points { margin: 0; padding-left: 16px; color: var(--paper); }
+  .wd-table ul.wd-points li { margin-bottom: 4px; }
+  /* Explicitly matched to .wd-summary's color (cards) rather than just
+     relying on inherited <td> color, so table and card summary text stay
+     in lockstep even if either rule changes later. */
+  .wd-table-summary-brief, .wd-table ul.wd-points { color: var(--paper); }
+  .wd-table-summary-full { display: none; margin-top: 6px; }
+  .wd-table-summary-full.wd-open { display: block; }
+  .wd-table-expand {
+    background: none;
+    border: none;
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 6px 0 0;
+    display: inline-block;
+  }
+  .wd-table-expand:hover { color: var(--amber); }
+
+  /* Table-view scope toggle — switches between "just this topic's results"
+     (the default) and "every cached result across every topic, grouped by
+     source" so the whole local cache is browsable in one table. */
+  .wd-table-scope {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .wd-table-scope-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--paper-dim);
+    cursor: pointer;
+    user-select: none;
+  }
+  .wd-table-scope-label input { accent-color: var(--amber); cursor: pointer; }
+  .wd-table-scope-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--paper-dim); }
+
+  /* Sort toggle bar — a segmented control (reusing the CARDS/TABLE toggle's
+     look) rather than clickable column headers, so sorting is one obvious
+     control instead of a hover affordance buried in the table itself. */
+  .wd-table-sortbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .wd-table-sortbar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--paper-dim);
+  }
+  .wd-sort-btn.wd-view-active::after { content: attr(data-dir-arrow); margin-left: 4px; }
+
+  /* Focus mode — deliberately takes over the full viewport rather than
+     sitting as a modest centered modal, so there's nothing to scroll past
+     to reach it and the card itself, not the surrounding chrome, is what
+     dominates the screen. Background page scroll is also locked (via JS,
+     see openFocus/closeFocus) for as long as this is open. */
+  .wd-focus-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 16, 13, 0.92);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 20px;
+  }
+  .wd-focus-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .wd-focus-close:hover { border-color: var(--amber); color: var(--amber); }
+  .wd-focus-stage {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    max-width: min(94vw, 920px);
+    flex: 1;
+    min-height: 0; /* lets the card's own max-height govern, instead of the flex item refusing to shrink */
+  }
+  .wd-focus-nav {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-size: 22px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .wd-focus-nav:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+  .wd-focus-nav:disabled { opacity: 0.3; cursor: default; }
+  .wd-focus-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 22px;
+    flex: 1;
+    min-height: 320px;
+    max-height: 84dvh;
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+  .wd-focus-counter {
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--paper-dim);
+    text-align: center;
+  }
+  /* Progress dots — one per source, current one filled amber. Tapping a
+     dot jumps straight to that source, so focus mode reads as "flip
+     through the whole set" rather than a one-way swipe. */
+  .wd-focus-dots {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .wd-focus-dot {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    line-height: 0;
+  }
+  .wd-focus-dot::before {
+    content: "";
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--line);
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .wd-focus-dot:hover::before { background: var(--paper-dim); }
+  .wd-focus-dot.wd-dot-active::before { background: var(--amber); transform: scale(1.4); }
+
+  .wd-focus-header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .wd-focus-source { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; color: var(--paper); }
+  .wd-focus-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--teal);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--teal);
+    white-space: nowrap;
+  }
+  a.wd-focus-hint:hover { color: var(--amber); border-color: var(--amber); }
+  .wd-focus-summary { font-size: 16px; line-height: 1.65; margin: 12px 0 16px; }
+
+  /* Slide the incoming card in from the direction it logically came from
+     (next = from the right, prev = from the left) instead of a flat swap —
+     this is the main thing that makes focus mode feel like its own
+     browsing mode rather than a smaller copy of a results card. */
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes wd-focus-in-next { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes wd-focus-in-prev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+    .wd-focus-card.wd-slide-next { animation: wd-focus-in-next 0.22s ease both; }
+    .wd-focus-card.wd-slide-prev { animation: wd-focus-in-prev 0.22s ease both; }
+  }
+  .wd-focus-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  .wd-like-btn {
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--paper-dim);
+    font-size: 16px;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .wd-like-btn.wd-like-active { border-color: var(--teal); color: var(--teal); background: rgba(111,168,147,0.15); }
+  .wd-dislike-btn.wd-like-active { border-color: var(--rust); color: var(--rust); background: rgba(183,90,62,0.15); }
+  .wd-stars { display: flex; gap: 3px; }
+  .wd-star {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--line);
+    cursor: pointer;
+    padding: 0;
+  }
+  .wd-star.wd-star-on { color: var(--amber); }
+  .wd-debate-btn {
+    background: none;
+    border: 1px solid var(--rust);
+    color: var(--rust);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 6px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .wd-debate-btn:hover { background: var(--rust); color: var(--paper); }
+  .wd-debate-points { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .wd-debate-points ul { margin: 0; padding-left: 18px; }
+  .wd-debate-points li { margin-bottom: 8px; font-size: 13.5px; line-height: 1.5; }
+  .wd-debate-loading { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--paper-dim); font-style: italic; }
+
+  /* ===================================================================
+     VISUAL POLISH — depth, motion, texture. Same terminal/wire-service
+     palette throughout, just given more life: soft elevation on panels,
+     a faint scanline texture, gentle entrance/hover motion, and a
+     themed scrollbar so the widget still feels considered at the edges.
+     =================================================================== */
+
+  #dig-root {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* Faint horizontal scanline texture over the whole widget — reads as
+     "wire service teletype" rather than a flat color fill. Very low
+     opacity so it never fights with text contrast. */
+  /* Faint horizontal scanline texture over the whole widget — reads as
+     "wire service teletype" rather than a flat color fill. Very low
+     opacity so it never fights with text contrast.
+
+     z-index: -1 (not 0) is deliberate. #dig-root establishes its own
+     stacking context via isolation:isolate, so a negative-z pseudo paints
+     ABOVE #dig-root's own background but BELOW its content — exactly what
+     we want. The earlier approach paired z-index:0 here with a blanket
+     `#dig-root > * { position: relative }` to lift children above it, but
+     that rule (ID specificity) silently overrode `.wd-focus-overlay`'s
+     `position: fixed`, dropping the focus overlay into normal flow at the
+     bottom of the page instead of rendering it fullscreen. Keeping the
+     layering entirely on this pseudo-element means no rule has to touch
+     the children's positioning at all. */
+  #dig-root::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(236, 228, 206, 0.018) 0px,
+      rgba(236, 228, 206, 0.018) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    border-radius: inherit;
+  }
+
+  /* Themed scrollbar (webkit + firefox) for anything that scrolls inside
+     the widget — table wrap, focus card, chip grid overflow, etc. */
+  #dig-root, .wd-table-wrap, .wd-focus-card { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #dig-root *::-webkit-scrollbar { width: 8px; height: 8px; }
+  #dig-root *::-webkit-scrollbar-track { background: transparent; }
+  #dig-root *::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  #dig-root *::-webkit-scrollbar-thumb:hover { background: var(--paper-dim); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Cards settle into place with a slight stagger, instead of just
+       popping in — makes a batch of results feel like they're arriving
+       rather than being dumped on screen. */
+    @keyframes wd-card-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .wd-card { animation: wd-card-in 0.35s ease both; }
+    .wd-grid .wd-card:nth-child(1) { animation-delay: 0.00s; }
+    .wd-grid .wd-card:nth-child(2) { animation-delay: 0.04s; }
+    .wd-grid .wd-card:nth-child(3) { animation-delay: 0.08s; }
+    .wd-grid .wd-card:nth-child(4) { animation-delay: 0.12s; }
+    .wd-grid .wd-card:nth-child(5) { animation-delay: 0.16s; }
+    .wd-grid .wd-card:nth-child(n+6) { animation-delay: 0.20s; }
+
+    @keyframes wd-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .wd-table-wrap, .wd-focus-overlay { animation: wd-fade-in 0.2s ease both; }
+  }
+
+  .wd-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .wd-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--paper-dim);
+    box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(212, 162, 76, 0.08);
+  }
+
+  /* Elevated panels — settings/onboard/focus surfaces get a soft shadow so
+     they read as "lifted" above the base background instead of flat
+     rectangles of a slightly different green. */
+  .wd-settings, .wd-onboard-panel, .wd-focus-card, .wd-table th, .wd-table td {
+    box-shadow: 0 4px 14px -8px rgba(0, 0, 0, 0.5);
+  }
+
+  .wd-run-btn, .wd-build-btn {
+    transition: filter 0.15s, transform 0.08s ease, box-shadow 0.18s ease;
+    box-shadow: 0 4px 16px -6px rgba(212, 162, 76, 0.35);
+  }
+  .wd-run-btn:hover:not(:disabled), .wd-build-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px -6px rgba(212, 162, 76, 0.5);
+  }
+  .wd-run-btn:active:not(:disabled), .wd-build-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .wd-chip, .wd-onboard-tab, .wd-view-btn, .wd-focus-nav, .wd-like-btn, .wd-star {
+    transition: transform 0.1s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+  }
+  .wd-chip:active, .wd-like-btn:active, .wd-focus-nav:active:not(:disabled) { transform: scale(0.94); }
+  .wd-star:hover { transform: scale(1.15); }
+
+  .wd-focus-overlay { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .wd-focus-card { transition: transform 0.18s ease, opacity 0.18s ease; }
+
+  /* Scroll-hint gradient on the table wrapper so a horizontally-scrollable
+     table on narrow screens visibly implies "more →" instead of just
+     cutting off with no affordance. */
+  .wd-table-wrap {
+    position: relative;
+    background: linear-gradient(to right, var(--bg) 0%, transparent 2%) 0 0,
+                linear-gradient(to left, var(--bg) 0%, transparent 2%) 100% 0;
+    background-repeat: no-repeat;
+    background-size: 24px 100%, 24px 100%;
+    background-attachment: local, local;
+  }
+
+  /* Focus ring for keyboard users, in the widget's own palette rather than
+     the browser default (which reads jarringly against the dark theme). */
+  #dig-root button:focus-visible,
+  #dig-root input:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+
+  /* ===================================================================
+     RESPONSIVE — mobile & tablet. Desktop styles above stay the default;
+     these narrow the layout down progressively. No JS/markup changes
+     required — same elements, same IDs, just re-flowed.
+     =================================================================== */
+
+  @media (max-width: 860px) {
+    .wd-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  }
+
+  @media (max-width: 640px) {
+    #dig-root { padding: 18px 14px 30px; border-radius: 0; }
+
+    .wd-title { font-size: 12px; letter-spacing: 0.14em; }
+    .wd-header { align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+    .wd-header-btns { gap: 6px; flex-wrap: wrap; }
+    .wd-gear { padding: 7px 9px; font-size: 10.5px; }
+
+    /* Every tappable control gets closer to a real 44px touch target on
+       touchscreens, without changing the compact desktop sizing above. */
+    .wd-gear, .wd-view-btn, .wd-focus-btn, .wd-add-btn, .wd-save-btn,
+    .wd-find-btn, .wd-remove-btn, .wd-onboard-tab, .wd-rebuild-btn,
+    .wd-delete-btn, .wd-recent-topic-chip {
+      min-height: 40px;
+    }
+    .wd-like-btn, .wd-dislike-btn { width: 44px; height: 44px; font-size: 18px; }
+    .wd-focus-nav { width: 44px; height: 44px; font-size: 24px; }
+    .wd-star { font-size: 22px; padding: 4px; }
+
+    .wd-query-row { flex-wrap: wrap; padding: 10px 12px; }
+    .wd-prompt-label { font-size: 12px; margin-bottom: 2px; }
+    .wd-input { font-size: 16px; } /* 16px stops iOS Safari auto-zooming into the field on focus */
+
+    .wd-grid { grid-template-columns: 1fr; gap: 12px; }
+    .wd-card:hover { transform: none; } /* hover-lift is a desktop-mouse affordance; skip on touch */
+
+    .wd-onboard-custom {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-areas: "name name" "hint hint" "find add";
+      gap: 6px;
+    }
+    .wd-onboard-custom input#wd-custom-name { grid-area: name; }
+    .wd-onboard-custom input#wd-custom-hint { grid-area: hint; }
+    .wd-onboard-custom #wd-custom-find { grid-area: find; }
+    .wd-onboard-custom #wd-custom-add { grid-area: add; }
+    .wd-onboard-custom input { font-size: 16px; padding: 10px; }
+    .wd-find-btn, .wd-add-btn { text-align: center; }
+
+    /* Two compact rows instead of one cramped line: name on its own row,
+       then hint + find + remove sharing the second row. Keeps each source
+       to a fixed, predictable height instead of the ragged 3-4 line wrap
+       you'd get from just letting a 4-item flex row wrap freely — with a
+       long source list that wrapping ate a lot of extra vertical space. */
+    .wd-source-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      grid-template-areas: "name name name" "hint find remove";
+      gap: 6px;
+      padding: 8px;
+    }
+    .wd-source-row input.wd-name { grid-area: name; font-size: 16px; padding: 9px 10px; }
+    .wd-source-row input.wd-hint { grid-area: hint; font-size: 16px; padding: 9px 10px; min-width: 0; }
+    .wd-source-row .wd-find-btn { grid-area: find; flex: 0 0 auto; padding: 0 10px; }
+    .wd-source-row .wd-remove-btn { grid-area: remove; flex: 0 0 auto; }
+
+    .wd-chip-grid { grid-template-columns: 1fr; }
+    .wd-onboard-tabs { gap: 5px; }
+    .wd-onboard-tab { font-size: 10.5px; padding: 8px 10px; flex: 1 1 auto; text-align: center; }
+
+    .wd-onboard-footer { flex-direction: column; align-items: stretch; }
+    .wd-onboard-footer > div { flex-direction: column; width: 100%; }
+    .wd-build-btn, .wd-skip-link, .wd-rebuild-btn { width: 100%; text-align: center; padding-top: 10px; padding-bottom: 10px; }
+
+    .wd-results-toolbar { flex-direction: column; align-items: stretch; }
+    .wd-toolbar-left { flex-direction: column; align-items: stretch; gap: 8px; }
+    .wd-view-toggle { width: 100%; }
+    .wd-view-btn { flex: 1; text-align: center; }
+    .wd-table-sortbar { justify-content: space-between; }
+    .wd-focus-btn { width: 100%; text-align: center; }
+
+    .wd-table { font-size: 12px; }
+    .wd-table th, .wd-table td { padding: 8px 10px; }
+
+    .wd-focus-overlay { padding: 8px 4px; }
+    .wd-focus-stage { gap: 6px; }
+    .wd-focus-card { padding: 16px; min-height: 260px; max-height: 88dvh; }
+    .wd-focus-close { top: 10px; right: 10px; padding: 8px 10px; }
+    .wd-focus-source { font-size: 15px; }
+    .wd-focus-summary { font-size: 14px; }
+    .wd-focus-actions { gap: 10px; }
+    .wd-debate-btn { margin-left: 0; width: 100%; text-align: center; }
+
+    .wd-stats-row { font-size: 11.5px; }
+  }
+
+  /* Very narrow phones — trim the focus-mode chrome further so the prev/
+     next circles don't crowd out the card itself. Swipe still works. */
+  @media (max-width: 380px) {
+    .wd-focus-nav { width: 36px; height: 36px; font-size: 20px; }
+    .wd-focus-stage { gap: 4px; }
+    .wd-onboard-tab { font-size: 10px; padding: 7px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="dig-root">
+  <div class="wd-header">
+    <div class="wd-title">DIG <span>/ stance by source</span></div>
+    <div class="wd-header-btns">
+      <button class="wd-gear wd-home-gear" id="wd-home-btn" style="display:none;" title="Clear results and start a new search">⌂ NEW</button>
+      <button class="wd-gear" id="wd-profile-btn" style="display:none;">PROFILE</button>
+      <button class="wd-gear" id="wd-stats-btn" style="display:none;">STATS</button>
+      <button class="wd-gear" id="wd-gear" style="display:none;">SOURCES</button>
+    </div>
+  </div>
+
+  <!-- ONBOARDING: profile builder -->
+  <div id="wd-onboard" class="wd-onboard" style="display:none;">
+    <div class="wd-info-chip">
+      <span class="wd-info-icon">👋</span>
+      <span class="wd-info-text">Let's build your source list — pick what looks interesting, or add your own.</span>
+      <button class="wd-info-toggle" data-target="wd-intro-detail">more</button>
+    </div>
+    <div class="wd-info-detail" id="wd-intro-detail" style="display:none;">Mix and match freely across the categories below. This is the start of a profile that's yours — easy to grow, tidy up, or start fresh anytime. Nothing here is set in stone.</div>
+
+    <div class="wd-info-chip">
+      <span class="wd-info-icon">🔒</span>
+      <span class="wd-info-text">Private by default — your profile lives only on this device.</span>
+      <button class="wd-info-toggle" data-target="wd-privacy-detail">more</button>
+    </div>
+    <div class="wd-info-detail" id="wd-privacy-detail" style="display:none;">Your profile (sources, topics you've checked, ratings) is saved only in this browser, on this device. It's never uploaded, synced, or sold. Running a check sends just one source name + your topic per query, nothing more. You can review, edit, or delete all of it anytime from PROFILE once you're in.</div>
+
+    <div class="wd-info-chip">
+      <span class="wd-info-icon">📊</span>
+      <span class="wd-info-text">Anonymous, aggregate stats only — never tied to you.</span>
+      <button class="wd-info-toggle" data-target="wd-stats-detail">more</button>
+    </div>
+    <div class="wd-info-detail" id="wd-stats-detail" style="display:none;">We keep fully anonymous public counters — which sources get added to profiles and which topics get checked, across everyone, plus aggregate like/dislike/star feedback per source. No device, account, or IP is ever attached to these — see STATS in the app once you're in.</div>
+
+    <div class="wd-onboard-tabs" id="wd-onboard-tabs"></div>
+    <div class="wd-onboard-panel">
+      <div class="wd-onboard-blurb" id="wd-onboard-blurb"></div>
+      <div class="wd-chip-grid" id="wd-chip-grid"></div>
+    </div>
+
+    <div class="wd-onboard-custom">
+      <input type="text" id="wd-custom-name" placeholder="Add your own — name" />
+      <input type="text" id="wd-custom-hint" placeholder="where to find them (optional)" />
+      <button class="wd-find-btn" id="wd-custom-find" type="button" title="Look up where to find them">🔍 FIND</button>
+      <button class="wd-add-btn" id="wd-custom-add">+ ADD</button>
+    </div>
+
+    <div class="wd-onboard-footer">
+      <span class="wd-onboard-count"><b id="wd-selected-count">0</b> selected</span>
+      <div style="display:flex; gap:14px; align-items:center;">
+        <button class="wd-skip-link" id="wd-randomize-sources" type="button">🎲 surprise me — one per category</button>
+        <button class="wd-skip-link" id="wd-skip-onboard">skip, use a general starter mix</button>
+        <button class="wd-build-btn" id="wd-build-profile" disabled>BUILD MY PROFILE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="wd-app" style="display:none;">
+    <div class="wd-settings" id="wd-settings" style="display:none;">
+      <div class="wd-settings-title">Your sources</div>
+      <div id="wd-source-list"></div>
+      <div class="wd-add-row">
+        <button class="wd-add-btn" id="wd-add-source">+ ADD SOURCE</button>
+      </div>
+      <div class="wd-save-row">
+        <button class="wd-save-btn" id="wd-save-sources">SAVE LIST</button>
+        <span class="wd-save-note" id="wd-save-note"></span>
+      </div>
+      <button class="wd-rebuild-btn" id="wd-rebuild-profile">↺ REBUILD STARTER PROFILE</button>
+    </div>
+
+    <div class="wd-settings" id="wd-profile-panel" style="display:none;">
+      <div class="wd-settings-title">Your profile</div>
+      <div class="wd-info-chip">
+        <span class="wd-info-icon">🗂️</span>
+        <span class="wd-info-text">This is your space — private, and yours to shape.</span>
+        <button class="wd-info-toggle" data-target="wd-profile-intro-detail">more</button>
+      </div>
+      <div class="wd-info-detail" id="wd-profile-intro-detail" style="display:none;">Everything below lives only on this device — nobody else sees it. Keep it, tidy it up, or clear it whenever you like.</div>
+      <div class="wd-profile-summary" id="wd-profile-summary"></div>
+      <div class="wd-profile-section">
+        <div class="wd-profile-section-title">Recently checked topics</div>
+        <div id="wd-topic-history-list"></div>
+        <button class="wd-find-btn" id="wd-clear-history-btn" type="button" style="margin-top:8px;">Clear topic history</button>
+      </div>
+      <div class="wd-profile-danger">
+        <div class="wd-profile-section-title">Start over</div>
+        <div class="wd-profile-danger-note">This clears your sources, ratings, checked-topic history, and cached results from this device, and takes you back to onboarding. It can't be undone.</div>
+        <button class="wd-delete-btn" id="wd-delete-everything-btn" type="button">DELETE EVERYTHING ON THIS DEVICE</button>
+      </div>
+    </div>
+
+    <div class="wd-settings" id="wd-stats-panel" style="display:none;">
+      <div class="wd-settings-title">Community stats <span class="wd-stats-title-note">— anonymous &amp; aggregate, visible to everyone</span></div>
+      <div id="wd-stats-body">Loading…</div>
+    </div>
+
+    <div class="wd-query-row">
+      <span class="wd-prompt-label">TOPIC&gt;</span>
+      <div class="wd-topic-field">
+        <input class="wd-input" id="wd-topic-input" placeholder="e.g. Ukraine ceasefire negotiations" />
+        <div class="wd-trending-ghost" id="wd-trending-ghost"></div>
+      </div>
+      <span class="wd-cursor"></span>
+    </div>
+    <div class="wd-recent-topics" id="wd-recent-topics" style="display:none;"></div>
+    <button class="wd-run-btn" id="wd-run-btn">CHECK STANCE ACROSS SOURCES</button>
+
+    <div id="wd-flag-area"></div>
+    <div class="wd-wait-splash" id="wd-wait-splash" style="display:none;"></div>
+
+    <div class="wd-results-toolbar" id="wd-results-toolbar" style="display:none;">
+      <div class="wd-toolbar-left">
+        <div class="wd-view-toggle">
+          <button class="wd-view-btn wd-view-active" id="wd-view-cards">CARDS</button>
+          <button class="wd-view-btn" id="wd-view-table">TABLE</button>
+        </div>
+        <div class="wd-table-sortbar" id="wd-table-sortbar" style="display:none;">
+          <span class="wd-table-sortbar-label">SORT BY</span>
+          <div class="wd-view-toggle">
+            <button class="wd-view-btn wd-sort-btn" id="wd-sort-source" data-sort-field="source">SOURCE</button>
+            <button class="wd-view-btn wd-sort-btn" id="wd-sort-topic" data-sort-field="topic" style="display:none;">TOPIC</button>
+          </div>
+        </div>
+      </div>
+      <button class="wd-focus-btn" id="wd-focus-btn">⛶ FOCUS MODE</button>
+    </div>
+
+    <div class="wd-grid" id="wd-grid"></div>
+    <div class="wd-table-scope" id="wd-table-scope" style="display:none;">
+      <label class="wd-table-scope-label" for="wd-table-all-cached">
+        <input type="checkbox" id="wd-table-all-cached">
+        Show all cached results, every topic, grouped by source
+      </label>
+      <span class="wd-table-scope-count" id="wd-table-scope-count"></span>
+    </div>
+    <div class="wd-table-wrap" id="wd-table-wrap" style="display:none;"></div>
+  </div>
+
+  <!-- FOCUS MODE overlay -->
+  <div class="wd-focus-overlay" id="wd-focus-overlay" style="display:none;">
+    <button class="wd-focus-close" id="wd-focus-close">✕ CLOSE</button>
+    <div class="wd-focus-stage">
+      <button class="wd-focus-nav" id="wd-focus-prev">‹</button>
+      <div class="wd-focus-card" id="wd-focus-card"></div>
+      <button class="wd-focus-nav" id="wd-focus-next">›</button>
+    </div>
+    <div class="wd-focus-counter" id="wd-focus-counter"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Self-hosted build: no window.storage API here (that's a claude.ai
+  // artifact-only feature), so this shim gives the same async interface
+  // backed by plain localStorage on the visitor's own browser.
+  //
+  const storage = {
+    async get(key) {
+      const v = localStorage.getItem(key);
+      if (v === null) throw new Error('not found');
+      return { key, value: v };
+    },
+    async set(key, value) {
+      localStorage.setItem(key, value);
+      return { key, value };
+    }
+  };
+
+  // Global toggle for the icon+one-liner "info chips" — click "more"/"less"
+  // to expand or collapse the fuller explanation sitting right below it.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.wd-info-toggle');
+    if (!btn) return;
+    const target = document.getElementById(btn.dataset.target);
+    if (!target) return;
+    const show = target.style.display === 'none';
+    target.style.display = show ? 'block' : 'none';
+    btn.textContent = show ? 'less' : 'more';
+  });
+
+  // Short, upbeat lines shown while sources are actually being fetched —
+  // never shown for cache-only reruns, which finish instantly anyway.
+  const WAIT_MESSAGES = [
+    '🔎 Casting a wide net across your sources…',
+    '🧭 Gathering the range of takes on this…',
+    '🗞️ Fetching fresh coverage as it comes in…',
+    '🌗 Lining up the different framings…',
+    '📡 Reaching out to each source now…'
+  ];
+  let waitSplashTimer = null;
+
+  function startWaitSplash() {
+    let i = 0;
+    const show = () => {
+      const msg = WAIT_MESSAGES[i % WAIT_MESSAGES.length];
+      i++;
+      waitSplashEl.innerHTML = `<span class="wd-info-icon">${msg.slice(0, 2)}</span>${escapeHtml(msg.slice(2).trim())}`;
+    };
+    show();
+    waitSplashEl.style.display = 'block';
+    waitSplashTimer = setInterval(show, 2600);
+  }
+
+  function stopWaitSplash() {
+    if (waitSplashTimer) { clearInterval(waitSplashTimer); waitSplashTimer = null; }
+    waitSplashEl.style.display = 'none';
+    waitSplashEl.innerHTML = '';
+  }
+
+  // Fire-and-forget: posts an anonymous, aggregate usage event (source
+  // added, topic checked, or rating) to the stats endpoint. Never blocks
+  // or throws into the main flow — stats are nice-to-have, not load-bearing.
+  function postStat(type, name, extra) {
+    try {
+      fetch('/api/dig-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, name, ...(extra || {}) })
+      }).catch(() => {});
+    } catch (e) { /* best-effort */ }
+  }
+
+  // Best-effort lookup of where to find a named source online, so people
+  // adding a custom source don't have to go find a URL themselves. Reuses
+  // the same check endpoint/budget as stance checks — one extra call, same
+  // server-side cap applies. Throws on failure; callers should just leave
+  // the hint field for manual entry in that case.
+  async function lookupHint(name) {
+    const prompt = `Someone is adding "${name}" as a source to a media-monitoring tool and needs to know where to find their content online. Search the web if needed, then reply with ONLY their primary website domain, YouTube channel name, Substack, or handle — whichever is most useful for finding their coverage. One short answer, no explanation, no markdown, no surrounding quotes. If you can't identify this source with confidence, reply with exactly: unknown`;
+    const response = await fetch('/api/dig-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (!response.ok) throw new Error('lookup failed');
+    const data = await response.json();
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join(' ')
+      .trim();
+    const clean = text.replace(/^["'`]+|["'`]+$/g, '').split('\n')[0].trim();
+    if (!clean || /^unknown$/i.test(clean)) throw new Error('not found');
+    return clean;
+  }
+
+  // ---- Trending-topics chyron for the (empty) topic box ----
+  //
+  // Rotates short example topics through the topic box as ghost text —
+  // present, hold, dissolve, repeat. Hitting Enter or CHECK with an empty
+  // box runs whatever's currently showing. The list itself is fetched via
+  // the same check endpoint (one extra call) and cached on-device for 24h,
+  // so it's at most one call per visitor per day, not one per page load.
+  // If that fetch ever fails, a small static fallback list keeps the
+  // ticker working — just not "of the day" fresh.
+  const FALLBACK_TRENDING_TOPICS = [
+    'Immigration and border policy', 'Healthcare system reform', 'Federal Reserve rate policy',
+    'Gun control and Second Amendment', 'Abortion access and regulation', 'Climate and energy policy',
+    'Tax policy and reform', 'Free speech and content moderation', 'Trade tariffs and globalization',
+    'Criminal justice reform', 'AI regulation and oversight', 'Government spending and the deficit'
+  ];
+  let trendingTopics = [];
+  let trendingIndex = -1;
+  let currentGhostTopic = '';
+  let trendingTicker = null;
+  const TRENDING_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  async function loadTrendingTopics() {
+    let cached = null;
+    try {
+      const res = await storage.get('dig-trending-topics-v2');
+      if (res && res.value) cached = JSON.parse(res.value);
+    } catch (e) { /* no cache yet */ }
+
+    if (cached && Array.isArray(cached.topics) && cached.topics.length && (Date.now() - (cached.savedAt || 0)) < TRENDING_CACHE_TTL_MS) {
+      trendingTopics = cached.topics;
+      startTrendingTicker();
+      return;
+    }
+
+    // Show the fallback immediately so the box isn't empty while the real
+    // list loads, then swap in the fetched list once it lands.
+    trendingTopics = FALLBACK_TRENDING_TOPICS;
+    startTrendingTicker();
+
+    try {
+      const prompt = `List 10 broad, ongoing policy debates or issue areas that are currently active in public discourse, worldwide or major regions — the underlying subject people are arguing about, not a single day's headline event. Think in terms of areas like immigration policy, healthcare reform, monetary policy, trade policy, criminal justice, free speech online, energy and climate policy, tax policy — general and durable enough that they'd still make sense as a search topic next month, not just today. Search the web if it helps you pick ones that are genuinely live right now rather than dormant. For each, write a short phrase of 3-7 words naming the policy area itself (e.g. "Healthcare system reform", "Immigration and border policy" — NOT "Senate passes border bill" or any single event/headline). Respond with ONLY a JSON array of exactly 10 strings — no markdown, no explanation, no surrounding text, just the array.`;
+      const response = await fetch('/api/dig-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      if (!response.ok) throw new Error('trending fetch failed');
+      const data = await response.json();
+      const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      const parsed = JSON.parse(match ? match[0] : text);
+      const cleaned = Array.isArray(parsed) ? parsed.map(t => String(t).trim()).filter(Boolean).slice(0, 10) : [];
+      if (!cleaned.length) throw new Error('empty trending list');
+
+      trendingTopics = cleaned;
+      trendingIndex = -1;
+      try {
+        await storage.set('dig-trending-topics-v2', JSON.stringify({ topics: cleaned, savedAt: Date.now() }));
+      } catch (e) { /* best-effort */ }
+    } catch (e) {
+      // keep the fallback list already running — no need to surface this
+    }
+  }
+
+  function startTrendingTicker() {
+    if (trendingTicker) clearInterval(trendingTicker);
+    trendingIndex = -1;
+    topicInput.placeholder = ''; // the rotating ghost text takes over this role
+    showNextTrending();
+    trendingTicker = setInterval(showNextTrending, 5000);
+  }
+
+  function showNextTrending() {
+    if (!trendingTopics.length) return;
+    trendingGhostEl.classList.remove('wd-ghost-visible');
+    setTimeout(() => {
+      trendingIndex = (trendingIndex + 1) % trendingTopics.length;
+      currentGhostTopic = trendingTopics[trendingIndex];
+      trendingGhostEl.textContent = currentGhostTopic;
+      if (!topicInput.value.trim()) trendingGhostEl.classList.add('wd-ghost-visible');
+    }, 350);
+  }
+
+  // General starter mix, used only if someone skips the profile builder entirely.
+  const DEFAULT_SOURCES = [
+    { name: "Associated Press", hint: "apnews.com" },
+    { name: "The Free Press", hint: "thefp.com" },
+    { name: "Breaking Points", hint: "YouTube" },
+    { name: "The Intercept", hint: "theintercept.com" },
+    { name: "Reason", hint: "reason.com" },
+    { name: "One America News (OAN)", hint: "oann.com" }
+  ];
+
+  // Curated starter picks by branch. Categorization leans on general reach and
+  // independent bias/reliability trackers (AllSides, Ad Fontes Media, Media
+  // Bias/Fact Check) rather than any one outlet's self-description — treat
+  // these as a rough starting mix, not a precise ranking.
+  const ONBOARD_CATEGORIES = [
+    {
+      key: 'mainstream',
+      label: 'MAINSTREAM',
+      blurb: 'Wire services and national outlets with large staffs, broad reach, and editorial fact-checking. Spans the spectrum from center-left to center-right.',
+      sources: [
+        { name: "Associated Press", hint: "apnews.com", meta: "Wire service — widely syndicated, rated near-center by most trackers" },
+        { name: "Reuters", hint: "reuters.com", meta: "Wire service — global reach, rated near-center" },
+        { name: "BBC News", hint: "bbc.com/news", meta: "Public broadcaster — large global audience" },
+        { name: "NPR", hint: "npr.org", meta: "Public radio — center-left lean per most raters" },
+        { name: "The New York Times", hint: "nytimes.com", meta: "Large subscriber base — center-left lean" },
+        { name: "The Wall Street Journal", hint: "wsj.com", meta: "Business-focused news desk — right-leaning opinion page" },
+        { name: "Fox News", hint: "foxnews.com", meta: "Top-rated cable news — right lean" },
+        { name: "CNN", hint: "cnn.com", meta: "Major cable news — left-of-center lean" },
+        { name: "The Washington Post", hint: "washingtonpost.com", meta: "Major national daily — center-left lean" },
+        { name: "The Guardian", hint: "theguardian.com", meta: "UK-based, large English readership — left lean" }
+      ]
+    },
+    {
+      key: 'independent',
+      label: 'INDEPENDENT',
+      blurb: 'Journalist- or host-led shows and newsletters outside a big network — often opinionated, with sizable dedicated audiences.',
+      sources: [
+        { name: "Breaking Points", hint: "Krystal Ball & Saagar Enjeti, YouTube", meta: "Populist left/right duo — large YouTube following" },
+        { name: "The Free Press", hint: "Bari Weiss, thefp.com", meta: "Newsletter — heterodox / center-right leaning" },
+        { name: "The Daily Wire", hint: "Ben Shapiro, dailywire.com", meta: "One of the largest right-leaning independent shows" },
+        { name: "Glenn Greenwald", hint: "System Update, Substack/Rumble", meta: "Independent — civil-liberties, anti-establishment framing" },
+        { name: "Matt Taibbi", hint: "Racket News, Substack", meta: "Independent journalist — anti-establishment" },
+        { name: "Timcast IRL", hint: "Tim Pool, YouTube", meta: "Large independent right-leaning talk show" },
+        { name: "The Young Turks", hint: "Cenk Uygur, YouTube", meta: "Long-running independent left commentary show" },
+        { name: "Zeteo", hint: "Mehdi Hasan, zeteo.com", meta: "Newsletter/video — left-leaning" },
+        { name: "Public", hint: "Michael Shellenberger, Substack", meta: "Independent — contrarian, investigative" },
+        { name: "Pod Save America", hint: "Crooked Media", meta: "Left-leaning politics podcast — large audience" }
+      ]
+    },
+    {
+      key: 'alternative',
+      label: 'ALTERNATIVE',
+      blurb: 'Smaller ideological or niche outlets with dedicated readerships, often more openly opinionated than mainstream desks.',
+      sources: [
+        { name: "The Intercept", hint: "theintercept.com", meta: "Investigative — left-leaning" },
+        { name: "Reason", hint: "reason.com", meta: "Libertarian magazine" },
+        { name: "National Review", hint: "nationalreview.com", meta: "Conservative magazine — longstanding" },
+        { name: "Jacobin", hint: "jacobinmag.com", meta: "Socialist magazine" },
+        { name: "The Federalist", hint: "thefederalist.com", meta: "Conservative opinion site" },
+        { name: "UnHerd", hint: "unherd.com", meta: "UK-based, contrarian / heterodox outlet" },
+        { name: "Compact", hint: "compactmag.com", meta: "Populist, cross-ideological outlet" },
+        { name: "The Dispatch", hint: "thedispatch.com", meta: "Center-right, anti-populist conservative outlet" },
+        { name: "ZeroHedge", hint: "zerohedge.com", meta: "Anonymous finance/geopolitics blog — contrarian framing" },
+        { name: "Drop Site News", hint: "dropsitenews.com", meta: "Independent, foreign-policy focused outlet" }
+      ]
+    },
+    {
+      key: 'fringe',
+      label: 'FAR OUT',
+      blurb: "High-engagement, low-reliability corners of the media world — frequently flagged by fact-checkers (NewsGuard, MBFC). Track them to see the framing, not for the facts.",
+      sources: [
+        { name: "InfoWars", hint: "Alex Jones, infowars.com", meta: "Widely flagged for conspiracy content" },
+        { name: "RT (Russia Today)", hint: "rt.com", meta: "Russian state media — flagged for propaganda by most raters" },
+        { name: "The Grayzone", hint: "thegrayzone.com", meta: "Contrarian geopolitics blog" },
+        { name: "Natural News", hint: "naturalnews.com", meta: "Frequently flagged for health misinformation" },
+        { name: "The Duran", hint: "theduran.com", meta: "Contrarian geopolitics commentary" },
+        { name: "Jimmy Dore", hint: "The Jimmy Dore Show, YouTube", meta: "Populist-left commentary, conspiracy-adjacent framing per some raters" },
+        { name: "Before It's News", hint: "beforeitsnews.com", meta: "User-submitted — frequently flagged for fabricated stories" },
+        { name: "One America News (OAN)", hint: "oann.com", meta: "Cable channel — flagged for low factual reporting by most raters" },
+        { name: "The Epoch Times", hint: "theepochtimes.com", meta: "Flagged for misinformation by several fact-checkers" },
+        { name: "David Icke", hint: "davidicke.com", meta: "Conspiracy commentator" }
+      ]
+    }
+  ];
+
+  const root = document.getElementById('dig-root');
+  const homeBtn = document.getElementById('wd-home-btn');
+  const gearBtn = document.getElementById('wd-gear');
+  const statsBtn = document.getElementById('wd-stats-btn');
+  const statsPanel = document.getElementById('wd-stats-panel');
+  const profileBtn = document.getElementById('wd-profile-btn');
+  const profilePanel = document.getElementById('wd-profile-panel');
+  const profileSummaryEl = document.getElementById('wd-profile-summary');
+  const topicHistoryListEl = document.getElementById('wd-topic-history-list');
+  const clearHistoryBtn = document.getElementById('wd-clear-history-btn');
+  const deleteEverythingBtn = document.getElementById('wd-delete-everything-btn');
+  const recentTopicsEl = document.getElementById('wd-recent-topics');
+  const statsBody = document.getElementById('wd-stats-body');
+  const onboardEl = document.getElementById('wd-onboard');
+  const appEl = document.getElementById('wd-app');
+  const onboardTabsEl = document.getElementById('wd-onboard-tabs');
+  const onboardBlurbEl = document.getElementById('wd-onboard-blurb');
+  const chipGridEl = document.getElementById('wd-chip-grid');
+  const customNameInput = document.getElementById('wd-custom-name');
+  const customHintInput = document.getElementById('wd-custom-hint');
+  const customAddBtn = document.getElementById('wd-custom-add');
+  const customFindBtn = document.getElementById('wd-custom-find');
+  const selectedCountEl = document.getElementById('wd-selected-count');
+  const buildBtn = document.getElementById('wd-build-profile');
+  const skipBtn = document.getElementById('wd-skip-onboard');
+  const randomizeBtn = document.getElementById('wd-randomize-sources');
+  const rebuildBtn = document.getElementById('wd-rebuild-profile');
+  const settingsPanel = document.getElementById('wd-settings');
+  const sourceListEl = document.getElementById('wd-source-list');
+  const addSourceBtn = document.getElementById('wd-add-source');
+  const saveSourcesBtn = document.getElementById('wd-save-sources');
+  const saveNote = document.getElementById('wd-save-note');
+  const topicInput = document.getElementById('wd-topic-input');
+  const trendingGhostEl = document.getElementById('wd-trending-ghost');
+  const runBtn = document.getElementById('wd-run-btn');
+  const grid = document.getElementById('wd-grid');
+  const flagArea = document.getElementById('wd-flag-area');
+  const waitSplashEl = document.getElementById('wd-wait-splash');
+  const resultsToolbar = document.getElementById('wd-results-toolbar');
+  const viewCardsBtn = document.getElementById('wd-view-cards');
+  const viewTableBtn = document.getElementById('wd-view-table');
+  const tableWrap = document.getElementById('wd-table-wrap');
+  const tableScope = document.getElementById('wd-table-scope');
+  const tableAllCachedCheckbox = document.getElementById('wd-table-all-cached');
+  const tableScopeCount = document.getElementById('wd-table-scope-count');
+  const tableSortbar = document.getElementById('wd-table-sortbar');
+  const sortSourceBtn = document.getElementById('wd-sort-source');
+  const sortTopicBtn = document.getElementById('wd-sort-topic');
+  const focusBtn = document.getElementById('wd-focus-btn');
+  const focusOverlay = document.getElementById('wd-focus-overlay');
+  const focusCardEl = document.getElementById('wd-focus-card');
+  const focusCounter = document.getElementById('wd-focus-counter');
+  const focusPrev = document.getElementById('wd-focus-prev');
+  const focusNext = document.getElementById('wd-focus-next');
+  const focusClose = document.getElementById('wd-focus-close');
+
+  let sources = [];
+  let activeCategory = ONBOARD_CATEGORIES[0].key;
+  const selectedChips = new Map(); // key: "category:name" -> {name, hint}
+  const customPicks = [];
+
+  // Results / view state
+  let resultsState = {};   // source name -> { stance, summary, error, timestamp }
+  let currentTopic = '';
+  let viewMode = 'cards';  // 'cards' | 'table'
+  let tableAllCached = false; // table sub-mode: this topic only, or every cached topic grouped by source
+  let tableSortField = 'source'; // 'source' | 'topic' — which column is currently driving the sort/grouping
+  let tableSortDir = 'asc';
+  const tableExpanded = new Set(); // row keys (`${topic}::${source}`) currently expanded in table view
+  let previousSavedSources = []; // names present at last successful save/build, for diffing new adds
+  let focusIndex = 0;
+  let ratingsLocal = {};   // source name -> { like: 'up'|'down'|null, stars: 0-5 } — kept on-device only
+  let debateCache = {};    // `${topic}::${name}` -> array of points | { error } | 'loading'
+
+  // Per-topic, per-source result cache. Lets adding/renaming one source (or
+  // rerunning the same topic) skip re-querying sources already checked
+  // recently, instead of re-fanning-out a fresh API call for every source
+  // every time. Persisted on-device so it survives reloads within the
+  // window, not just within one in-memory session.
+  // Shape: { [topic]: { [sourceName]: { stance, summary, timestamp, savedAt } } }
+  let resultsCache = {};
+  const RESULTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Topics the person has checked, most-recent first — powers the "recent
+  // topics" quick-repeat chips and the PROFILE panel's history view. Local
+  // only, same as everything else here.
+  let topicHistory = []; // [{ topic, timestamp }]
+  const TOPIC_HISTORY_MAX = 50;
+
+  async function loadSources() {
+    let hasSavedProfile = false;
+    try {
+      const res = await storage.get('dig-sources');
+      if (res && res.value) {
+        const parsed = JSON.parse(res.value);
+        if (Array.isArray(parsed) && parsed.length) {
+          sources = parsed;
+          hasSavedProfile = true;
+        }
+      }
+    } catch (e) {
+      // no saved list yet
+    }
+
+    if (hasSavedProfile) {
+      showApp();
+    } else {
+      showOnboarding();
+    }
+  }
+
+  function showApp() {
+    onboardEl.style.display = 'none';
+    appEl.style.display = 'block';
+    homeBtn.style.display = 'inline-block';
+    gearBtn.style.display = 'inline-block';
+    statsBtn.style.display = 'inline-block';
+    profileBtn.style.display = 'inline-block';
+    previousSavedSources = sources.map(s => s.name);
+    renderSourceEditor();
+    renderEmptyGrid();
+    renderRecentTopics();
+  }
+
+  function showOnboarding() {
+    selectedChips.clear();
+    customPicks.length = 0;
+    activeCategory = ONBOARD_CATEGORIES[0].key;
+    appEl.style.display = 'none';
+    homeBtn.style.display = 'none';
+    gearBtn.style.display = 'none';
+    statsBtn.style.display = 'none';
+    profileBtn.style.display = 'none';
+    document.getElementById('wd-settings').style.display = 'none';
+    profilePanel.style.display = 'none';
+    onboardEl.style.display = 'block';
+    renderOnboardTabs();
+    renderChipGrid();
+    updateOnboardFooter();
+  }
+
+  // ---- Header panel toggles (SOURCES / STATS / PROFILE) ----
+  //
+  // Only one of the three panels is open at a time — opening one closes
+  // the other two, so you never end up scrolling past two stacked panels
+  // by accident. Each button's own pressed/unpressed look is kept in sync
+  // with whichever panel (if any) is actually visible.
+  function closeAllHeaderPanels() {
+    settingsPanel.style.display = 'none';
+    statsPanel.style.display = 'none';
+    profilePanel.style.display = 'none';
+    syncHeaderToggles();
+  }
+
+  function syncHeaderToggles() {
+    gearBtn.classList.toggle('wd-toggle-on', settingsPanel.style.display === 'block');
+    statsBtn.classList.toggle('wd-toggle-on', statsPanel.style.display === 'block');
+    profileBtn.classList.toggle('wd-toggle-on', profilePanel.style.display === 'block');
+  }
+
+  // Clears the current topic/results and returns to a fresh search —
+  // closes any open panel or focus mode first, so it always lands you
+  // back on the plain "type a topic" view.
+  homeBtn.addEventListener('click', () => {
+    closeAllHeaderPanels();
+    closeFocus();
+    currentTopic = '';
+    resultsState = {};
+    topicInput.value = '';
+    flagArea.innerHTML = '';
+    renderEmptyGrid();
+    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    topicInput.focus();
+  });
+
+  function renderOnboardTabs() {
+    onboardTabsEl.innerHTML = ONBOARD_CATEGORIES.map(cat => {
+      const count = [...selectedChips.keys()].filter(k => k.startsWith(cat.key + ':')).length;
+      return `<button class="wd-onboard-tab ${cat.key === activeCategory ? 'wd-tab-active' : ''}" data-cat="${cat.key}">
+        ${cat.label}${count ? `<span class="wd-tab-count">${count}</span>` : ''}
+      </button>`;
+    }).join('');
+    onboardTabsEl.querySelectorAll('[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeCategory = btn.dataset.cat;
+        renderOnboardTabs();
+        renderChipGrid();
+      });
+    });
+  }
+
+  function renderChipGrid() {
+    const cat = ONBOARD_CATEGORIES.find(c => c.key === activeCategory);
+    onboardBlurbEl.textContent = cat.blurb;
+    chipGridEl.innerHTML = cat.sources.map(src => {
+      const chipKey = `${cat.key}:${src.name}`;
+      const selected = selectedChips.has(chipKey);
+      return `
+        <button class="wd-chip ${selected ? 'wd-chip-selected' : ''}" data-chip="${escapeAttr(chipKey)}">
+          <div class="wd-chip-name">${escapeHtml(src.name)}<span class="wd-chip-check">✓</span></div>
+          <div class="wd-chip-meta">${escapeHtml(src.meta || src.hint || '')}</div>
+        </button>
+      `;
+    }).join('');
+    chipGridEl.querySelectorAll('[data-chip]').forEach(chipBtn => {
+      chipBtn.addEventListener('click', () => {
+        const key = chipBtn.dataset.chip;
+        if (selectedChips.has(key)) {
+          selectedChips.delete(key);
+        } else {
+          const [catKey, ...nameParts] = key.split(':');
+          const name = nameParts.join(':');
+          const catData = ONBOARD_CATEGORIES.find(c => c.key === catKey);
+          const src = catData.sources.find(s => s.name === name);
+          selectedChips.set(key, { name: src.name, hint: src.hint });
+        }
+        renderOnboardTabs();
+        renderChipGrid();
+        updateOnboardFooter();
+      });
+    });
+  }
+
+  function updateOnboardFooter() {
+    const total = selectedChips.size + customPicks.length;
+    selectedCountEl.textContent = total;
+    buildBtn.disabled = total === 0;
+  }
+
+  customAddBtn.addEventListener('click', () => {
+    const name = customNameInput.value.trim();
+    if (!name) { customNameInput.focus(); return; }
+    const hint = customHintInput.value.trim();
+    customPicks.push({ name, hint });
+    customNameInput.value = '';
+    customHintInput.value = '';
+    updateOnboardFooter();
+    customAddBtn.textContent = '+ ADDED';
+    setTimeout(() => { customAddBtn.textContent = '+ ADD'; }, 900);
+  });
+
+  customFindBtn.addEventListener('click', async () => {
+    const name = customNameInput.value.trim();
+    if (!name) { customNameInput.focus(); return; }
+    const original = customFindBtn.textContent;
+    customFindBtn.disabled = true;
+    customFindBtn.textContent = '…';
+    try {
+      customHintInput.value = await lookupHint(name);
+    } catch (e) {
+      customHintInput.placeholder = "Couldn't find it — enter manually";
+    } finally {
+      customFindBtn.disabled = false;
+      customFindBtn.textContent = original;
+    }
+  });
+
+  buildBtn.addEventListener('click', async () => {
+    const built = [...selectedChips.values(), ...customPicks];
+    sources = built;
+    built.forEach(s => postStat('source', s.name));
+    try {
+      await storage.set('dig-sources', JSON.stringify(sources));
+    } catch (e) {
+      // will still work for this session even if save fails
+    }
+    showApp();
+  });
+
+  skipBtn.addEventListener('click', async () => {
+    sources = DEFAULT_SOURCES.slice();
+    sources.forEach(s => postStat('source', s.name));
+    try {
+      await storage.set('dig-sources', JSON.stringify(sources));
+    } catch (e) {}
+    showApp();
+  });
+
+  // One random pick per category — a quick, diverse starting profile for
+  // anyone who'd rather not scroll through every list themselves. Jumps
+  // straight into the app and calls out the topic box so the next step is
+  // obvious.
+  randomizeBtn.addEventListener('click', async () => {
+    const built = ONBOARD_CATEGORIES
+      .filter(cat => cat.sources.length)
+      .map(cat => {
+        const pick = cat.sources[Math.floor(Math.random() * cat.sources.length)];
+        return { name: pick.name, hint: pick.hint };
+      });
+    sources = built;
+    built.forEach(s => postStat('source', s.name));
+    try {
+      await storage.set('dig-sources', JSON.stringify(sources));
+    } catch (e) {}
+    showApp();
+    drawAttentionToTopicInput();
+  });
+
+  function drawAttentionToTopicInput() {
+    const row = topicInput.closest('.wd-query-row');
+    topicInput.focus();
+    if (!row) return;
+    row.classList.remove('wd-attention-pulse');
+    // restart the animation even if it's already mid-run
+    void row.offsetWidth;
+    row.classList.add('wd-attention-pulse');
+    setTimeout(() => row.classList.remove('wd-attention-pulse'), 1600);
+  }
+
+  rebuildBtn.addEventListener('click', () => {
+    showOnboarding();
+  });
+
+  function renderSourceEditor() {
+    sourceListEl.innerHTML = '';
+    sources.forEach((src, i) => {
+      const row = document.createElement('div');
+      row.className = 'wd-source-row';
+      row.innerHTML = `
+        <input class="wd-name" data-i="${i}" data-field="name" value="${escapeAttr(src.name)}" placeholder="Name" />
+        <input class="wd-hint" data-i="${i}" data-field="hint" value="${escapeAttr(src.hint || '')}" placeholder="Where to find them (site, channel, handle)" />
+        <button class="wd-find-btn" data-find="${i}" type="button" title="Look up where to find them">🔍</button>
+        <button class="wd-remove-btn" data-remove="${i}">×</button>
+      `;
+      sourceListEl.appendChild(row);
+    });
+
+    sourceListEl.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', (e) => {
+        const i = parseInt(e.target.dataset.i, 10);
+        const field = e.target.dataset.field;
+        sources[i][field] = e.target.value;
+      });
+    });
+    sourceListEl.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const i = parseInt(e.target.dataset.remove, 10);
+        sources.splice(i, 1);
+        renderSourceEditor();
+      });
+    });
+    sourceListEl.querySelectorAll('[data-find]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const target = e.currentTarget;
+        const i = parseInt(target.dataset.find, 10);
+        const name = (sources[i].name || '').trim();
+        const hintInput = sourceListEl.querySelector(`input.wd-hint[data-i="${i}"]`);
+        if (!name) {
+          const nameInput = sourceListEl.querySelector(`input.wd-name[data-i="${i}"]`);
+          if (nameInput) nameInput.focus();
+          return;
+        }
+        const original = target.textContent;
+        target.disabled = true;
+        target.textContent = '…';
+        try {
+          const hint = await lookupHint(name);
+          sources[i].hint = hint;
+          if (hintInput) hintInput.value = hint;
+        } catch (e2) {
+          if (hintInput) hintInput.placeholder = "Couldn't find it — enter manually";
+        } finally {
+          target.disabled = false;
+          target.textContent = original;
+        }
+      });
+    });
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/"/g, '&quot;');
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  }
+
+  gearBtn.addEventListener('click', () => {
+    const show = settingsPanel.style.display === 'none';
+    closeAllHeaderPanels();
+    settingsPanel.style.display = show ? 'block' : 'none';
+    syncHeaderToggles();
+  });
+
+  addSourceBtn.addEventListener('click', () => {
+    sources.push({ name: '', hint: '' });
+    renderSourceEditor();
+  });
+
+  saveSourcesBtn.addEventListener('click', async () => {
+    sources = sources.filter(s => s.name && s.name.trim());
+    renderSourceEditor();
+    const newNames = sources.map(s => s.name).filter(n => !previousSavedSources.includes(n));
+    newNames.forEach(n => postStat('source', n));
+    previousSavedSources = sources.map(s => s.name);
+    try {
+      await storage.set('dig-sources', JSON.stringify(sources));
+      saveNote.textContent = 'Saved — your profile is looking good.';
+    } catch (e) {
+      saveNote.textContent = 'Could not save — will reset next session.';
+    }
+    setTimeout(() => { saveNote.textContent = ''; }, 3000);
+  });
+
+  function renderEmptyGrid() {
+    resultsToolbar.style.display = 'none';
+    tableWrap.style.display = 'none';
+    grid.style.display = 'grid';
+    grid.innerHTML = `<div class="wd-empty">Enter a topic above to see how each of your ${sources.length} source(s) is framing it.</div>`;
+  }
+
+  // ---- Community stats panel ----
+
+  statsBtn.addEventListener('click', () => {
+    const show = statsPanel.style.display === 'none';
+    closeAllHeaderPanels();
+    statsPanel.style.display = show ? 'block' : 'none';
+    syncHeaderToggles();
+    if (show) loadStatsPanel();
+  });
+
+  async function loadStatsPanel() {
+    statsBody.innerHTML = '<div class="wd-stats-row">📊 Pulling the latest community numbers…</div>';
+    try {
+      const res = await fetch('/api/dig-stats');
+      if (!res.ok) throw new Error('request failed');
+      const data = await res.json();
+      statsBody.innerHTML = renderStatsBody(data);
+    } catch (e) {
+      statsBody.innerHTML = '<div class="wd-stats-row">Could not load stats right now.</div>';
+    }
+  }
+
+  function renderStatsBody(data) {
+    const sourcesRows = (data.sources || []).slice(0, 10).map((s, i) =>
+      `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(s.name)}</span><span class="wd-stats-count">added ${s.count}×</span></div>`
+    ).join('') || '<div class="wd-stats-row">No data yet.</div>';
+
+    const topicsRows = (data.topics || []).slice(0, 10).map((t, i) =>
+      `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(t.name)}</span><span class="wd-stats-count">checked ${t.count}×</span></div>`
+    ).join('') || '<div class="wd-stats-row">No data yet.</div>';
+
+    const ratingsRows = (data.ratings || []).slice(0, 10).map((r, i) => {
+      const stars = r.avgStars ? `${r.avgStars}★ (${r.starCount})` : 'no ratings';
+      return `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(r.name)}</span><span class="wd-stats-count">👍${r.likes} 👎${r.dislikes} · ${stars}</span></div>`;
+    }).join('') || '<div class="wd-stats-row">No ratings yet.</div>';
+
+    return `
+      <div class="wd-stats-section">
+        <div class="wd-stats-heading">Most-added sources</div>
+        ${sourcesRows}
+      </div>
+      <div class="wd-stats-section">
+        <div class="wd-stats-heading">Most-checked topics</div>
+        ${topicsRows}
+      </div>
+      <div class="wd-stats-section">
+        <div class="wd-stats-heading">Source trust ratings (from Focus mode)</div>
+        ${ratingsRows}
+      </div>
+    `;
+  }
+
+  const CARD_WAIT_LABELS = ['Transmitting query…', 'Reaching out…', 'On it…', 'Fetching their take…'];
+
+  function cardHtml(name, i) {
+    const label = CARD_WAIT_LABELS[(i || 0) % CARD_WAIT_LABELS.length];
+    return `
+      <div class="wd-card" data-source="${escapeAttr(name)}">
+        <div class="wd-card-head">
+          <span class="wd-source-name">${escapeHtml(name)}</span>
+          <span class="wd-timestamp">checking…</span>
+        </div>
+        <div class="wd-summary wd-dim">${label}</div>
+      </div>
+    `;
+  }
+
+  function updateCard(name, { stance, summary, error, timestamp, cached }) {
+    resultsState[name] = { stance, summary, error, timestamp, cached };
+
+    const card = grid.querySelector(`.wd-card[data-source="${cssEscape(name)}"]`);
+    if (card) {
+      const timeLabel = cached ? `${timestamp} · cached` : timestamp;
+      if (error) {
+        card.innerHTML = `
+          <div class="wd-card-head">
+            <span class="wd-source-name">${escapeHtml(name)}</span>
+            <span class="wd-timestamp">${timeLabel}</span>
+          </div>
+          <div class="wd-summary wd-dim">Couldn't retrieve this one: ${escapeHtml(error)}</div>
+          <button class="wd-retry-btn" data-retry="${escapeAttr(name)}">RETRY</button>
+        `;
+        const retryBtn = card.querySelector('[data-retry]');
+        retryBtn.addEventListener('click', () => retrySingle(name));
+      } else {
+        const { preview, truncated } = summaryPreview(summary || 'No summary returned.');
+        card.innerHTML = `
+          <div class="wd-card-head">
+            <span class="wd-source-name">${escapeHtml(name)}</span>
+            <span class="wd-timestamp">${timeLabel}</span>
+          </div>
+          ${stance ? `<div class="wd-stance-tag">${escapeHtml(stance)}</div>` : ''}
+          <div class="wd-summary wd-summary-brief">${escapeHtml(preview)}</div>
+          ${truncated ? `
+            <div class="wd-summary wd-summary-full">${escapeHtml(summary)}</div>
+            <button class="wd-read-more" data-expand>▸ Read more</button>
+          ` : ''}
+          ${cached ? `<button class="wd-retry-btn" data-retry="${escapeAttr(name)}">RECHECK</button>` : ''}
+        `;
+        const expandBtn = card.querySelector('[data-expand]');
+        if (expandBtn) {
+          expandBtn.addEventListener('click', () => {
+            const brief = card.querySelector('.wd-summary-brief');
+            const full = card.querySelector('.wd-summary-full');
+            const isOpen = full.classList.toggle('wd-open');
+            brief.classList.toggle('wd-hidden', isOpen);
+            expandBtn.textContent = isOpen ? '▾ Collapse' : '▸ Read more';
+          });
+        }
+        const retryBtn = card.querySelector('[data-retry]');
+        if (retryBtn) retryBtn.addEventListener('click', () => retrySingle(name));
+      }
+    }
+
+    if (viewMode === 'table') renderTable();
+  }
+
+  // Short 1-2 line preview of a summary, with the full text kept alongside
+  // for the "Read more" expand toggle.
+  function summaryPreview(summary) {
+    const oneLine = String(summary || '').replace(/\s+/g, ' ').trim();
+    const LIMIT = 140;
+    if (oneLine.length <= LIMIT) return { preview: oneLine, truncated: false };
+    const cut = oneLine.slice(0, LIMIT);
+    const lastSpace = cut.lastIndexOf(' ');
+    const preview = (lastSpace > 80 ? cut.slice(0, lastSpace) : cut) + '…';
+    return { preview, truncated: true };
+  }
+
+  // Breaks a summary into sentence-level bullet points for the table view.
+  function splitIntoPoints(summary) {
+    if (!summary) return ['No summary returned.'];
+    const points = summary
+      .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    return points.length ? points : [summary.trim()];
+  }
+
+  // ---- View toggle (cards / table) ----
+
+  viewCardsBtn.addEventListener('click', () => setView('cards'));
+  viewTableBtn.addEventListener('click', () => setView('table'));
+
+  function setView(mode) {
+    viewMode = mode;
+    viewCardsBtn.classList.toggle('wd-view-active', mode === 'cards');
+    viewTableBtn.classList.toggle('wd-view-active', mode === 'table');
+    grid.style.display = mode === 'cards' ? 'grid' : 'none';
+    tableScope.style.display = mode === 'table' ? 'flex' : 'none';
+    tableSortbar.style.display = mode === 'table' ? 'flex' : 'none';
+    tableWrap.style.display = mode === 'table' ? 'block' : 'none';
+    if (mode === 'table') renderTable();
+  }
+
+  tableAllCachedCheckbox.addEventListener('change', () => {
+    tableAllCached = tableAllCachedCheckbox.checked;
+    // The Topic sort option only makes sense once there's a Topic column
+    // to sort — fall back to Source if Topic was active and we're leaving
+    // all-cached mode.
+    sortTopicBtn.style.display = tableAllCached ? 'inline-block' : 'none';
+    if (!tableAllCached && tableSortField === 'topic') {
+      tableSortField = 'source';
+      tableSortDir = 'asc';
+    }
+    syncSortButtons();
+    renderTable();
+  });
+
+  function syncSortButtons() {
+    [sortSourceBtn, sortTopicBtn].forEach(btn => {
+      const active = tableSortField === btn.dataset.sortField;
+      btn.classList.toggle('wd-view-active', active);
+      btn.dataset.dirArrow = active ? (tableSortDir === 'asc' ? '▲' : '▼') : '';
+    });
+  }
+
+  function setSortField(field) {
+    if (tableSortField === field) {
+      tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      tableSortField = field;
+      tableSortDir = 'asc';
+    }
+    syncSortButtons();
+    renderTable();
+  }
+
+  sortSourceBtn.addEventListener('click', () => setSortField('source'));
+  sortTopicBtn.addEventListener('click', () => setSortField('topic'));
+  syncSortButtons();
+
+  // Single delegated listener on the table container — survives renderTable()
+  // replacing the whole innerHTML on every re-render, so per-row expand
+  // buttons keep working without needing to be individually re-wired.
+  tableWrap.addEventListener('click', (e) => {
+    const expandBtn = e.target.closest('[data-table-expand]');
+    if (!expandBtn) return;
+    const key = expandBtn.dataset.tableExpand;
+    const row = expandBtn.closest('tr');
+    const full = row.querySelector('.wd-table-summary-full');
+    const isOpen = full.classList.toggle('wd-open');
+    if (isOpen) tableExpanded.add(key); else tableExpanded.delete(key);
+    expandBtn.textContent = isOpen ? '▾ Collapse' : '▸ Read more';
+  });
+
+  // Renders one summary cell: short preview + optional expand caret that
+  // reveals the full text (as sentence-level bullets, same breakdown the
+  // table has always used) without collapsing the row itself.
+  function summaryCellHtml(rowKey, summary) {
+    const { preview, truncated } = summaryPreview(summary || 'No summary returned.');
+    if (!truncated) {
+      return `<div class="wd-table-summary-brief">${escapeHtml(preview)}</div>`;
+    }
+    const points = splitIntoPoints(summary);
+    const open = tableExpanded.has(rowKey);
+    return `
+      <div class="wd-table-summary-brief">${escapeHtml(preview)}</div>
+      <ul class="wd-points wd-table-summary-full${open ? ' wd-open' : ''}">${points.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
+      <button class="wd-table-expand" data-table-expand="${escapeAttr(rowKey)}">${open ? '▾ Collapse' : '▸ Read more'}</button>
+    `;
+  }
+
+  // Sorts entries by the active field (with the other field as a stable
+  // tiebreaker so grouped blocks come out in a predictable sub-order), then
+  // marks each row with whether it starts a new group and how many rows
+  // that group spans — so the render step can turn repeated values into a
+  // single rowspan'd cell instead of repeating the value on every row.
+  function sortAndGroup(entries, field, dir) {
+    const other = field === 'source' ? 'topic' : 'source';
+    const sorted = [...entries].sort((a, b) => {
+      const primary = a[field].localeCompare(b[field]) * (dir === 'asc' ? 1 : -1);
+      return primary !== 0 ? primary : a[other].localeCompare(b[other]);
+    });
+    return sorted.map((entry, i) => {
+      if (i > 0 && sorted[i - 1][field] === entry[field]) {
+        return { ...entry, groupStart: false };
+      }
+      let span = 1;
+      while (i + span < sorted.length && sorted[i + span][field] === entry[field]) span++;
+      return { ...entry, groupStart: true, groupSpan: span };
+    });
+  }
+
+  function renderTable() {
+    if (tableAllCached) { renderTableAllCached(); return; }
+
+    tableScopeCount.textContent = '';
+    const field = tableSortField === 'topic' ? 'source' : tableSortField; // no topic column here
+    const entries = sources.map(s => ({ source: s.name, topic: currentTopic, result: resultsState[s.name] }));
+    const grouped = sortAndGroup(entries, field, tableSortDir);
+
+    const rows = grouped.map(({ source, result: r, groupStart, groupSpan }) => {
+      const rowKey = `${currentTopic}::${source}`;
+      const sourceCell = groupStart
+        ? `<td class="wd-table-source"${groupSpan > 1 ? ` rowspan="${groupSpan}"` : ''}>${escapeHtml(source)}</td>`
+        : '';
+      if (!r) {
+        return `<tr>${sourceCell}<td colspan="2" class="wd-dim">not checked yet</td></tr>`;
+      }
+      if (r.error) {
+        return `<tr>${sourceCell}<td colspan="2">Couldn't retrieve: ${escapeHtml(r.error)}</td></tr>`;
+      }
+      const stanceLabel = r.stance ? `<span class="wd-stance-tag">${escapeHtml(r.stance)}</span>` : '—';
+      return `<tr>
+        ${sourceCell}
+        <td>${stanceLabel}</td>
+        <td>${summaryCellHtml(rowKey, r.summary)}</td>
+      </tr>`;
+    }).join('');
+
+    // Single sortable field here (no Topic column), so it's always the
+    // leftmost column already — nothing to reorder.
+    tableWrap.innerHTML = `
+      <table class="wd-table">
+        <thead><tr><th>Source</th><th>Stance</th><th>Summary</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  // Every cached (topic, source) pair on this device — a browsable record
+  // of everything that's been checked and cached locally, not just the
+  // topic currently on screen. Sortable by source or topic via the toggle
+  // buttons above the table. Whichever field is currently sorted becomes
+  // the leftmost column and gets grouped into a single blocked cell (via
+  // rowspan) instead of repeating the same value down the column.
+  function renderTableAllCached() {
+    const entries = [];
+    Object.keys(resultsCache).forEach(topic => {
+      const bucket = resultsCache[topic] || {};
+      Object.keys(bucket).forEach(sourceName => {
+        entries.push({ topic, source: sourceName, result: bucket[sourceName] });
+      });
+    });
+
+    tableScopeCount.textContent = entries.length
+      ? `${entries.length} cached result${entries.length === 1 ? '' : 's'}`
+      : '';
+
+    if (!entries.length) {
+      tableWrap.innerHTML = `<div class="wd-dim" style="padding:16px;">No cached results on this device yet — run a check first.</div>`;
+      return;
+    }
+
+    const field = tableSortField || 'source';
+    const grouped = sortAndGroup(entries, field, tableSortDir);
+
+    const rows = grouped.map(({ topic, source, result: r, groupStart, groupSpan }) => {
+      const rowKey = `${topic}::${source}`;
+      const sourceCell = field === 'source'
+        ? (groupStart ? `<td class="wd-table-source"${groupSpan > 1 ? ` rowspan="${groupSpan}"` : ''}>${escapeHtml(source)}</td>` : '')
+        : `<td class="wd-table-source">${escapeHtml(source)}</td>`;
+      const topicCell = field === 'topic'
+        ? (groupStart ? `<td class="wd-table-topic"${groupSpan > 1 ? ` rowspan="${groupSpan}"` : ''}>${escapeHtml(topic)}</td>` : '')
+        : `<td class="wd-table-topic">${escapeHtml(topic)}</td>`;
+      // Whichever field is sorted goes first (far-left column) — the two
+      // cells are built above, then ordered here based on which is active.
+      const leadCell = field === 'topic' ? topicCell : sourceCell;
+      const trailCell = field === 'topic' ? sourceCell : topicCell;
+
+      if (!r || r.error) {
+        return `<tr>
+          ${leadCell}${trailCell}
+          <td colspan="2" class="wd-dim">${r && r.error ? `Couldn't retrieve: ${escapeHtml(r.error)}` : 'no result'}</td>
+        </tr>`;
+      }
+      const stanceLabel = r.stance ? `<span class="wd-stance-tag">${escapeHtml(r.stance)}</span>` : '—';
+      return `<tr>
+        ${leadCell}${trailCell}
+        <td>${stanceLabel}</td>
+        <td>${summaryCellHtml(rowKey, r.summary)}</td>
+      </tr>`;
+    }).join('');
+
+    const leadHeader = field === 'topic' ? '<th>Topic</th>' : '<th>Source</th>';
+    const trailHeader = field === 'topic' ? '<th>Source</th>' : '<th>Topic</th>';
+
+    tableWrap.innerHTML = `
+      <table class="wd-table">
+        <thead><tr>${leadHeader}${trailHeader}<th>Stance</th><th>Summary</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/(["\\])/g, '\\$1');
+  }
+
+  function parseResponseText(text) {
+    let stance = '';
+    let summary = text.trim();
+    const stanceMatch = text.match(/STANCE:\s*(.+)/i);
+    const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
+    if (stanceMatch) stance = stanceMatch[1].split('\n')[0].trim();
+    if (summaryMatch) summary = summaryMatch[1].trim();
+    return { stance, summary };
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // Wraps the raw API call with retry + backoff for rate limits and
+  // transient/network errors, and turns opaque low-level errors into
+  // something a person can actually read.
+  async function checkSourceWithRetry(src, topic, maxAttempts = 4) {
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await checkSource(src, topic);
+      } catch (e) {
+        lastErr = e;
+        const isRateLimit = e.status === 429;
+        const isTransient = isRateLimit || e.transient;
+        if (!isTransient || attempt === maxAttempts) break;
+        const retryAfterMs = e.retryAfterMs;
+        const backoff = retryAfterMs || Math.min(1000 * Math.pow(2, attempt) + Math.random() * 300, 8000);
+        await sleep(backoff);
+      }
+    }
+    throw lastErr;
+  }
+
+  async function checkSource(src, topic) {
+    const prompt = `You are tracking how a specific independent commentator or outlet is covering a news topic, for a media-monitoring tool.
+
+Source: ${src.name}${src.hint ? ` (find via: ${src.hint})` : ''}
+Topic: ${topic}
+
+Search the web for this source's own recent coverage or commentary on this topic — their site, channel, Substack, podcast, or social posts. Many independent commentators and analysts don't primarily publish under their own byline — they show up as guests on OTHER people's podcasts, YouTube shows, and panel discussions. If a search limited to their own outlet doesn't turn up anything, broaden it: search their name together with the topic, and also try their name plus terms like "interview," "podcast," or "panel" to surface appearances on other shows where they've addressed it. Use a few different search angles before concluding there's nothing — don't stop after a single search if the first one comes up empty.
+
+Then respond in exactly this plain-text format, no markdown:
+
+STANCE: <a short tag of 8 words or fewer capturing their core framing or position>
+SUMMARY: <2-3 sentences, in your own words, on how they've covered it and what they emphasize — mention a specific piece, episode, or interview if you found one>
+
+Only use STANCE: "no coverage found" if you've genuinely searched multiple angles (their own outlet AND guest appearances elsewhere) and still found nothing — not just because the first search came up empty.`;
+
+    let response;
+    try {
+      // Self-hosted build: calls our own Netlify function, which holds the
+      // real API key server-side, instead of hitting Anthropic directly.
+      response = await fetch("/api/dig-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+    } catch (networkErr) {
+      const err = new Error('network hiccup — retrying');
+      err.transient = true;
+      throw err;
+    }
+
+    // 402 = our own daily shared-budget cap; 429 could be either our own
+    // per-visitor cap (permanent until UTC midnight, don't bother retrying)
+    // or Anthropic's own transient rate limit (worth backing off and retrying).
+    if (response.status === 402 || response.status === 429) {
+      let message = '';
+      try {
+        const errBody = await response.json();
+        message = (errBody && errBody.error && errBody.error.message) || '';
+      } catch (parseErr) { /* body wasn't JSON */ }
+
+      const isHardCap = /daily (limit|budget)/i.test(message);
+      if (isHardCap) {
+        throw new Error(message || 'daily limit reached — try again tomorrow');
+      }
+
+      const err = new Error(message || 'rate limited, backing off');
+      err.status = 429;
+      const retryAfter = response.headers.get('retry-after');
+      if (retryAfter) err.retryAfterMs = parseFloat(retryAfter) * 1000;
+      throw err;
+    }
+
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const errBody = await response.json();
+        detail = (errBody && errBody.error && errBody.error.message) || '';
+      } catch (parseErr) { /* body wasn't JSON — ignore, use generic message */ }
+      const err = new Error(`API error ${response.status}${detail ? ': ' + detail : ''}`);
+      if (response.status >= 500) err.transient = true;
+      throw err;
+    }
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      const err = new Error('got an unreadable response — retrying');
+      err.transient = true;
+      throw err;
+    }
+
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n')
+      .trim();
+
+    if (!text) throw new Error('empty response');
+    return parseResponseText(text);
+  }
+
+  // Runs work with a concurrency cap so a big source list doesn't fire
+  // 20 requests at once and trip rate limits.
+  async function runWithConcurrency(items, limit, worker) {
+    let idx = 0;
+    async function next() {
+      while (idx < items.length) {
+        const i = idx++;
+        await worker(items[i], i);
+        await sleep(120); // small stagger between requests within a lane
+      }
+    }
+    const lanes = Array(Math.min(limit, items.length)).fill(0).map(next);
+    await Promise.all(lanes);
+  }
+
+  async function runOne(src) {
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      const { stance, summary } = await checkSourceWithRetry(src, currentTopic);
+      setCachedResult(currentTopic, src.name, { stance, summary, timestamp });
+      updateCard(src.name, { stance, summary, timestamp });
+    } catch (e) {
+      updateCard(src.name, { error: e.message || 'request failed', timestamp });
+    }
+  }
+
+  async function retrySingle(name) {
+    const src = sources.find(s => s.name === name);
+    if (!src) return;
+    const card = grid.querySelector(`.wd-card[data-source="${cssEscape(name)}"]`);
+    if (card) card.innerHTML = `
+      <div class="wd-card-head">
+        <span class="wd-source-name">${escapeHtml(name)}</span>
+        <span class="wd-timestamp">checking…</span>
+      </div>
+      <div class="wd-summary wd-dim">Retrying…</div>
+    `;
+    await runOne(src);
+  }
+
+  async function runCheck() {
+    // If the box is empty, fall back to whatever trending topic is
+    // currently showing as ghost text — "hit enter and go" should work
+    // even if nothing was typed.
+    const topic = topicInput.value.trim() || currentGhostTopic.trim();
+    if (!topic) { topicInput.focus(); return; }
+    if (!topicInput.value.trim()) topicInput.value = topic;
+    trendingGhostEl.classList.remove('wd-ghost-visible');
+    if (!sources.length) {
+      grid.innerHTML = `<div class="wd-empty">Add at least one source first.</div>`;
+      return;
+    }
+
+    currentTopic = topic;
+    resultsState = {};
+    postStat('topic', topic);
+    recordTopicHistory(topic);
+
+    runBtn.disabled = true;
+    runBtn.textContent = 'CHECKING…';
+    flagArea.innerHTML = `<div class="wd-topic-flag">TOPIC: <b>${escapeHtml(topic)}</b></div>`;
+    resultsToolbar.style.display = 'flex';
+    grid.style.display = viewMode === 'cards' ? 'grid' : 'none';
+    grid.innerHTML = sources.map((s, i) => cardHtml(s.name, i)).join('');
+    if (viewMode === 'table') { tableWrap.style.display = 'block'; renderTable(); }
+
+    // Reuse cached results for sources already checked on this exact topic
+    // within the last 24h — adding a source, renaming one, or rerunning the
+    // same topic only fans out fresh calls for the sources that actually
+    // need one.
+    const toFetch = [];
+    sources.forEach(src => {
+      const cached = getCachedResult(currentTopic, src.name);
+      if (cached) {
+        updateCard(src.name, { stance: cached.stance, summary: cached.summary, timestamp: cached.timestamp, cached: true });
+      } else {
+        toFetch.push(src);
+      }
+    });
+
+    // Cap concurrent in-flight requests to stay under rate limits.
+    if (toFetch.length) {
+      startWaitSplash();
+      await runWithConcurrency(toFetch, 3, runOne);
+      stopWaitSplash();
+    }
+
+    runBtn.disabled = false;
+    runBtn.textContent = 'CHECK STANCE ACROSS SOURCES';
+  }
+
+  runBtn.addEventListener('click', runCheck);
+  topicInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') runCheck();
+  });
+  topicInput.addEventListener('input', () => {
+    trendingGhostEl.classList.toggle('wd-ghost-visible', !topicInput.value.trim());
+  });
+
+  // ---- Focus mode: one card at a time, swipeable, with like/dislike,
+  // star rating, and on-demand debate talking points ----
+
+  async function loadRatingsLocal() {
+    try {
+      const res = await storage.get('dig-ratings');
+      if (res && res.value) ratingsLocal = JSON.parse(res.value) || {};
+    } catch (e) {
+      ratingsLocal = {};
+    }
+  }
+
+  function saveRatingsLocal() {
+    try { storage.set('dig-ratings', JSON.stringify(ratingsLocal)); } catch (e) {}
+  }
+
+  // ---- Per-topic result cache (avoid re-querying unchanged sources) ----
+
+  async function loadResultsCache() {
+    try {
+      const res = await storage.get('dig-results-cache');
+      if (res && res.value) resultsCache = JSON.parse(res.value) || {};
+    } catch (e) {
+      resultsCache = {};
+    }
+    pruneResultsCache();
+  }
+
+  function saveResultsCache() {
+    try { storage.set('dig-results-cache', JSON.stringify(resultsCache)); } catch (e) {}
+  }
+
+  // Drops any cached entry older than the TTL, and any now-empty topic
+  // buckets left behind. Cheap enough to run on every load/check.
+  function pruneResultsCache() {
+    const now = Date.now();
+    let changed = false;
+    Object.keys(resultsCache).forEach(topic => {
+      const bucket = resultsCache[topic];
+      Object.keys(bucket).forEach(name => {
+        if (!bucket[name] || (now - (bucket[name].savedAt || 0)) > RESULTS_CACHE_TTL_MS) {
+          delete bucket[name];
+          changed = true;
+        }
+      });
+      if (Object.keys(bucket).length === 0) {
+        delete resultsCache[topic];
+        changed = true;
+      }
+    });
+    if (changed) saveResultsCache();
+  }
+
+  function getCachedResult(topic, name) {
+    const bucket = resultsCache[topic];
+    if (!bucket) return null;
+    const entry = bucket[name];
+    if (!entry) return null;
+    if ((Date.now() - (entry.savedAt || 0)) > RESULTS_CACHE_TTL_MS) return null;
+    return entry;
+  }
+
+  function setCachedResult(topic, name, result) {
+    if (!resultsCache[topic]) resultsCache[topic] = {};
+    resultsCache[topic][name] = { ...result, savedAt: Date.now() };
+    saveResultsCache();
+  }
+
+  // ---- Topic history (recent-topic chips + PROFILE panel) ----
+
+  async function loadTopicHistory() {
+    try {
+      const res = await storage.get('dig-topic-history');
+      if (res && res.value) topicHistory = JSON.parse(res.value) || [];
+    } catch (e) {
+      topicHistory = [];
+    }
+    renderRecentTopics();
+  }
+
+  function saveTopicHistory() {
+    try { storage.set('dig-topic-history', JSON.stringify(topicHistory)); } catch (e) {}
+  }
+
+  function recordTopicHistory(topic) {
+    const key = topic.trim().toLowerCase();
+    topicHistory = topicHistory.filter(t => t.topic.trim().toLowerCase() !== key);
+    topicHistory.unshift({ topic, timestamp: Date.now() });
+    if (topicHistory.length > TOPIC_HISTORY_MAX) topicHistory.length = TOPIC_HISTORY_MAX;
+    saveTopicHistory();
+    renderRecentTopics();
+  }
+
+  function removeTopicHistoryEntry(topic) {
+    topicHistory = topicHistory.filter(t => t.topic !== topic);
+    saveTopicHistory();
+    renderProfilePanel();
+    renderRecentTopics();
+  }
+
+  function relativeTime(ts) {
+    const diffMs = Date.now() - ts;
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return `${days}d ago`;
+  }
+
+  // Quick-repeat chips under the topic input — clicking one refills the
+  // topic and reruns the check. Cheap in practice: any source checked on
+  // that topic in the last 24h answers from cache instead of a fresh call.
+  function renderRecentTopics() {
+    if (!topicHistory.length) {
+      recentTopicsEl.style.display = 'none';
+      recentTopicsEl.innerHTML = '';
+      return;
+    }
+    const recent = topicHistory.slice(0, 5);
+    recentTopicsEl.innerHTML = `<span class="wd-recent-topics-label">RECENT:</span>` +
+      recent.map(t => `<button class="wd-recent-topic-chip" data-topic="${escapeAttr(t.topic)}">${escapeHtml(t.topic)}</button>`).join('');
+    recentTopicsEl.style.display = 'flex';
+    recentTopicsEl.querySelectorAll('[data-topic]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        topicInput.value = chip.dataset.topic;
+        runCheck();
+      });
+    });
+  }
+
+  function renderProfilePanel() {
+    const cachedCount = Object.values(resultsCache).reduce((n, bucket) => n + Object.keys(bucket).length, 0);
+    profileSummaryEl.textContent =
+      `${sources.length} source${sources.length === 1 ? '' : 's'} saved · ${topicHistory.length} topic${topicHistory.length === 1 ? '' : 's'} checked · ${cachedCount} result${cachedCount === 1 ? '' : 's'} cached`;
+
+    if (!topicHistory.length) {
+      topicHistoryListEl.innerHTML = `<div class="wd-profile-empty">Nothing checked yet — once you run a topic, it'll show up here.</div>`;
+      return;
+    }
+    topicHistoryListEl.innerHTML = topicHistory.map(t => `
+      <div class="wd-topic-history-row">
+        <span>${escapeHtml(t.topic)}</span>
+        <span>
+          <span class="wd-topic-history-time">${relativeTime(t.timestamp)}</span>
+          <button class="wd-topic-history-remove" data-remove-topic="${escapeAttr(t.topic)}" title="Remove from history">×</button>
+        </span>
+      </div>
+    `).join('');
+    topicHistoryListEl.querySelectorAll('[data-remove-topic]').forEach(btn => {
+      btn.addEventListener('click', () => removeTopicHistoryEntry(btn.dataset.removeTopic));
+    });
+  }
+
+  profileBtn.addEventListener('click', () => {
+    const show = profilePanel.style.display === 'none';
+    closeAllHeaderPanels();
+    profilePanel.style.display = show ? 'block' : 'none';
+    syncHeaderToggles();
+    if (show) renderProfilePanel();
+  });
+
+  clearHistoryBtn.addEventListener('click', () => {
+    if (!topicHistory.length) return;
+    if (!confirm('Clear your checked-topic history? This only affects the history list — your sources and cached results are untouched.')) return;
+    topicHistory = [];
+    saveTopicHistory();
+    renderProfilePanel();
+    renderRecentTopics();
+  });
+
+  deleteEverythingBtn.addEventListener('click', async () => {
+    if (!confirm("Delete everything on this device? This clears your sources, ratings, topic history, and cached results, and can't be undone.")) return;
+    sources = [];
+    ratingsLocal = {};
+    resultsCache = {};
+    topicHistory = [];
+    debateCache = {};
+    try {
+      await storage.set('dig-sources', JSON.stringify([]));
+      await storage.set('dig-ratings', JSON.stringify({}));
+      await storage.set('dig-results-cache', JSON.stringify({}));
+      await storage.set('dig-topic-history', JSON.stringify([]));
+    } catch (e) { /* best-effort */ }
+    profilePanel.style.display = 'none';
+    showOnboarding();
+  });
+
+
+  focusBtn.addEventListener('click', () => openFocus(0));
+  focusClose.addEventListener('click', closeFocus);
+  focusPrev.addEventListener('click', () => moveFocus(-1));
+  focusNext.addEventListener('click', () => moveFocus(1));
+
+  function openFocus(startIndex) {
+    if (!sources.length) return;
+    focusIndex = Math.max(0, Math.min(sources.length - 1, startIndex));
+    focusOverlay.style.display = 'flex';
+    // Lock the background page in place while focus mode is open — it's
+    // meant to take over the screen entirely, so there's nothing to
+    // scroll past to see it and no risk of the page behind it drifting.
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    renderFocusCard(null);
+    document.addEventListener('keydown', focusKeyHandler);
+  }
+
+  function closeFocus() {
+    focusOverlay.style.display = 'none';
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    document.removeEventListener('keydown', focusKeyHandler);
+  }
+
+  function focusKeyHandler(e) {
+    if (e.key === 'Escape') closeFocus();
+    if (e.key === 'ArrowLeft') moveFocus(-1);
+    if (e.key === 'ArrowRight') moveFocus(1);
+  }
+
+  function moveFocus(delta) {
+    const next = focusIndex + delta;
+    if (next < 0 || next > sources.length - 1) return;
+    focusIndex = next;
+    renderFocusCard(delta > 0 ? 'next' : 'prev');
+  }
+
+  function jumpFocus(index) {
+    if (index === focusIndex) return;
+    const dir = index > focusIndex ? 'next' : 'prev';
+    focusIndex = index;
+    renderFocusCard(dir);
+  }
+
+  // A source's "hint" is a domain, handle, or channel name — render it as
+  // a small link when it looks like a real domain, otherwise just as
+  // plain identifying text (e.g. "YouTube") next to the source name.
+  function focusHintHtml(hint) {
+    if (!hint) return '';
+    const clean = hint.trim();
+    if (!clean) return '';
+    const looksLikeDomain = /^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(clean) && !clean.includes(' ');
+    if (looksLikeDomain) {
+      const href = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+      return `<a class="wd-focus-hint" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(clean)} ↗</a>`;
+    }
+    return `<span class="wd-focus-hint">${escapeHtml(clean)}</span>`;
+  }
+
+  function renderFocusCard(direction) {
+    const src = sources[focusIndex];
+    const r = resultsState[src.name];
+    const rating = ratingsLocal[src.name] || { like: null, stars: 0 };
+
+    focusPrev.disabled = focusIndex === 0;
+    focusNext.disabled = focusIndex === sources.length - 1;
+    focusCounter.textContent = `${focusIndex + 1} / ${sources.length}`;
+
+    const stanceHtml = (r && !r.error && r.stance) ? `<div class="wd-stance-tag">${escapeHtml(r.stance)}</div>` : '';
+    const summaryHtml = !r
+      ? `<div class="wd-focus-summary wd-dim">Not checked yet for this topic.</div>`
+      : r.error
+        ? `<div class="wd-focus-summary wd-dim">Couldn't retrieve this one: ${escapeHtml(r.error)}</div>`
+        : `<div class="wd-focus-summary">${escapeHtml(r.summary || 'No summary returned.')}</div>`;
+
+    focusCardEl.classList.remove('wd-slide-next', 'wd-slide-prev');
+    focusCardEl.innerHTML = `
+      <div class="wd-focus-header">
+        <div class="wd-focus-source">${escapeHtml(src.name)}</div>
+        ${focusHintHtml(src.hint)}
+      </div>
+      ${stanceHtml}
+      ${summaryHtml}
+      <div class="wd-focus-actions">
+        <button class="wd-like-btn" data-like="up" title="Like this framing">👍</button>
+        <button class="wd-like-btn wd-dislike-btn" data-like="down" title="Dislike this framing">👎</button>
+        <div class="wd-stars" id="wd-focus-stars"></div>
+        <button class="wd-debate-btn" id="wd-debate-btn">DEBATE ⇄</button>
+      </div>
+      <div class="wd-debate-points" id="wd-debate-points" style="display:none;"></div>
+    `;
+    if (direction === 'next') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-next');
+    else if (direction === 'prev') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-prev');
+
+    focusCardEl.querySelector('[data-like="up"]').classList.toggle('wd-like-active', rating.like === 'up');
+    focusCardEl.querySelector('[data-like="down"]').classList.toggle('wd-like-active', rating.like === 'down');
+
+    renderStars(rating.stars || 0);
+    wireFocusActions(src.name);
+    renderFocusDots();
+
+    // Restore cached debate points, if this source/topic pair was already fetched.
+    const key = `${currentTopic}::${src.name}`;
+    const cached = debateCache[key];
+    if (cached && cached !== 'loading') showDebatePoints(cached);
+  }
+
+  // Tappable progress dots under the card — one per source, current one
+  // highlighted — so focus mode reads as flipping through a whole set
+  // rather than a one-directional swipe with no sense of how many are left.
+  function renderFocusDots() {
+    let dotsEl = document.getElementById('wd-focus-dots');
+    if (!dotsEl) {
+      dotsEl = document.createElement('div');
+      dotsEl.className = 'wd-focus-dots';
+      dotsEl.id = 'wd-focus-dots';
+      focusCounter.insertAdjacentElement('afterend', dotsEl);
+    }
+    dotsEl.innerHTML = sources.map((s, i) =>
+      `<button class="wd-focus-dot ${i === focusIndex ? 'wd-dot-active' : ''}" data-dot="${i}" title="${escapeAttr(s.name)}"></button>`
+    ).join('');
+    dotsEl.querySelectorAll('[data-dot]').forEach(btn => {
+      btn.addEventListener('click', () => jumpFocus(parseInt(btn.dataset.dot, 10)));
+    });
+  }
+
+  function renderStars(active) {
+    const starsEl = document.getElementById('wd-focus-stars');
+    starsEl.innerHTML = [1, 2, 3, 4, 5].map(n =>
+      `<button class="wd-star ${n <= active ? 'wd-star-on' : ''}" data-star="${n}">★</button>`
+    ).join('');
+    starsEl.querySelectorAll('[data-star]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n = parseInt(btn.dataset.star, 10);
+        const src = sources[focusIndex];
+        ratingsLocal[src.name] = { ...(ratingsLocal[src.name] || {}), stars: n };
+        saveRatingsLocal();
+        renderStars(n);
+        postStat('rating', src.name, { action: 'star', stars: n });
+      });
+    });
+  }
+
+  function wireFocusActions(name) {
+    focusCardEl.querySelectorAll('[data-like]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.dataset.like;
+        const current = ratingsLocal[name] || {};
+        const newVal = current.like === dir ? null : dir; // click again to unset
+        ratingsLocal[name] = { ...current, like: newVal };
+        saveRatingsLocal();
+        renderFocusCard();
+        if (newVal) postStat('rating', name, { action: newVal === 'up' ? 'like' : 'dislike' });
+      });
+    });
+
+    const debateBtn = document.getElementById('wd-debate-btn');
+    debateBtn.addEventListener('click', () => runDebate(name));
+  }
+
+  // Swipe navigation for focus mode.
+  //
+  // These bind ONCE, at startup — not per render. focusCardEl is a
+  // persistent element (renderFocusCard only swaps its innerHTML), so
+  // re-binding on every render used to stack up handlers: each render
+  // added another pair, and because each closure kept its own
+  // touchStartX, a single swipe fired all of them and advanced the card
+  // once per accumulated handler. Five renders meant one swipe jumped
+  // five sources — and since moveFocus() re-renders, it compounded.
+  // Binding once, without { once: true }, keeps exactly one handler pair
+  // alive for the life of the page.
+  let touchStartX = null;
+  focusCardEl.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  focusCardEl.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    touchStartX = null; // reset before moving, so a re-render can't re-trigger off a stale value
+    if (dx > 60) moveFocus(-1);
+    else if (dx < -60) moveFocus(1);
+  }, { passive: true });
+
+  async function runDebate(name) {
+    const key = `${currentTopic}::${name}`;
+    const pointsEl = document.getElementById('wd-debate-points');
+    if (debateCache[key] && debateCache[key] !== 'loading') {
+      showDebatePoints(debateCache[key]);
+      return;
+    }
+
+    debateCache[key] = 'loading';
+    if (pointsEl) {
+      pointsEl.style.display = 'block';
+      pointsEl.innerHTML = `<div class="wd-debate-loading">Pulling talking points…</div>`;
+    }
+
+    const src = sources.find(s => s.name === name);
+    const prompt = `You're prepping debate talking points for someone arguing the position that "${name}"${src && src.hint ? ` (${src.hint})` : ''} takes on this topic: "${currentTopic}".
+
+Based on this source's actual public coverage or commentary, list 4-6 short talking points a debater could use to argue their side, framed the way this source itself would frame them. Respond in exactly this format, one point per line, no markdown, no numbering, no preamble:
+
+POINT: <talking point in a single sentence>
+POINT: <talking point in a single sentence>
+(etc.)`;
+
+    let result;
+    try {
+      const response = await fetch('/api/dig-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      if (!response.ok) throw new Error(`request failed (${response.status})`);
+      const data = await response.json();
+      const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+      const points = text.split('\n').map(l => l.replace(/^POINT:\s*/i, '').trim()).filter(Boolean);
+      result = points.length ? points : ['No talking points returned.'];
+    } catch (e) {
+      result = { error: e.message || 'request failed' };
+    }
+    debateCache[key] = result;
+
+    // Only paint the result if the person is still looking at this source.
+    if (sources[focusIndex] && sources[focusIndex].name === name) {
+      showDebatePoints(result);
+    }
+  }
+
+  function showDebatePoints(pointsOrError) {
+    const pointsEl = document.getElementById('wd-debate-points');
+    if (!pointsEl) return;
+    pointsEl.style.display = 'block';
+    if (pointsOrError && pointsOrError.error) {
+      pointsEl.innerHTML = `<div class="wd-summary wd-dim">Couldn't pull talking points: ${escapeHtml(pointsOrError.error)}</div>`;
+      return;
+    }
+    pointsEl.innerHTML = `<ul>${pointsOrError.map(p => `<li>${escapeHtml(p)}</li>`).join('')}</ul>`;
+  }
+
+  // One-time migration for anyone who already has a profile saved under
+  // the old "wire-desk-*" key names (from before the app was renamed to
+  // DIG) — copies it over to the new "dig-*" names so nobody's local
+  // profile appears to vanish after this update. Safe to leave in
+  // permanently; it's a no-op once everyone's migrated.
+  async function migrateLegacyStorage() {
+    const KEY_MAP = {
+      'dig-sources': 'wire-desk-sources',
+      'dig-ratings': 'wire-desk-ratings',
+      'dig-results-cache': 'wire-desk-results-cache',
+      'dig-topic-history': 'wire-desk-topic-history',
+      'dig-trending-topics': 'wire-desk-trending-topics'
+    };
+    for (const [newKey, oldKey] of Object.entries(KEY_MAP)) {
+      try {
+        await storage.get(newKey);
+        continue; // already have data under the new name
+      } catch (e) { /* fall through and check the old name */ }
+      try {
+        const legacy = await storage.get(oldKey);
+        if (legacy && legacy.value != null) {
+          await storage.set(newKey, legacy.value);
+        }
+      } catch (e) { /* nothing under the old name either — first-time visitor */ }
+    }
+  }
+
+  (async () => {
+    await migrateLegacyStorage();
+    loadRatingsLocal();
+    loadResultsCache();
+    loadTopicHistory();
+    loadTrendingTopics();
+    loadSources();
+  })();
+})();
+</script>
+</body>
+</html>

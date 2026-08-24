@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Docket — CiViX</title>
+<meta name="theme-color" content="#14161a">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --amber: #e0a32e;
+    --amber-soft: rgba(224, 163, 46, 0.14);
+    --strike: #c1272d;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --pad: clamp(16px, 4vw, 28px);
+  }
+  [data-theme="dark"] {
+    --ground: #14161a;
+    --panel: #1b1e23;
+    --panel-2: #22262c;
+    --ink: #e8e6df;
+    --ink-dim: #9aa0a8;
+    --rule: #2b3038;
+  }
+  [data-theme="light"] {
+    --ground: #f0efe8;
+    --panel: #f8f7f2;
+    --panel-2: #eceada;
+    --ink: #16181c;
+    --ink-dim: #62666d;
+    --rule: #d6d4c8;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 var(--pad) calc(48px + env(safe-area-inset-bottom));
+    transition: background .25s ease, color .25s ease;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  /* ---------- masthead ---------- */
+  header {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: calc(24px + env(safe-area-inset-top)) 0 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .mark {
+    font-family: var(--serif); font-weight: 700;
+    font-size: 26px; letter-spacing: -0.01em; color: var(--ink);
+  }
+  .mark b { color: var(--amber); font-weight: 700; }
+  .masthead-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--ink-dim); margin-left: auto;
+  }
+  .theme-btn {
+    background: none; border: 1px solid var(--rule); color: var(--ink-dim);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 6px 10px; cursor: pointer;
+    border-radius: 2px; transition: border-color .15s, color .15s;
+  }
+  .theme-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* ---------- confirmation ---------- */
+  .receipt {
+    border-left: 3px solid var(--amber);
+    background: var(--amber-soft);
+    padding: 14px 16px; margin-top: 22px;
+    animation: slot .4s cubic-bezier(.16,1,.3,1);
+  }
+  .receipt.dupe { border-left-color: var(--ink-dim); background: none; border: 1px solid var(--rule); border-left: 3px solid var(--ink-dim); }
+  .receipt .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--amber); display: block; margin-bottom: 4px;
+  }
+  .receipt.dupe .eyebrow { color: var(--ink-dim); }
+  .receipt p { margin: 0; font-size: 16px; }
+  @keyframes slot { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- add by link ---------- */
+  .composer { display: flex; gap: 8px; margin-top: 22px; }
+  .composer input {
+    flex: 1; min-width: 0; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--rule); border-radius: 2px; padding: 11px 12px;
+    font-family: var(--mono); font-size: 13px;
+  }
+  .composer input::placeholder { color: var(--ink-dim); }
+  .composer input:focus { outline: 2px solid var(--amber); outline-offset: 1px; border-color: transparent; }
+  .composer button {
+    background: var(--amber); color: #14161a; border: 0; border-radius: 2px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; padding: 0 16px; cursor: pointer;
+  }
+  .composer button:hover { filter: brightness(1.08); }
+
+  /* ---------- filters ---------- */
+  .filters {
+    display: flex; gap: 4px; align-items: center;
+    margin-top: 30px; border-bottom: 1px solid var(--rule);
+  }
+  .filter {
+    background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--ink-dim); font-family: var(--mono); font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase;
+    padding: 8px 12px; cursor: pointer; margin-bottom: -1px;
+  }
+  .filter[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--amber); }
+  .filter .count { color: var(--ink-dim); font-weight: 400; }
+  .filter[aria-selected="true"] .count { color: var(--amber); }
+
+  /* ---------- filings ---------- */
+  .filing {
+    display: grid; grid-template-columns: 54px 1fr; gap: 0 14px;
+    padding: 18px 0; border-bottom: 1px solid var(--rule);
+    position: relative;
+  }
+  .filing:last-child { border-bottom: 0; }
+  .docket-no {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+    color: var(--ink-dim); padding-top: 4px;
+  }
+  .filing.adopted .docket-no { color: var(--amber); }
+  .filing h2 {
+    margin: 0 0 4px; font-size: 19px; font-weight: 600;
+    line-height: 1.32; letter-spacing: -0.005em; overflow-wrap: anywhere;
+  }
+  .filing .meta {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+    color: var(--ink-dim); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .filing .meta a { color: var(--ink-dim); text-decoration: none; border-bottom: 1px solid var(--rule); }
+  .filing .meta a:hover { color: var(--amber); border-bottom-color: var(--amber); }
+  .filing .note {
+    margin: 0 0 10px; color: var(--ink-dim); font-size: 15.5px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    line-clamp: 3; overflow: hidden;
+  }
+  .filing .repeat {
+    display: inline-block; font-family: var(--mono); font-size: 9.5px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--amber);
+    border: 1px solid var(--amber); border-radius: 2px; padding: 1px 5px; margin-left: 6px;
+  }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .act {
+    background: none; border: 1px solid var(--rule); color: var(--ink-dim);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 5px 11px; border-radius: 2px;
+    cursor: pointer; transition: color .15s, border-color .15s;
+  }
+  .act:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .act.adopt:hover { color: var(--amber); border-color: var(--amber); }
+  .act.strike:hover { color: var(--strike); border-color: var(--strike); }
+  .act:focus-visible, .filter:focus-visible, .theme-btn:focus-visible, .link-btn:focus-visible {
+    outline: 2px solid var(--amber); outline-offset: 2px;
+  }
+
+  /* the signature: striking a filing draws the amendment line through it */
+  .filing.striking { color: var(--ink-dim); }
+  .filing.striking::after {
+    content: ""; position: absolute; left: 0; top: 50%; height: 2px;
+    background: var(--strike); width: 0; animation: strike .34s ease forwards;
+  }
+  @keyframes strike { to { width: 100%; } }
+
+  /* ---------- empty ---------- */
+  .empty { padding: 44px 0 8px; }
+  .empty h2 { font-family: var(--serif); font-size: 24px; font-weight: 600; margin: 0 0 10px; letter-spacing: -0.01em; }
+  .empty p { color: var(--ink-dim); margin: 0 0 18px; max-width: 46ch; }
+  .steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  .steps li {
+    counter-increment: s; position: relative; padding-left: 30px;
+    margin-bottom: 10px; color: var(--ink-dim); font-size: 16px;
+  }
+  .steps li::before {
+    content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 2px;
+    font-family: var(--mono); font-size: 10.5px; color: var(--amber); letter-spacing: .06em;
+  }
+
+  /* ---------- install ---------- */
+  .install {
+    display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 22px; padding: 13px 15px;
+    border: 1px solid var(--amber); border-radius: 2px; background: var(--amber-soft);
+  }
+  .install.show { display: flex; }
+  .install p { margin: 0; flex: 1; min-width: 200px; font-size: 15.5px; }
+  .install button {
+    background: var(--amber); color: #14161a; border: 0; border-radius: 2px;
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; padding: 8px 14px; cursor: pointer;
+  }
+
+  /* ---------- wrong-bucket warning (iOS) ---------- */
+  .misplaced {
+    display: none; margin-top: 22px; padding: 13px 15px;
+    border: 1px solid var(--strike); border-left-width: 3px; border-radius: 2px;
+  }
+  .misplaced.show { display: block; }
+  .misplaced .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--strike); display: block; margin-bottom: 4px;
+  }
+  .misplaced p { margin: 0; font-size: 15.5px; }
+
+  /* ---------- inline rename ---------- */
+  .rename-field {
+    width: 100%; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--amber); border-radius: 2px; padding: 7px 9px;
+    font-family: var(--serif); font-size: 19px; font-weight: 600;
+    line-height: 1.32; margin-bottom: 4px;
+  }
+  .rename-field:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
+
+  /* ---------- footer ---------- */
+  footer {
+    margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--rule);
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  }
+  .link-btn {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-dim);
+    border-bottom: 1px solid transparent;
+  }
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-dim);
+    border-bottom: 1px solid transparent;
+  }
+  .link-btn:hover { color: var(--ink); border-bottom-color: var(--rule); }
+  .link-btn.danger:hover { color: var(--strike); border-bottom-color: var(--strike); }
+  .privacy {
+    width: 100%; margin: 0; font-family: var(--mono); font-size: 10px;
+    letter-spacing: .06em; color: var(--ink-dim); line-height: 1.7;
+  }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; transform: translateX(-50%) translateY(20px);
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--rule); border-left: 3px solid var(--amber);
+    border-radius: 2px; padding: 11px 15px; z-index: 50;
+    display: flex; align-items: center; gap: 14px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    max-width: calc(100vw - 32px);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  #toast button {
+    background: none; border: 0; color: var(--amber); cursor: pointer;
+    font: inherit; text-transform: uppercase; padding: 0;
+    border-bottom: 1px solid var(--amber);
+  }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  /* ---------- capture address panel ---------- */
+  .addr {
+    margin-top: 22px; padding: 15px 16px;
+    border: 1px solid var(--rule); border-left: 3px solid var(--amber);
+    border-radius: 0;
+  }
+  .addr .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--amber); display: block; margin-bottom: 6px;
+  }
+  .addr .value {
+    font-family: var(--mono); font-size: 15px; color: var(--ink);
+    overflow-wrap: anywhere; margin: 0 0 10px;
+  }
+  .addr .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .addr a.cta, .addr button.cta {
+    background: var(--amber); color: #14161a; border: 0; border-radius: 2px;
+    font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; padding: 8px 13px; cursor: pointer;
+    text-decoration: none; display: inline-block;
+  }
+  .addr button.ghost {
+    background: none; border: 1px solid var(--rule); color: var(--ink-dim);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 7px 12px; border-radius: 2px; cursor: pointer;
+  }
+  .addr button.ghost:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+  /* ---------- error + loading ---------- */
+  .errbar {
+    display: none; margin-top: 22px; padding: 13px 15px; align-items: center; gap: 14px;
+    border: 1px solid var(--strike); border-left-width: 3px; flex-wrap: wrap;
+  }
+  .errbar.show { display: flex; }
+  .errbar p { margin: 0; flex: 1; min-width: 200px; font-size: 15.5px; }
+  .errbar button {
+    background: none; border: 1px solid var(--strike); color: var(--strike);
+    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; padding: 6px 12px; border-radius: 2px; cursor: pointer;
+  }
+  .loading {
+    padding: 40px 0; font-family: var(--mono); font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim);
+  }
+  .filing.pending { opacity: .5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="mark">Ci<b>Vi</b>X</span>
+    <span class="masthead-label">Docket</span>
+    <button class="theme-btn" id="themeBtn" type="button">Light</button>
+  </header>
+
+  <div id="receiptSlot"></div>
+
+  <div class="errbar" id="errBar">
+    <p id="errText">Couldn't reach your docket.</p>
+    <button type="button" id="retryBtn">Retry</button>
+  </div>
+
+  <div class="addr" id="addrPanel" hidden>
+    <span class="eyebrow">Your capture address</span>
+    <p class="value" id="addrValue">—</p>
+    <div class="row">
+      <a class="cta" id="vcardLink" href="#">Add CiViX to contacts</a>
+      <button class="ghost" type="button" id="copyAddr">Copy address</button>
+      <button class="ghost" type="button" id="copyDocket">Copy docket link</button>
+    </div>
+  </div>
+
+  <div class="composer">
+    <label class="sr-only" for="linkInput">Paste a link or a note</label>
+    <input id="linkInput" type="text" placeholder="Paste a link or type a note…" autocomplete="off">
+    <button type="button" id="addBtn">File</button>
+  </div>
+
+  <div class="filters" role="tablist">
+    <button class="filter" role="tab" data-view="docket" aria-selected="true">
+      On the docket <span class="count" id="cDocket">0</span>
+    </button>
+    <button class="filter" role="tab" data-view="adopted" aria-selected="false">
+      Adopted <span class="count" id="cAdopted">0</span>
+    </button>
+  </div>
+
+  <main id="list" aria-live="polite"><div class="loading">Loading your docket…</div></main>
+
+  <footer>
+    <button class="link-btn" id="exportBtn" type="button">Export docket</button>
+    <button class="link-btn danger" id="clearBtn" type="button">Clear everything</button>
+    <p class="privacy">
+      Your docket lives on the CiViX server, tied to a random address and nothing else —
+      no name, no login, no email of yours on file. Anyone with your docket link can read it,
+      so keep it to yourself.
+    </p>
+  </footer>
+
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API = 'https://civix-capture.mycivix.workers.dev';
+  var TOKEN_KEY = 'civix.token';
+
+  var state = { token: null, address: '', items: [], view: 'docket' };
+
+  var listEl = document.getElementById('list');
+  var errBar = document.getElementById('errBar');
+  var errText = document.getElementById('errText');
+
+  /* ---------------------------------------------------------------
+     Network
+  ----------------------------------------------------------------*/
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: {} };
+    if (opts.body) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(API + path, init).then(function (r) {
+      return r.text().then(function (txt) {
+        var data;
+        try { data = txt ? JSON.parse(txt) : {}; } catch (e) { data = { error: txt }; }
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      });
+    });
+  }
+
+  function showError(msg) {
+    errText.textContent = msg;
+    errBar.classList.add('show');
+  }
+  function clearError() { errBar.classList.remove('show'); }
+
+  /* ---------------------------------------------------------------
+     Token — the docket's only credential. Fragment first so it can
+     be moved between devices by copying one link.
+  ----------------------------------------------------------------*/
+  function readToken() {
+    var frag = (window.location.hash || '').replace(/^#/, '').trim();
+    if (/^[a-z0-9]{10}$/.test(frag)) {
+      try { localStorage.setItem(TOKEN_KEY, frag); } catch (e) {}
+      return frag;
+    }
+    try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+  }
+
+  function ensureToken() {
+    var t = readToken();
+    if (t) return Promise.resolve(t);
+    return api('/api/docket', { method: 'POST' }).then(function (d) {
+      try { localStorage.setItem(TOKEN_KEY, d.token); } catch (e) {}
+      return d.token;
+    });
+  }
+
+  /* ---------------------------------------------------------------
+     Helpers
+  ----------------------------------------------------------------*/
+  function since(ts) {
+    var s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return 'just now';
+    var m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+    var h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+    var d = Math.floor(h / 24); if (d < 7) return d + 'd ago';
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function docketUrl() {
+    return window.location.origin + window.location.pathname + '#' + state.token;
+  }
+
+  /* ---------------------------------------------------------------
+     Render
+  ----------------------------------------------------------------*/
+  function visible() {
+    return state.items
+      .filter(function (i) { return i.state === state.view; })
+      .sort(function (a, b) { return b.at - a.at; });
+  }
+
+  function render() {
+    document.getElementById('cDocket').textContent =
+      state.items.filter(function (i) { return i.state === 'docket'; }).length;
+    document.getElementById('cAdopted').textContent =
+      state.items.filter(function (i) { return i.state === 'adopted'; }).length;
+
+    var rows = visible();
+    if (!rows.length) { listEl.innerHTML = emptyMarkup(); return; }
+
+    listEl.innerHTML = rows.map(function (i) {
+      var no = '§ ' + String(i.seq).padStart(3, '0');
+      var bits = [];
+      if (i.host) {
+        bits.push('<a href="' + esc(i.url) + '" target="_blank" rel="noopener noreferrer">' + esc(i.host) + '</a>');
+      }
+      bits.push(esc(since(i.at)));
+      if (i.source === 'mail') bits.push('by mail');
+      var repeat = i.repeats > 1 ? '<span class="repeat">Sent ' + i.repeats + '×</span>' : '';
+
+      return '' +
+        '<article class="filing ' + (i.state === 'adopted' ? 'adopted' : '') + '" data-id="' + esc(i.id) + '">' +
+          '<div class="docket-no">' + no + '</div>' +
+          '<div>' +
+            '<h2>' + esc(i.title) + repeat + '</h2>' +
+            '<div class="meta">' + bits.join(' &nbsp;·&nbsp; ') + '</div>' +
+            (i.note ? '<p class="note">' + esc(i.note) + '</p>' : '') +
+            '<div class="actions">' +
+              (i.state === 'docket'
+                ? '<button class="act adopt" data-do="adopt">Adopt</button>'
+                : '<button class="act" data-do="return">Return to docket</button>') +
+              '<button class="act" data-do="rename">Rename</button>' +
+              '<button class="act strike" data-do="strike">Strike</button>' +
+            '</div>' +
+          '</div>' +
+        '</article>';
+    }).join('');
+  }
+
+  function emptyMarkup() {
+    if (state.view === 'adopted') {
+      return '<div class="empty">' +
+        '<h2>Nothing adopted yet</h2>' +
+        '<p>Adopt a filing from your docket and it becomes part of what CiViX works on for you.</p>' +
+        '</div>';
+    }
+    return '<div class="empty">' +
+      '<h2>Your docket is clear</h2>' +
+      '<p>Next time something irks or interests you, send it here instead of losing it in a tab.</p>' +
+      '<ol class="steps">' +
+        '<li>Save the CiViX contact above — one tap.</li>' +
+        '<li>Hit share in any app, then pick Mail.</li>' +
+        '<li>Type “CiViX” in the To field and send. It lands here.</li>' +
+      '</ol>' +
+      '</div>';
+  }
+
+  /* ---------------------------------------------------------------
+     Load
+  ----------------------------------------------------------------*/
+  function load() {
+    return api('/api/filings?token=' + encodeURIComponent(state.token))
+      .then(function (d) {
+        clearError();
+        state.address = d.address || '';
+        state.items = d.items || [];
+        document.getElementById('addrValue').textContent = state.address;
+        document.getElementById('vcardLink').href =
+          API + '/api/vcard?token=' + encodeURIComponent(state.token);
+        document.getElementById('addrPanel').hidden = false;
+        render();
+      })
+      .catch(function (e) {
+        showError('Couldn’t reach your docket — ' + e.message);
+        if (!state.items.length) listEl.innerHTML = '';
+      });
+  }
+
+  document.getElementById('retryBtn').addEventListener('click', function () {
+    listEl.innerHTML = '<div class="loading">Loading your docket…</div>';
+    load();
+  });
+
+  /* ---------------------------------------------------------------
+     Actions — optimistic, with rollback on failure
+  ----------------------------------------------------------------*/
+  function findItem(id) {
+    for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
+    return null;
+  }
+
+  listEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-do]');
+    if (!btn) return;
+    var card = btn.closest('.filing');
+    var id = card.getAttribute('data-id');
+    var item = findItem(id);
+    if (!item) return;
+
+    var act = btn.getAttribute('data-do');
+
+    if (act === 'adopt' || act === 'return') {
+      var next = act === 'adopt' ? 'adopted' : 'docket';
+      var prev = item.state;
+      item.state = next;
+      render();
+      toast(act === 'adopt' ? 'Adopted.' : 'Back on the docket.');
+      api('/api/filing?token=' + encodeURIComponent(state.token),
+          { method: 'PATCH', body: { id: id, state: next } })
+        .catch(function (err) {
+          item.state = prev; render();
+          showError('That didn’t save — ' + err.message);
+        });
+
+    } else if (act === 'rename') {
+      var h = card.querySelector('h2');
+      if (!h) return;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'rename-field';
+      input.value = item.title;
+      h.replaceWith(input);
+      input.focus();
+      input.select();
+
+      var done = false;
+      var commit = function (keep) {
+        if (done) return;
+        done = true;
+        var v = input.value.trim();
+        if (keep && v && v !== item.title) {
+          var was = item.title;
+          item.title = v;
+          render();
+          api('/api/filing?token=' + encodeURIComponent(state.token),
+              { method: 'PATCH', body: { id: id, title: v } })
+            .catch(function (err) {
+              item.title = was; render();
+              showError('Rename didn’t save — ' + err.message);
+            });
+        } else {
+          render();
+        }
+      };
+      input.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') commit(true);
+        if (ev.key === 'Escape') commit(false);
+      });
+      input.addEventListener('blur', function () { commit(true); });
+
+    } else if (act === 'strike') {
+      card.classList.add('striking');
+      window.setTimeout(function () {
+        var idx = state.items.indexOf(item);
+        var snapshot = item;
+        state.items = state.items.filter(function (i) { return i.id !== id; });
+        render();
+
+        api('/api/filing?token=' + encodeURIComponent(state.token),
+            { method: 'DELETE', body: { id: id } })
+          .then(function () {
+            toast('Struck.', 'Undo', function () {
+              // Re-file it: the row is gone server-side, so this creates a fresh one.
+              api('/api/filings?token=' + encodeURIComponent(state.token), {
+                method: 'POST',
+                body: { title: snapshot.title, url: snapshot.url, text: snapshot.note }
+              }).then(load).catch(function (err) {
+                showError('Couldn’t undo — ' + err.message);
+              });
+            });
+          })
+          .catch(function (err) {
+            state.items.splice(Math.min(idx, state.items.length), 0, snapshot);
+            render();
+            showError('Couldn’t strike that — ' + err.message);
+          });
+      }, 340);
+    }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.filter'), function (b) {
+    b.addEventListener('click', function () {
+      state.view = b.getAttribute('data-view');
+      Array.prototype.forEach.call(document.querySelectorAll('.filter'), function (o) {
+        o.setAttribute('aria-selected', String(o === b));
+      });
+      render();
+    });
+  });
+
+  /* ---------------------------------------------------------------
+     Composer
+  ----------------------------------------------------------------*/
+  function addFromInput() {
+    var el = document.getElementById('linkInput');
+    var v = el.value.trim();
+    if (!v) return;
+    el.value = '';
+    state.view = 'docket';
+    Array.prototype.forEach.call(document.querySelectorAll('.filter'), function (o) {
+      o.setAttribute('aria-selected', String(o.getAttribute('data-view') === 'docket'));
+    });
+
+    api('/api/filings?token=' + encodeURIComponent(state.token),
+        { method: 'POST', body: { text: v } })
+      .then(function (r) {
+        toast(r.status === 'repeat' ? 'Already on your docket.' : 'Filed.');
+        return load();
+      })
+      .catch(function (err) {
+        el.value = v;
+        showError('Couldn’t file that — ' + err.message);
+      });
+  }
+  document.getElementById('addBtn').addEventListener('click', addFromInput);
+  document.getElementById('linkInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addFromInput();
+  });
+
+  /* ---------------------------------------------------------------
+     Address panel
+  ----------------------------------------------------------------*/
+  function copy(text, label) {
+    var done = function () { toast(label); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { prompt('Copy this:', text); });
+    } else {
+      prompt('Copy this:', text);
+    }
+  }
+  document.getElementById('copyAddr').addEventListener('click', function () {
+    copy(state.address, 'Address copied.');
+  });
+  document.getElementById('copyDocket').addEventListener('click', function () {
+    copy(docketUrl(), 'Docket link copied.');
+  });
+
+  /* ---------------------------------------------------------------
+     Toast
+  ----------------------------------------------------------------*/
+  var toastEl = document.getElementById('toast');
+  var toastTimer;
+  function toast(msg, actionLabel, onAction) {
+    window.clearTimeout(toastTimer);
+    toastEl.innerHTML = '<span></span>';
+    toastEl.firstChild.textContent = msg;
+    if (actionLabel) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = actionLabel;
+      b.addEventListener('click', function () { onAction(); hideToast(); });
+      toastEl.appendChild(b);
+    }
+    toastEl.classList.add('show');
+    toastTimer = window.setTimeout(hideToast, actionLabel ? 6000 : 2400);
+  }
+  function hideToast() { toastEl.classList.remove('show'); }
+
+  /* ---------------------------------------------------------------
+     Theme
+  ----------------------------------------------------------------*/
+  var themeBtn = document.getElementById('themeBtn');
+  function setTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    themeBtn.textContent = t === 'dark' ? 'Light' : 'Dark';
+    document.querySelector('meta[name="theme-color"]')
+      .setAttribute('content', t === 'dark' ? '#14161a' : '#f0efe8');
+    try { localStorage.setItem('civix.theme', t); } catch (e) {}
+  }
+  var savedTheme;
+  try { savedTheme = localStorage.getItem('civix.theme'); } catch (e) {}
+  if (!savedTheme) {
+    savedTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+  setTheme(savedTheme);
+  themeBtn.addEventListener('click', function () {
+    setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------------------------------------------------------------
+     Data controls
+  ----------------------------------------------------------------*/
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    var payload = { address: state.address, exported_at: new Date().toISOString(), items: state.items };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'civix-docket.json';
+    a.click();
+    window.setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function () {
+    if (!state.items.length) { toast('Nothing to clear.'); return; }
+    if (!window.confirm('Delete all ' + state.items.length + ' filings? This cannot be undone.')) return;
+    var ids = state.items.map(function (i) { return i.id; });
+    toast('Clearing…');
+    Promise.all(ids.map(function (id) {
+      return api('/api/filing?token=' + encodeURIComponent(state.token),
+                 { method: 'DELETE', body: { id: id } });
+    })).then(function () {
+      return load();
+    }).then(function () {
+      toast('Docket cleared.');
+    }).catch(function (err) {
+      showError('Couldn’t clear everything — ' + err.message);
+      load();
+    });
+  });
+
+  /* ---------------------------------------------------------------
+     Boot — handle an inbound share, then load
+  ----------------------------------------------------------------*/
+  var params = new URLSearchParams(window.location.search);
+  var shared = null;
+  if (params.has('title') || params.has('text') || params.has('url')) {
+    shared = {
+      title: params.get('title') || '',
+      text: params.get('text') || '',
+      url: params.get('url') || ''
+    };
+    if (window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    }
+  }
+
+  ensureToken()
+    .then(function (t) {
+      state.token = t;
+      if (!window.location.hash) {
+        try { window.history.replaceState(null, '', window.location.pathname + '#' + t); } catch (e) {}
+      }
+      if (!shared) return null;
+      return api('/api/filings?token=' + encodeURIComponent(t), { method: 'POST', body: shared })
+        .then(function (r) {
+          var slot = document.getElementById('receiptSlot');
+          var box = document.createElement('div');
+          var dupe = r.status === 'repeat';
+          box.className = 'receipt' + (dupe ? ' dupe' : '');
+          box.innerHTML = '<span class="eyebrow">' +
+            (dupe ? 'Already filed' : 'Filed to your docket') + '</span><p></p>';
+          box.querySelector('p').textContent = dupe
+            ? 'This one is already on your docket.'
+            : (shared.title || shared.url || shared.text).slice(0, 140);
+          slot.appendChild(box);
+        })
+        .catch(function (err) { showError('That share didn’t file — ' + err.message); });
+    })
+    .then(load)
+    .catch(function (err) {
+      showError('Couldn’t start a docket — ' + err.message);
+      listEl.innerHTML = '';
+    });
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
