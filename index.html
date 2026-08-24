@@ -497,6 +497,20 @@
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ---- Daily-once gating ----
+  // The amendment sequence plays only on the first visit to the splash
+  // each calendar day; any later visit that day — a reload, or navigating
+  // back from another page on the site — lands straight on the finished
+  // state instead. Replay (the transport button below) always re-plays on
+  // request regardless of this gate.
+  const SEEN_KEY = 'civix-splash-seen';
+  const today = new Date().toDateString();
+  let seenToday = false;
+  try { seenToday = localStorage.getItem(SEEN_KEY) === today; } catch (e) {}
+  function markSeenToday() {
+    try { localStorage.setItem(SEEN_KEY, today); } catch (e) {}
+  }
+
   // ---- Theme ----
   const THEME_COLORS = { dark: '#0A0F1C', light: '#FBFAF7' };
   function applyTheme(theme) {
@@ -584,8 +598,13 @@
   function start() {
     measure();
     stage.classList.add('is-ready');
-    if (reduced) finish();
-    else play();
+    if (seenToday) {
+      finish();
+    } else {
+      markSeenToday();
+      if (reduced) finish();
+      else play();
+    }
   }
 
   if (document.fonts && document.fonts.ready) {
