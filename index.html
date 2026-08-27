@@ -70,6 +70,14 @@
 
   * { box-sizing: border-box; }
 
+  :root {
+    /* Shared by .amendments, its margin rule, and .sec's position calc —
+       kept as variables so the mobile override below can shrink all
+       three in lockstep instead of three clamp()s drifting out of sync. */
+    --amend-indent: clamp(46px, 7vw, 96px);
+    --rule-inset: clamp(20px, 3.2vw, 46px);
+  }
+
   html, body {
     margin: 0;
     padding: 0;
@@ -78,6 +86,11 @@
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
     transition: background 0.25s ease, color 0.25s ease;
+    /* Belt-and-suspenders: a measured .del/.ins span is pinned to its own
+       natural pixel width (see measure() in the script), so a long enough
+       phrase at the font-size floor can still exceed a very narrow
+       viewport. This stops that from becoming a horizontal scrollbar. */
+    overflow-x: hidden;
   }
 
   /* ---- Header bar: raised strip, hairline underneath (PTP) ---- */
@@ -154,13 +167,13 @@
   .amendments {
     list-style: none;
     margin: 0;
-    padding: 0 0 0 clamp(46px, 7vw, 96px);
+    padding: 0 0 0 var(--amend-indent);
     position: relative;
   }
   .amendments::before {
     content: "";
     position: absolute;
-    left: clamp(20px, 3.2vw, 46px);
+    left: var(--rule-inset);
     top: 0;
     bottom: 0;
     width: 1px;
@@ -178,7 +191,7 @@
 
   .sec {
     position: absolute;
-    left: calc(-1 * clamp(46px, 7vw, 96px) + clamp(20px, 3.2vw, 46px) + 12px);
+    left: calc(-1 * var(--amend-indent) + var(--rule-inset) + 12px);
     top: 0.86em;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: clamp(9px, 1.05vw, 11px);
@@ -388,12 +401,58 @@
     .del::after, .ins::after, html, body { transition: none; }
   }
 
+  /* ---- Sticky mobile CTA ----
+     The in-flow CTA in .resolve only appears once the whole amendment
+     sequence resolves (by design — it's the storytelling payoff), which
+     on a first mobile visit means ~7 seconds with no visible way to
+     start, and even after that it can sit below the fold. This bar is a
+     second, always-visible entry point pinned to the bottom of the
+     screen from first paint — hidden on desktop, where the in-flow CTA
+     is reachable immediately without scrolling past four stacked lines. */
+  .cta-sticky {
+    display: none;
+  }
+
   @media (max-width: 560px) {
+    :root {
+      --amend-indent: clamp(28px, 10vw, 46px);
+      --rule-inset: clamp(13px, 4.6vw, 24px);
+    }
+    /* The desktop clamp's vw coefficient (7.6vw) barely shrinks on a
+       phone-width viewport, so the longest pre-strike phrase ("get more
+       of the same" — measure() in the script pins it to its own natural
+       pixel width) stays wider than the screen. A lower coefficient here
+       actually shrinks with the viewport instead of hovering near a
+       floor that was tuned for short lines. */
+    .line { font-size: clamp(19px, 6.1vw, 88px); }
+    .sec { font-size: 8.5px; }
+
     .resolve { flex-direction: column; align-items: stretch; }
     .cta { width: 100%; }
     .mark-sub { display: none; }
     .line-row { flex-direction: column; align-items: flex-start; }
-    .agent-links { margin-top: 2px; }
+    .agent-links { margin-top: 2px; gap: 6px; }
+    .agent-link { font-size: 10px; padding: 4px 9px; }
+
+    /* Room for the sticky CTA bar so it never covers the resolve block. */
+    .wrap { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+    /* Fixed-bottom transport controls fight the resolve block on short
+       viewports — the page's natural content height can exceed the
+       viewport, so whatever ends up scrolled to the bottom sits right
+       behind them. Top-right, under the header, can't collide with
+       either the resolve block or the sticky CTA bar. */
+    .transport { top: 66px; bottom: auto; right: clamp(14px, 3vw, 28px); }
+
+    .cta-sticky {
+      display: flex;
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 50;
+      padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: var(--ink-raised);
+      border-top: 1px solid var(--line);
+    }
+    .cta-sticky .cta { width: 100%; margin: 0; }
   }
 </style>
 </head>
@@ -482,6 +541,10 @@
 <div class="transport">
   <button class="tbtn" id="skip">Skip</button>
   <button class="tbtn" id="replay" hidden>Replay</button>
+</div>
+
+<div class="cta-sticky">
+  <button class="cta" id="cta-sticky">Build your profile</button>
 </div>
 
 <script>
@@ -626,6 +689,9 @@
   replayBtn.addEventListener('click', play);
 
   cta.addEventListener('click', () => {
+    window.location.href = 'builder.html';
+  });
+  document.getElementById('cta-sticky').addEventListener('click', () => {
     window.location.href = 'builder.html';
   });
 })();
