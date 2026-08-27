@@ -430,7 +430,7 @@
 
   <div class="wip">
     <span>&#9888;</span>
-    <span><strong>Municipal and state are still placeholders —</strong> there's no unified public data source for either yet, so the cards below are sample content. Federal, below that, is live: real bill activity from congress.gov, matched against your profile where you have one.</span>
+    <span><strong>Municipal is still a placeholder —</strong> there's no unified public data source for city/county government yet, so the cards below are sample content. State and Federal, below that, are both live.</span>
   </div>
 
 <p class="section-label">Municipal</p>
@@ -445,16 +445,8 @@
     <div class="card-body">Follow-up to the funding proposal introduced this spring.</div>
   </div>
 <p class="section-label">State</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">SB 214 — Tribal water rights compact ratification</span><span class="tag">State</span></div>
-    <div class="card-meta">Sep 15 · Senate floor vote</div>
-    <div class="card-body">Ratifies the renegotiated compact; committee sent it to the floor with a bipartisan recommendation.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Committee hearing — statewide broadband access</span><span class="tag">State</span></div>
-    <div class="card-meta">Oct 2 · House Committee</div>
-    <div class="card-body">Testimony window open for public and advocacy groups.</div>
-  </div>
+  <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
+  <div id="state-list"></div>
 <p class="section-label">Federal</p>
   <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
   <div id="fed-list"></div>
@@ -927,6 +919,74 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     if (e.key === 'Escape' && ACTIVE) closeActionModal();
   });
 
+  // State cards intentionally have no Take Action button — reps.js only
+  // resolves federal (US House/Senate) contacts today, so wiring the same
+  // button in here would show a state bill's reader their federal rep,
+  // which is simply wrong. State-legislator lookup + drafting is future
+  // scope, not shipped alongside this data slice.
+  function renderStateCard(bill, hits) {
+    const title = bill.url
+      ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
+      : esc(bill.title);
+    const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
+    const tags = hits && hits.length
+      ? `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
+      : '';
+    return `
+      <div class="card">
+        <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">State</span></div>
+        <div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>
+        <div class="card-body">${action}</div>
+        ${tags}
+      </div>`;
+  }
+
+  async function bootState() {
+    const statusEl = document.getElementById('state-status');
+    const listEl = document.getElementById('state-list');
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+
+    if (!zip) {
+      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your profile</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
+      return;
+    }
+
+    let data;
+    try {
+      const r = await fetch('/api/state-bills?zip=' + encodeURIComponent(zip));
+      data = await r.json();
+      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+    } catch (e) {
+      statusEl.textContent = "Couldn't reach the state calendar. Try reloading in a bit.";
+      statusEl.classList.add('is-error');
+      return;
+    }
+
+    const bills = data.bills || [];
+    if (!bills.length) {
+      statusEl.textContent = `No recent activity came back for ${data.state || 'your state'}'s legislature — try again later.`;
+      return;
+    }
+
+    const issues = profile.issues || [];
+    if (!issues.length) {
+      statusEl.innerHTML = `Showing the most recently updated bills in ${esc(data.state)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
+      listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
+      return;
+    }
+
+    const matched = matchBills(bills, issues);
+    if (!matched.length) {
+      statusEl.textContent = `Checked ${bills.length} recently updated ${data.state} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
+      listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
+      return;
+    }
+
+    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated ${data.state} bills against your profile, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
+    listEl.innerHTML = matched.slice(0, 8).map(m => renderStateCard(m.bill, m.hits)).join('');
+  }
+
   async function boot() {
     const statusEl = document.getElementById('fed-status');
     const listEl = document.getElementById('fed-list');
@@ -971,6 +1031,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   }
 
   boot();
+  bootState();
 })();
 </script>
 </body>
