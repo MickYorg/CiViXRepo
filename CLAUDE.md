@@ -5,7 +5,7 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 24 Aug 2026)
+## Current state (as of 25 Aug 2026)
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -33,28 +33,29 @@ see "Deliberately not yet done" below for why.
 - PolTraPro (poltrapro.com) — separate product, own domain, linked from the
   splash. Relationship to CiViX (same family vs. unrelated) not yet decided.
 
-## In progress: Netlify → Cloudflare migration
+## Netlify → Cloudflare migration — done
 
-The site just moved hosting from Netlify to Cloudflare. **Unresolved as of
-this writing:** `netlify.toml` and `netlify/functions/*.js` are still present
-and still Netlify-specific (they use `@netlify/blobs` for storage and the
-Netlify Functions v2 Request/Response convention). Cloudflare Pages does NOT
-run Netlify Functions automatically — it needs its own `/functions` directory
-convention and a different storage backend (Workers KV or D1 instead of
-Netlify Blobs).
+The site moved hosting from Netlify to Cloudflare and the backend port is
+complete and verified live. `functions/api/dig-check.js` and
+`functions/api/dig-stats.js` are the Cloudflare Pages Functions equivalents
+of the old `netlify/functions/*.js`, using Workers KV (`DIG_KV`) instead of
+`@netlify/blobs`. `wrangler.toml` scopes KV bindings explicitly per
+environment (`env.preview` / `env.production`, no root-level fallback) —
+an earlier attempt with a root `[[kv_namespaces]]` block plus a production
+override left Production silently resolving to the preview namespace even
+after a fresh deploy; explicit scoping on both sides fixed it.
 
-A live check on 24 Aug 2026 showed `mycivix.com/dig/` loading, but its
-community-stats panel stuck on "Loading…" — consistent with `/api/dig-check`
-and `/api/dig-stats` no longer resolving post-migration. **First thing to
-verify**: whether the backend functions were ported to Cloudflare Pages
-Functions, or only the static files moved.
+Verified live 25 Aug 2026: `mycivix.com/dig/` returns 200, and
+`/api/dig-stats` returns real accumulated data (sources, topics, ratings).
+The old `netlify.toml` / `netlify/functions/*.js` files may still be present
+in the repo as leftovers — worth confirming they're inert and safe to
+delete, but they are no longer what's serving traffic.
 
 ## Known housekeeping debt
 
-- **No git history** — the project has never been under version control.
-  `git init` + one commit as a checkpoint should happen before anything else
-  changes. A `.gitignore` (excluding `.wrangler/`, `.DS_Store`, `node_modules/`)
-  is already in the folder root, ready for this.
+- **Git history exists now** — `git init` happened, the repo is on GitHub
+  with `main` tracking `origin/main`, and the working tree is clean as of
+  25 Aug 2026 (10 commits). The old "no git history" debt is resolved.
 - **Design tokens are hand-copied per page**, and have already drifted:
   `index.html`/`calendar.html`/`builder.html` share one token system (navy/
   paper/amber, Newsreader + IBM Plex Mono); `capture.html` runs a visibly
