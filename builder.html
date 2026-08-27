@@ -322,6 +322,13 @@
     margin-bottom: 8px;
     align-items: center;
   }
+  .srow-badge {
+    grid-column: 1 / -1;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--amber-ink);
+  }
 
   /* ---- Action grid ---- */
   .acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
@@ -752,9 +759,12 @@
         <span class="sec-caret">›</span>
       </div>
       <div class="sec-body">
-        <p class="sec-note">Outlets and voices you want weighted when CiViX reads coverage.</p>
+        <p class="sec-note">Outlets and voices you want weighted when CiViX reads coverage. Sources you've added and rated in DIG are pulled in automatically — use Sync to pick up ones you've added there since.</p>
         <div id="sources-list"></div>
-        <button class="btn" id="add-source" type="button" style="margin-top:6px;">Add a source</button>
+        <div class="row" style="margin-top:6px;">
+          <button class="btn" id="add-source" type="button">Add a source</button>
+          <button class="btn" id="sync-dig" type="button">Sync from DIG</button>
+        </div>
         <div class="handoff">
           <p class="sec-note" style="margin:0 0 9px;">DIG checks how each of these is covering a topic, side by side.</p>
           <a class="btn btn-primary" href="dig/" target="_blank" rel="noopener">Open DIG &#8599;</a>
@@ -802,6 +812,9 @@
     <div class="finish" id="finish"></div>
 
     <div class="row" style="margin-top:18px;">
+      <button class="btn" id="export-manifesto" type="button">Download manifesto</button>
+      <button class="btn" id="import-manifesto-btn" type="button">Import manifesto</button>
+      <input type="file" id="import-manifesto-file" accept="application/json" style="display:none;">
       <button class="btn btn-danger" id="wipe" type="button">Delete everything on this device</button>
     </div>
   </div>
@@ -866,7 +879,8 @@
     actions: [],       // action keys
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
-    updated: null
+    updated: null,
+    digSyncedAt: null  // set once trusted sources have been pulled in from DIG
   };
 
   let P = load();
@@ -1012,6 +1026,22 @@
     `).join('');
   }
 
+  // A source rated in DIG (localStorage 'dig-ratings', keyed by source
+  // name — DIG keeps one like/dislike + star rating per source, not per
+  // topic) shows that rating here, so the trust signal DIG already
+  // captured is visible where the source is actually declared trusted.
+  function digRatingBadge(name) {
+    let ratings;
+    try { ratings = JSON.parse(localStorage.getItem('dig-ratings') || '{}'); } catch (e) { return ''; }
+    const r = ratings[name];
+    if (!r || (!r.like && !r.stars)) return '';
+    const bits = [];
+    if (r.like === 'up') bits.push('\u{1F44D}');
+    if (r.like === 'down') bits.push('\u{1F44E}');
+    if (r.stars) bits.push('★'.repeat(r.stars));
+    return bits.length ? `<div class="srow-badge">${bits.join(' ')} rated in DIG</div>` : '';
+  }
+
   function renderSources() {
     const el = document.getElementById('sources-list');
     if (!P.sources.length) {
@@ -1020,11 +1050,75 @@
     }
     el.innerHTML = P.sources.map((s, idx) => `
       <div class="srow">
+        ${digRatingBadge(s.name)}
         <input class="field" type="text" data-src-name="${idx}" value="${esc(s.name)}" placeholder="Name">
         <input class="field mono" type="text" data-src-hint="${idx}" value="${esc(s.hint)}" placeholder="Where to find them">
         <button type="button" class="btn btn-quiet" data-drop-src="${idx}" aria-label="Remove source">✕</button>
       </div>
     `).join('');
+  }
+
+  // ---- DIG source sync -------------------------------------------------
+  // One-way: DIG's own onboarding-built source list -> the Manifesto's
+  // § 04. Dedup by name; doesn't touch DIG's own list, and doesn't
+  // re-add anything the user has since removed here (only runs the
+  // silent auto-merge once per device, via P.digSyncedAt).
+  function loadDigSources() {
+    try { return JSON.parse(localStorage.getItem('dig-sources') || '[]'); } catch (e) { return []; }
+  }
+
+  function mergeDigSources() {
+    const digSources = loadDigSources();
+    if (!digSources.length) return 0;
+    const existing = new Set(P.sources.map(s => (s.name || '').trim().toLowerCase()));
+    let added = 0;
+    digSources.forEach(ds => {
+      const name = (ds.name || '').trim();
+      if (!name || existing.has(name.toLowerCase())) return;
+      P.sources.push({ name, hint: ds.hint || '' });
+      existing.add(name.toLowerCase());
+      added++;
+    });
+    return added;
+  }
+
+  // ---- Manifesto file export/import ------------------------------------
+  // The profile's only path off this device used to be "Copy as text" —
+  // readable, but lossy (weights become words, no structure to reload).
+  // This is the real thing: the exact P object, downloadable and
+  // reloadable, docket token included on purpose so the same docket
+  // follows the manifesto to a new browser or device.
+  function exportManifesto() {
+    const blob = new Blob([JSON.stringify(P, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'civix-manifesto.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function importManifestoFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); } catch (e) {
+        alert("That file isn't valid JSON — nothing was imported.");
+        return;
+      }
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.issues)) {
+        alert("That doesn't look like a CiViX manifesto file — nothing was imported.");
+        return;
+      }
+      if (!confirm("Import this manifesto? It replaces everything currently on this device — profile, sources, and your capture address — with what's in the file. This can't be undone.")) return;
+      P = Object.assign({}, BLANK, parsed);
+      save();
+      renderAll();
+      ensureDrop(false).then(() => { if (P.token) loadInbox(); });
+    };
+    reader.readAsText(file);
   }
 
   function renderActions() {
@@ -1684,6 +1778,23 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
 
     if (t.closest('#copy-doc')) { copy(asText(), t.closest('#copy-doc')); return; }
 
+    if (t.closest('#sync-dig')) {
+      const btn = t.closest('#sync-dig');
+      const added = mergeDigSources();
+      if (added) {
+        amend('add', added + ' source' + (added === 1 ? '' : 's') + ' from DIG');
+        save(); renderAll();
+        btn.textContent = 'Synced ' + added;
+      } else {
+        btn.textContent = 'Nothing new';
+      }
+      setTimeout(() => { btn.textContent = 'Sync from DIG'; }, 1600);
+      return;
+    }
+
+    if (t.closest('#export-manifesto')) { exportManifesto(); return; }
+    if (t.closest('#import-manifesto-btn')) { document.getElementById('import-manifesto-file').click(); return; }
+
     if (t.closest('#wipe')) {
       if (confirm('Delete your profile from this device? Priorities, positions, sources, and your capture address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
         try { localStorage.removeItem(KEY); } catch (e) {}
@@ -1808,9 +1919,25 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
   });
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
 
+  document.getElementById('import-manifesto-file').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importManifestoFromFile(file);
+    e.target.value = ''; // allow re-selecting the same file later
+  });
+
   // ---- Boot -----------------------------------------------------------
   document.getElementById('place-zip').value = P.place.zip || '';
   document.getElementById('time-budget').value = P.time || '';
+  // One-time, silent: pulls in whatever's already in DIG's own source list
+  // the first time this device sees this change, so existing manifestos
+  // get the same incorporation new ones do without re-running on every
+  // load and fighting sources the user has since removed here.
+  if (!P.digSyncedAt) {
+    const added = mergeDigSources();
+    P.digSyncedAt = Date.now();
+    if (added) amend('add', added + ' source' + (added === 1 ? '' : 's') + ' from DIG');
+    save();
+  }
   renderAll();
   // Issued asynchronously so a slow or unreachable worker never blocks the
   // builder — everything else on this page works without an address.
