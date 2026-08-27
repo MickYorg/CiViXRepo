@@ -253,6 +253,115 @@
   }
   .build-cta a { color: var(--amber-ink); }
 
+  .take-action {
+    appearance: none;
+    background: var(--amber);
+    border: none;
+    color: var(--btn-ink);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 7px 13px;
+    border-radius: 7px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  .take-action:hover { filter: brightness(1.06); }
+
+  /* ---- Action modal — draft a call/email against a matched bill, and
+     stub an "add to calendar" using the bill's own legislative-action
+     date. Single centered dialog, not a carousel: unlike the Inbox/DIG
+     focus modes there's no "next" concept, this is one bill's context. */
+  .action-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(7, 11, 21, 0.86);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  :root[data-theme="light"] .action-overlay { background: rgba(20, 25, 43, 0.72); }
+  .action-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 24px;
+    width: 100%; max-width: 600px;
+    max-height: 86dvh;
+    overflow-y: auto;
+    position: relative;
+  }
+  .action-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: 1px solid var(--line); color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    padding: 7px 11px; border-radius: 7px; cursor: pointer;
+  }
+  .action-close:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .action-bill-title { font-weight: 600; font-size: 18px; line-height: 1.35; padding-right: 70px; }
+  .action-bill-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.05em; color: var(--paper-dim); margin: 6px 0 18px;
+  }
+  .action-empty { font-size: 13px; color: var(--paper-dim); line-height: 1.6; }
+  .action-empty a { color: var(--amber-ink); }
+  .action-section {
+    border-top: 1px solid var(--line-soft, var(--line));
+    padding-top: 16px; margin-top: 16px;
+  }
+  .action-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .action-section-title {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--paper-dim); margin-bottom: 10px;
+  }
+  .rep-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .rep-chip {
+    appearance: none;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    padding: 6px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+  .rep-chip:hover { border-color: var(--paper-dim); }
+  .rep-chip.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
+  .action-draft {
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .action-draft.is-loading { color: var(--paper-dim); font-style: italic; }
+  .action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: none;
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    padding: 8px 13px;
+    border-radius: 7px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .btn:hover { border-color: var(--paper-dim); }
+  .btn-primary { background: var(--amber); border-color: var(--amber); color: var(--btn-ink); font-weight: 500; }
+  .btn-primary:hover { filter: brightness(1.06); border-color: var(--amber); }
+  .ics-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
+
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -353,6 +462,10 @@
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
 </div>
 
+<div class="action-overlay" id="action-overlay">
+  <div class="action-card" id="action-card"></div>
+</div>
+
 <script>
 (function () {
   var root = document.documentElement;
@@ -449,7 +562,11 @@
 
   function fmtDate(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
+    // A bare "YYYY-MM-DD" (all the congress.gov dates used here) parses as
+    // UTC midnight, which toLocaleDateString then renders in local time —
+    // in any timezone behind UTC that silently shows the day before. Force
+    // local-midnight parsing instead, matching buildIcs's date handling.
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + 'T00:00:00') : new Date(iso);
     if (isNaN(d)) return iso;
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
@@ -471,7 +588,7 @@
     return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
   }
 
-  function renderCard(bill, hits) {
+  function renderCard(bill, hits, idx) {
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
@@ -486,8 +603,329 @@
         <div class="card-meta">${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}</div>
         <div class="card-body">${action}</div>
         ${tags}
+        <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
       </div>`;
   }
+
+  // ---- Take action: rep lookup + AI-drafted call script / email ----
+  let CURRENT = [];   // rendered {bill, hits} list, indexed for data-take-action
+  let ACTIVE = null;  // the bill currently open in the action modal
+  let REPS_CACHE = {};
+
+  function loadRawProfile() {
+    try {
+      const raw = localStorage.getItem('civix-profile');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  async function digCheckCall(prompt) {
+    const r = await fetch('/api/dig-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b.error && b.error.message) msg = b.error.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    const data = await r.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) throw new Error('empty response');
+    return text;
+  }
+
+  async function fetchReps(zip) {
+    if (REPS_CACHE[zip]) return REPS_CACHE[zip];
+    const r = await fetch('/api/reps?zip=' + encodeURIComponent(zip));
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+    REPS_CACHE[zip] = data;
+    return data;
+  }
+
+  function pickDefaultRep(reps, bill) {
+    const wantSenate = (bill.type || '').toLowerCase().startsWith('s');
+    return reps.find(r => r.area === (wantSenate ? 'US Senate' : 'US House')) || reps[0];
+  }
+
+  function copy(text, btn) {
+    const done = () => {
+      if (!btn) return;
+      const was = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = was; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    } else fallbackCopy(text, done);
+  }
+  function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  // ---- "Add to calendar" stub — CiViX has no rally/event data source
+  // yet, so this adds the bill's own latest legislative-action date as a
+  // plain reminder, labeled honestly as such rather than as an event.
+  function icsEscape(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  }
+  function icsDate(d) { return d.toISOString().slice(0, 10).replace(/-/g, ''); }
+  function buildIcs(bill) {
+    const dateStr = (bill.latestAction && bill.latestAction.date) || bill.updateDate;
+    if (!dateStr) return null;
+    const start = new Date(dateStr + 'T00:00:00');
+    if (isNaN(start)) return null;
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    const uid = 'civix-' + bill.congress + '-' + bill.type + bill.number + '@mycivix.com';
+    const title = ((bill.type || '').toUpperCase() + ' ' + bill.number + ': ' + bill.title).slice(0, 200);
+    const desc = (bill.latestAction ? bill.latestAction.text + ' ' : '') +
+      '(Tracked via CiViX \u2014 this is the bill\u2019s latest legislative action date, not a confirmed event.)';
+    return [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CiViX//Calendar//EN', 'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      'UID:' + uid,
+      'DTSTAMP:' + icsDate(new Date()) + 'T000000Z',
+      'DTSTART;VALUE=DATE:' + icsDate(start),
+      'DTEND;VALUE=DATE:' + icsDate(end),
+      'SUMMARY:' + icsEscape(title),
+      'DESCRIPTION:' + icsEscape(desc),
+      bill.url ? 'URL:' + bill.url : '',
+      'END:VEVENT', 'END:VCALENDAR'
+    ].filter(Boolean).join('\r\n');
+  }
+  function downloadIcs(bill) {
+    const ics = buildIcs(bill);
+    if (!ics) return;
+    const blob = new Blob([ics], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'civix-' + bill.type + bill.number + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  async function generateDrafts() {
+    const rep = ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
+    if (!rep) return;
+    ACTIVE.call = { status: 'loading' };
+    ACTIVE.email = { status: 'loading' };
+    renderActionCard();
+
+    const profile = loadRawProfile();
+    const matchedIssues = (profile && profile.issues || []).filter(i => (ACTIVE.hits || []).includes(i.name));
+    const stanceText = matchedIssues.length
+      ? matchedIssues.map(i => i.stance ? `${i.name}: "${i.stance}"` : i.name).join('; ')
+      : '';
+    const noStanceNote = "The constituent hasn't written a specific position on this yet — keep the ask general but still concrete (e.g. 'please support/oppose this bill').";
+    const bill = ACTIVE.bill;
+    const billLine = `${(bill.type || '').toUpperCase()} ${bill.number} \u2014 "${bill.title}"`;
+    const actionLine = bill.latestAction ? bill.latestAction.text : 'No recorded action yet.';
+    const chamberWord = rep.area === 'US Senate' ? 'Senator' : 'Representative';
+    const zip = (profile && profile.place && profile.place.zip) || '';
+
+    const callPrompt = `You're helping a constituent prepare for a phone call to their ${chamberWord}'s office about a bill in Congress, for a civic-engagement tool.
+
+${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
+Bill: ${billLine}
+Latest action: ${actionLine}
+${stanceText ? `Constituent's stated position: ${stanceText}` : noStanceNote}
+
+Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.`;
+
+    const emailPrompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office about a bill in Congress, for a civic-engagement tool.
+
+${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
+Bill: ${billLine}
+Latest action: ${actionLine}
+${stanceText ? `Constituent's stated position: ${stanceText}` : noStanceNote}
+Constituent's ZIP: ${zip}
+
+Write a concise constituent email, under 180 words total. Respond in exactly this plain-text format, no markdown:
+
+SUBJECT: <subject line>
+BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chamberWord} [last name]," and signed "A constituent in ${zip || '[ZIP]'}">`;
+
+    const [callResult, emailResult] = await Promise.allSettled([
+      digCheckCall(callPrompt),
+      digCheckCall(emailPrompt)
+    ]);
+
+    if (!ACTIVE || ACTIVE.bill !== bill) return; // closed or switched while in flight
+
+    ACTIVE.call = callResult.status === 'fulfilled'
+      ? { status: 'done', text: callResult.value }
+      : { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+
+    if (emailResult.status === 'fulfilled') {
+      const text = emailResult.value;
+      const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
+      const bodyMatch = text.match(/BODY:\s*([\s\S]+)/i);
+      ACTIVE.email = {
+        status: 'done',
+        subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${billLine}`,
+        body: bodyMatch ? bodyMatch[1].trim() : text
+      };
+    } else {
+      ACTIVE.email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
+    }
+
+    renderActionCard();
+  }
+
+  function renderActionCard() {
+    const el = document.getElementById('action-card');
+    if (!ACTIVE) return;
+    const bill = ACTIVE.bill;
+    const label = (bill.type || '').toUpperCase() + ' ' + bill.number;
+
+    let repsSection;
+    if (ACTIVE.noZip) {
+      repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your profile</a> to find your representatives and draft a call or email.</p>`;
+    } else if (ACTIVE.repsError) {
+      repsSection = `<p class="action-empty">Couldn't look up your representatives: ${esc(ACTIVE.repsError)}</p>`;
+    } else if (!ACTIVE.reps) {
+      repsSection = `<p class="action-empty">Looking up your representatives&hellip;</p>`;
+    } else if (!ACTIVE.reps.length) {
+      repsSection = `<p class="action-empty">No federal representatives came back for that ZIP.</p>`;
+    } else {
+      const picker = `<div class="rep-picker">${ACTIVE.reps.map(r =>
+        `<button type="button" class="rep-chip ${r.id === ACTIVE.selectedRepId ? 'is-on' : ''}" data-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} \u2014 ${r.area === 'US Senate' ? 'Senate' : 'House'}</button>`
+      ).join('')}</div>`;
+
+      const rep = ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
+      const callBody = ACTIVE.call.status === 'loading'
+        ? `<div class="action-draft is-loading">Drafting a call script&hellip;</div>`
+        : ACTIVE.call.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(ACTIVE.call.error)}</div>`
+          : `<div class="action-draft">${esc(ACTIVE.call.text || '')}</div>`;
+      const callActions = ACTIVE.call.status === 'done'
+        ? `<div class="action-row">
+            ${rep && rep.phone ? `<a class="btn btn-primary" href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}">Call ${esc(rep.phone)}</a>` : ''}
+            <button type="button" class="btn" data-copy-call>Copy script</button>
+          </div>`
+        : '';
+
+      const emailBody = ACTIVE.email.status === 'loading'
+        ? `<div class="action-draft is-loading">Drafting an email&hellip;</div>`
+        : ACTIVE.email.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(ACTIVE.email.error)}</div>`
+          : `<div class="action-draft"><strong>${esc(ACTIVE.email.subject || '')}</strong>\n\n${esc(ACTIVE.email.body || '')}</div>`;
+      const mailto = ACTIVE.email.status === 'done'
+        ? `mailto:?subject=${encodeURIComponent(ACTIVE.email.subject || '')}&body=${encodeURIComponent(ACTIVE.email.body || '')}`
+        : null;
+      const emailActions = ACTIVE.email.status === 'done'
+        ? `<div class="action-row">
+            ${mailto ? `<a class="btn btn-primary" href="${mailto}">Open in email app</a>` : ''}
+            <button type="button" class="btn" data-copy-email>Copy email</button>
+          </div>`
+        : '';
+
+      repsSection = `
+        ${picker}
+        <div class="action-section">
+          <div class="action-section-title">Call</div>
+          ${callBody}
+          ${callActions}
+        </div>
+        <div class="action-section">
+          <div class="action-section-title">Email</div>
+          ${emailBody}
+          ${emailActions}
+        </div>
+      `;
+    }
+
+    const ics = buildIcs(bill);
+    const calSection = `
+      <div class="action-section">
+        <div class="action-section-title">Add to calendar</div>
+        ${ics
+          ? `<button type="button" class="btn" data-add-ics>Add reminder to calendar</button>
+             <p class="ics-note">Adds the bill's latest legislative action date (${esc(fmtDate((bill.latestAction && bill.latestAction.date) || bill.updateDate))}) as a reminder \u2014 not a confirmed rally or public event, CiViX doesn't have that data yet.</p>`
+          : `<p class="action-empty">No dated activity to add for this bill yet.</p>`}
+      </div>
+    `;
+
+    el.innerHTML = `
+      <button class="action-close" type="button" id="action-close">&#10005; CLOSE</button>
+      <div class="action-bill-title">${esc(bill.title)}</div>
+      <div class="action-bill-meta">${esc(label)} \u00b7 Congress ${esc(bill.congress)} \u00b7 ${esc(bill.latestAction ? bill.latestAction.text : '')}</div>
+      ${repsSection}
+      ${calSection}
+    `;
+    document.getElementById('action-close').addEventListener('click', closeActionModal);
+  }
+
+  function openActionModal(idx) {
+    const entry = CURRENT[idx];
+    if (!entry) return;
+    ACTIVE = {
+      bill: entry.bill, hits: entry.hits,
+      reps: null, repsError: null, noZip: false, selectedRepId: null,
+      call: { status: 'idle' }, email: { status: 'idle' }
+    };
+    document.getElementById('action-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    renderActionCard();
+    loadRepsForActive();
+  }
+
+  function closeActionModal() {
+    document.getElementById('action-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    ACTIVE = null;
+  }
+
+  async function loadRepsForActive() {
+    const active = ACTIVE;
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+    if (!zip) { active.noZip = true; renderActionCard(); return; }
+    try {
+      const data = await fetchReps(zip);
+      if (ACTIVE !== active) return; // closed or switched while in flight
+      active.reps = data.reps || [];
+      if (active.reps.length) active.selectedRepId = pickDefaultRep(active.reps, active.bill).id;
+      renderActionCard();
+      if (active.reps.length) generateDrafts();
+    } catch (e) {
+      if (ACTIVE !== active) return;
+      active.repsError = e.message || 'request failed';
+      renderActionCard();
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+
+    const takeAction = t.closest('[data-take-action]');
+    if (takeAction) { openActionModal(Number(takeAction.dataset.takeAction)); return; }
+
+    if (t.id === 'action-overlay') { closeActionModal(); return; }
+
+    const repChip = t.closest('[data-rep]');
+    if (repChip && ACTIVE) { ACTIVE.selectedRepId = repChip.dataset.rep; generateDrafts(); return; }
+
+    if (t.closest('[data-copy-call]') && ACTIVE) { copy(ACTIVE.call.text || '', t.closest('[data-copy-call]')); return; }
+    if (t.closest('[data-copy-email]') && ACTIVE) {
+      copy((ACTIVE.email.subject || '') + '\n\n' + (ACTIVE.email.body || ''), t.closest('[data-copy-email]'));
+      return;
+    }
+    if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && ACTIVE) closeActionModal();
+  });
 
   async function boot() {
     const statusEl = document.getElementById('fed-status');
@@ -514,19 +952,22 @@
 
     if (!profile) {
       statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your profile</a> to see this narrowed to what you actually care about.`;
-      listEl.innerHTML = bills.slice(0, 6).map(b => renderCard(b, [])).join('');
+      CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
       return;
     }
 
     const matched = matchBills(bills, profile.issues);
     if (!matched.length) {
       statusEl.innerHTML = `Checked ${bills.length} recently updated bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
-      listEl.innerHTML = bills.slice(0, 6).map(b => renderCard(b, [])).join('');
+      CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
       return;
     }
 
     statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated bills against your profile, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
-    listEl.innerHTML = matched.slice(0, 8).map(m => renderCard(m.bill, m.hits)).join('');
+    CURRENT = matched.slice(0, 8).map(m => ({ bill: m.bill, hits: m.hits }));
+    listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
   }
 
   boot();
