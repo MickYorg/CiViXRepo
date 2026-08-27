@@ -549,6 +549,112 @@
     .dig-link { display: none; } /* the in-context one in § 04 still covers it */
   }
 
+  /* ---- Inbox focus mode — DIG's carousel/check/rating pattern, applied
+     to filed items instead of one topic's sources. A filing has no AI
+     summary of its own, so opening one first asks the model to place it
+     under a general, durable policy topic (never the raw headline), then
+     runs the same per-source stance check DIG runs, against § 04's
+     sources — sharing DIG's own localStorage result cache so a topic
+     checked from either surface is cached for both. */
+  .item { cursor: pointer; transition: border-color 0.15s ease; }
+  .item:hover { border-color: var(--paper-dim); }
+
+  .ifocus-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(7, 11, 21, 0.86);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  :root[data-theme="light"] .ifocus-overlay { background: rgba(20, 25, 43, 0.72); }
+  .ifocus-close {
+    position: absolute; top: 18px; right: 18px;
+    background: none; border: 1px solid var(--line); color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    padding: 8px 12px; border-radius: 7px; cursor: pointer;
+  }
+  .ifocus-close:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .ifocus-stage { display: flex; align-items: center; gap: 14px; width: 100%; max-width: 640px; }
+  .ifocus-col { flex: 1; min-width: 0; }
+  .ifocus-nav {
+    flex-shrink: 0;
+    background: none; border: 1px solid var(--line); color: var(--paper-dim);
+    width: 40px; height: 40px; border-radius: 50%;
+    font-size: 20px; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .ifocus-nav:hover:not(:disabled) { border-color: var(--amber); color: var(--amber-ink); }
+  .ifocus-nav:disabled { opacity: 0.3; cursor: default; }
+  .ifocus-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 22px 24px;
+    max-height: 78dvh;
+    overflow-y: auto;
+  }
+  .ifocus-title { font-weight: 600; font-size: 19px; line-height: 1.35; }
+  .ifocus-title a { color: inherit; text-decoration: none; }
+  .ifocus-title a:hover { text-decoration: underline; }
+  .ifocus-meta {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--paper-dim); margin: 6px 0 10px;
+  }
+  .ifocus-note { font-size: 14.5px; color: var(--paper-dim); margin: 0 0 14px; }
+  .ifocus-topic {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+    padding: 10px 0; margin: 4px 0 16px;
+  }
+  .ifocus-topic-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--paper-dim);
+  }
+  .ifocus-topic-val { font-weight: 600; font-size: 15px; color: var(--amber-ink); }
+  .ifocus-checks { margin-bottom: 16px; }
+  .ifocus-empty { font-size: 12.5px; color: var(--paper-dim); line-height: 1.55; }
+  .ifocus-empty a { color: var(--amber-ink); }
+  .ifocus-src { border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin-bottom: 8px; background: var(--ink-sunk); }
+  .ifocus-src-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .ifocus-src-name { font-size: 12.5px; font-weight: 600; }
+  .ifocus-src-time {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px; color: var(--paper-dim); white-space: nowrap;
+  }
+  .ifocus-stance {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; color: var(--amber-ink);
+    background: var(--amber-wash); border-radius: 20px;
+    padding: 2px 9px; margin-bottom: 6px;
+  }
+  .ifocus-src-summary { font-size: 13.5px; line-height: 1.55; }
+  .ifocus-src-summary.ifocus-full { margin-top: 4px; }
+  .ifocus-expand { font-size: 10px; margin-top: 4px; padding: 3px 4px; }
+  .ifocus-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ifocus-rate-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--paper-dim);
+  }
+  .ib-stars { display: flex; gap: 3px; }
+  .ib-star { appearance: none; background: none; border: none; cursor: pointer; font-size: 20px; color: var(--line); padding: 2px; }
+  .ib-star.is-on { color: var(--amber); }
+  .ifocus-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ifocus-counter {
+    text-align: center; margin-top: 12px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; color: var(--paper-dim);
+  }
+  .ifocus-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 8px; max-width: 500px; margin-left: auto; margin-right: auto; }
+  .ifocus-dot { width: 7px; height: 7px; border-radius: 50%; border: none; background: var(--line); cursor: pointer; padding: 0; }
+  .ifocus-dot.is-on { background: var(--amber); }
+  @media (max-width: 640px) {
+    .ifocus-stage { gap: 8px; }
+    .ifocus-nav { width: 34px; height: 34px; font-size: 16px; }
+    .ifocus-card { padding: 16px; }
+  }
+
   :focus-visible { outline: 2px solid var(--amber-ink); outline-offset: 2px; }
 </style>
 </head>
@@ -702,6 +808,19 @@
 
   <div class="doc-pane">
     <div class="doc" id="doc"></div>
+  </div>
+</div>
+
+<div class="ifocus-overlay" id="ifocus-overlay">
+  <button class="ifocus-close" id="ifocus-close" type="button">&#10005; CLOSE</button>
+  <div class="ifocus-stage">
+    <button class="ifocus-nav" id="ifocus-prev" type="button" aria-label="Previous item">&#8249;</button>
+    <div class="ifocus-col">
+      <div class="ifocus-card" id="ifocus-card"></div>
+      <div class="ifocus-counter" id="ifocus-counter"></div>
+      <div class="ifocus-dots" id="ifocus-dots"></div>
+    </div>
+    <button class="ifocus-nav" id="ifocus-next" type="button" aria-label="Next item">&#8250;</button>
   </div>
 </div>
 
@@ -947,7 +1066,7 @@
       if (it.source === 'mail') bits.push('by mail');
       if (it.repeats > 1) bits.push('sent ' + it.repeats + '\u00d7');
       return `
-      <div class="item">
+      <div class="item" data-open="${esc(it.id)}">
         <div class="item-src">${bits.join(' · ') || 'filed'}</div>
         <div class="item-title">${esc(it.title)}</div>
         <div class="item-acts">
@@ -957,6 +1076,367 @@
       </div>`;
     }).join('');
   }
+
+  // Shared by the plain inbox row buttons and the focus overlay's own
+  // Adopt/Strike buttons, so the two surfaces can't drift.
+  function adoptFiling(id, opts) {
+    opts = opts || {};
+    const it = INBOX.find(x => x.id === id);
+    if (!it) return;
+    const name = opts.name || it.title;
+    const added = addIssue(name);
+    if (added && opts.weight) {
+      const iss = findIssue(slug(name));
+      if (iss) iss.weight = opts.weight;
+    }
+    INBOX = INBOX.filter(x => x.id !== id);
+    save(); renderAll();
+    fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id, state: 'adopted' })
+    }).catch(() => { loadInbox(); });
+  }
+
+  function strikeFiling(id) {
+    INBOX = INBOX.filter(x => x.id !== id);
+    renderInbox(); counts();
+    fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id })
+    }).catch(() => { loadInbox(); });
+  }
+
+  // ---- Inbox focus mode -------------------------------------------------
+  // Ports DIG's carousel/check/rating pattern from dig/index.html onto
+  // filed items. A filing has no AI summary of its own — first it's placed
+  // under a general, durable policy topic (never the raw headline, per the
+  // same "broad and ongoing, not a single event" framing DIG uses for its
+  // own trending topics), then that topic is run through DIG's own
+  // per-source stance check against § 04's sources. Results are cached in
+  // DIG's own 'dig-results-cache' localStorage key (same shape it already
+  // uses), so a topic checked from either surface is cached for both.
+  let focusOpen = false;
+  let focusIndex = 0;
+  let focusRatings = {};       // filing id -> 1-3, becomes the adopted issue's weight
+  let inboxTopics = loadInboxTopics(); // filing id -> { topic, at }
+
+  function loadInboxTopics() {
+    try { return JSON.parse(localStorage.getItem('civix-inbox-topics') || '{}'); } catch (e) { return {}; }
+  }
+  function saveInboxTopics() {
+    try { localStorage.setItem('civix-inbox-topics', JSON.stringify(inboxTopics)); } catch (e) {}
+  }
+  function loadDigCache() {
+    try { return JSON.parse(localStorage.getItem('dig-results-cache') || '{}'); } catch (e) { return {}; }
+  }
+  function saveDigCache(cache) {
+    try { localStorage.setItem('dig-results-cache', JSON.stringify(cache)); } catch (e) {}
+  }
+
+  function previewText(summary) {
+    const oneLine = String(summary || '').replace(/\s+/g, ' ').trim();
+    const LIMIT = 140;
+    if (oneLine.length <= LIMIT) return { preview: oneLine, truncated: false };
+    const cut = oneLine.slice(0, LIMIT);
+    const lastSpace = cut.lastIndexOf(' ');
+    return { preview: (lastSpace > 80 ? cut.slice(0, lastSpace) : cut) + '…', truncated: true };
+  }
+  function cssEscapeLocal(s) {
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
+  }
+  async function digCheckCall(prompt) {
+    const r = await fetch('/api/dig-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b.error && b.error.message) msg = b.error.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    const data = await r.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) throw new Error('empty response');
+    return text;
+  }
+
+  // Same voice as DIG's own trending-topics prompt: general and durable
+  // enough to still make sense next month, not a single day's headline.
+  async function generalizeTopic(it) {
+    const prompt = `Someone captured this item into a civic-engagement inbox and it needs to be placed under a general, ongoing policy topic — not the specific headline itself.
+
+Captured item: "${it.title}"${it.note ? `\nTheir note: "${it.note}"` : ''}${it.host ? `\nSource: ${it.host}` : ''}
+
+Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy area this falls under (e.g. "Housing affordability", "Immigration and border policy", "Criminal justice reform") — general enough that it would still make sense as a topic next month, not tied to this one event. No markdown, no explanation, no surrounding quotes.`;
+    const text = await digCheckCall(prompt);
+    return text.replace(/^["']|["']$/g, '').trim();
+  }
+
+  // Identical prompt/parsing to checkSource() in dig/index.html, so a
+  // result cached from here is indistinguishable from one DIG produced.
+  async function checkSourceForInbox(src, topic) {
+    const prompt = `You are tracking how a specific independent commentator or outlet is covering a news topic, for a media-monitoring tool.
+
+Source: ${src.name}${src.hint ? ` (find via: ${src.hint})` : ''}
+Topic: ${topic}
+
+Search the web for this source's own recent coverage or commentary on this topic — their site, channel, Substack, podcast, or social posts. Many independent commentators and analysts don't primarily publish under their own byline — they show up as guests on OTHER people's podcasts, YouTube shows, and panel discussions. If a search limited to their own outlet doesn't turn up anything, broaden it: search their name together with the topic, and also try their name plus terms like "interview," "podcast," or "panel" to surface appearances on other shows where they've addressed it. Use a few different search angles before concluding there's nothing — don't stop after a single search if the first one comes up empty.
+
+Then respond in exactly this plain-text format, no markdown:
+
+STANCE: <a short tag of 8 words or fewer capturing their core framing or position>
+SUMMARY: <2-3 sentences, in your own words, on how they've covered it and what they emphasize — mention a specific piece, episode, or interview if you found one>
+
+Only use STANCE: "no coverage found" if you've genuinely searched multiple angles (their own outlet AND guest appearances elsewhere) and still found nothing — not just because the first search came up empty.`;
+    const text = await digCheckCall(prompt);
+    const stanceMatch = text.match(/STANCE:\s*(.+)/i);
+    const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
+    return {
+      stance: stanceMatch ? stanceMatch[1].split('\n')[0].trim() : '',
+      summary: summaryMatch ? summaryMatch[1].trim() : text
+    };
+  }
+
+  function openInboxFocus(index) {
+    if (!INBOX.length) return;
+    focusIndex = Math.max(0, Math.min(INBOX.length - 1, index));
+    focusOpen = true;
+    document.getElementById('ifocus-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    renderInboxFocus();
+    document.addEventListener('keydown', inboxFocusKeydown);
+  }
+  function closeInboxFocus() {
+    focusOpen = false;
+    document.getElementById('ifocus-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    document.removeEventListener('keydown', inboxFocusKeydown);
+  }
+  function inboxFocusKeydown(e) {
+    if (e.key === 'Escape') closeInboxFocus();
+    if (e.key === 'ArrowLeft') moveInboxFocus(-1);
+    if (e.key === 'ArrowRight') moveInboxFocus(1);
+  }
+  function moveInboxFocus(delta) {
+    const next = focusIndex + delta;
+    if (next < 0 || next > INBOX.length - 1) return;
+    focusIndex = next;
+    renderInboxFocus();
+  }
+  function jumpInboxFocus(index) {
+    if (index === focusIndex) return;
+    focusIndex = index;
+    renderInboxFocus();
+  }
+  // After an adopt/strike from inside focus mode: stay open on whatever
+  // now sits at this index, or close if the docket just emptied out.
+  function advanceInboxFocus() {
+    if (!focusOpen) return;
+    if (!INBOX.length) { closeInboxFocus(); return; }
+    if (focusIndex > INBOX.length - 1) focusIndex = INBOX.length - 1;
+    renderInboxFocus();
+  }
+
+  function renderInboxDots() {
+    const el = document.getElementById('ifocus-dots');
+    el.innerHTML = INBOX.map((it, i) =>
+      `<button type="button" class="ifocus-dot ${i === focusIndex ? 'is-on' : ''}" data-dot="${i}" title="${esc(it.title)}"></button>`
+    ).join('');
+    el.querySelectorAll('[data-dot]').forEach(btn => {
+      btn.addEventListener('click', () => jumpInboxFocus(Number(btn.dataset.dot)));
+    });
+  }
+
+  function renderInboxStars(id) {
+    const el = document.getElementById('ifocus-stars');
+    const active = focusRatings[id] || 0;
+    el.innerHTML = [1, 2, 3].map(n =>
+      `<button type="button" class="ib-star ${n <= active ? 'is-on' : ''}" data-star="${n}" aria-label="Weight ${n}">★</button>`
+    ).join('');
+    el.querySelectorAll('[data-star]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        focusRatings[id] = Number(btn.dataset.star);
+        renderInboxStars(id);
+      });
+    });
+  }
+
+  function renderInboxFocus() {
+    if (!INBOX.length) { closeInboxFocus(); return; }
+    if (focusIndex > INBOX.length - 1) focusIndex = INBOX.length - 1;
+    const it = INBOX[focusIndex];
+
+    document.getElementById('ifocus-prev').disabled = focusIndex === 0;
+    document.getElementById('ifocus-next').disabled = focusIndex === INBOX.length - 1;
+    document.getElementById('ifocus-counter').textContent = (focusIndex + 1) + ' / ' + INBOX.length;
+    renderInboxDots();
+
+    const bits = [];
+    if (it.host) bits.push(esc(it.host));
+    if (it.source === 'mail') bits.push('by mail');
+    if (it.repeats > 1) bits.push('sent ' + it.repeats + '\u00d7');
+
+    const card = document.getElementById('ifocus-card');
+    card.innerHTML = `
+      <div class="ifocus-title">${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)} &#8599;</a>` : esc(it.title)}</div>
+      <div class="ifocus-meta">${bits.join(' · ') || 'filed'}</div>
+      ${it.note ? `<p class="ifocus-note">${esc(it.note)}</p>` : ''}
+      <div class="ifocus-topic">
+        <span class="ifocus-topic-label">Policy topic</span>
+        <span class="ifocus-topic-val" id="ifocus-topic-val">…</span>
+      </div>
+      <div class="ifocus-checks" id="ifocus-checks"></div>
+      <div class="ifocus-rate">
+        <span class="ifocus-rate-label">How much does this matter to you?</span>
+        <div class="ib-stars" id="ifocus-stars"></div>
+      </div>
+      <div class="ifocus-actions">
+        <button class="btn btn-primary" id="ifocus-adopt" type="button">Adopt as priority</button>
+        <button class="btn btn-quiet" id="ifocus-strike" type="button">Strike</button>
+      </div>
+    `;
+
+    renderInboxStars(it.id);
+    document.getElementById('ifocus-adopt').addEventListener('click', () => {
+      const topic = inboxTopics[it.id] && inboxTopics[it.id].topic;
+      adoptFiling(it.id, { name: topic || it.title, weight: focusRatings[it.id] });
+      advanceInboxFocus();
+    });
+    document.getElementById('ifocus-strike').addEventListener('click', () => {
+      strikeFiling(it.id);
+      advanceInboxFocus();
+    });
+
+    loadTopicAndChecks(it);
+  }
+
+  async function loadTopicAndChecks(it) {
+    const topicValEl = document.getElementById('ifocus-topic-val');
+    const checksEl = document.getElementById('ifocus-checks');
+    if (!topicValEl) return;
+
+    let entry = inboxTopics[it.id];
+    if (!entry) {
+      topicValEl.textContent = 'Placing this under a policy topic…';
+      try {
+        const topic = await generalizeTopic(it);
+        entry = { topic, at: Date.now() };
+        inboxTopics[it.id] = entry;
+        saveInboxTopics();
+      } catch (e) {
+        entry = { topic: it.title, at: Date.now(), fellBack: true };
+      }
+    }
+
+    // Bail if the user moved to a different item while this was in flight.
+    if (!focusOpen || INBOX[focusIndex] !== it) return;
+    topicValEl.textContent = entry.topic + (entry.fellBack ? ' (couldn\u2019t generalize \u2014 showing as filed)' : '');
+
+    runInboxChecks(it, entry.topic, checksEl);
+  }
+
+  function srcRowHtml(name, cached) {
+    if (!cached) {
+      return `
+        <div class="ifocus-src" data-src="${esc(name)}">
+          <div class="ifocus-src-head">
+            <span class="ifocus-src-name">${esc(name)}</span>
+            <span class="ifocus-src-time">checking&hellip;</span>
+          </div>
+          <div class="ifocus-src-summary" style="opacity:.6;">Reaching out&hellip;</div>
+        </div>`;
+    }
+    const { preview, truncated } = previewText(cached.summary || '');
+    return `
+      <div class="ifocus-src" data-src="${esc(name)}">
+        <div class="ifocus-src-head">
+          <span class="ifocus-src-name">${esc(name)}</span>
+          <span class="ifocus-src-time">${esc(cached.timestamp || '')} · cached</span>
+        </div>
+        ${cached.stance ? `<div class="ifocus-stance">${esc(cached.stance)}</div>` : ''}
+        <div class="ifocus-src-summary ifocus-brief">${esc(preview)}</div>
+        ${truncated ? `<div class="ifocus-src-summary ifocus-full" hidden>${esc(cached.summary)}</div><button type="button" class="btn btn-quiet ifocus-expand" data-expand>Read more</button>` : ''}
+      </div>`;
+  }
+
+  function wireSrcRow(name) {
+    const row = document.querySelector(`.ifocus-src[data-src="${cssEscapeLocal(name)}"]`);
+    if (!row) return;
+    const btn = row.querySelector('[data-expand]');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const brief = row.querySelector('.ifocus-brief');
+      const full = row.querySelector('.ifocus-full');
+      const isOpen = !full.hidden;
+      full.hidden = isOpen;
+      brief.style.display = isOpen ? '' : 'none';
+      btn.textContent = isOpen ? 'Read more' : 'Collapse';
+    });
+  }
+
+  function updateSrcRow(name, r) {
+    const row = document.querySelector(`.ifocus-src[data-src="${cssEscapeLocal(name)}"]`);
+    if (!row) return;
+    if (r.error) {
+      row.innerHTML = `
+        <div class="ifocus-src-head">
+          <span class="ifocus-src-name">${esc(name)}</span>
+          <span class="ifocus-src-time">error</span>
+        </div>
+        <div class="ifocus-src-summary">Couldn't retrieve this one: ${esc(r.error)}</div>`;
+      return;
+    }
+    const { preview, truncated } = previewText(r.summary || 'No summary returned.');
+    row.innerHTML = `
+      <div class="ifocus-src-head">
+        <span class="ifocus-src-name">${esc(name)}</span>
+        <span class="ifocus-src-time">${esc(r.timestamp || '')}</span>
+      </div>
+      ${r.stance ? `<div class="ifocus-stance">${esc(r.stance)}</div>` : ''}
+      <div class="ifocus-src-summary ifocus-brief">${esc(preview)}</div>
+      ${truncated ? `<div class="ifocus-src-summary ifocus-full" hidden>${esc(r.summary)}</div><button type="button" class="btn btn-quiet ifocus-expand" data-expand>Read more</button>` : ''}
+    `;
+    wireSrcRow(name);
+  }
+
+  function runInboxChecks(it, topic, checksEl) {
+    const srcs = P.sources.filter(s => s.name);
+    if (!srcs.length) {
+      checksEl.innerHTML = `<p class="ifocus-empty">No trusted sources yet — add some in &sect; 04 to see this checked side by side.</p>`;
+      return;
+    }
+
+    const digCache = loadDigCache();
+    const bucket = digCache[topic] || {};
+    checksEl.innerHTML = srcs.map(s => srcRowHtml(s.name, bucket[s.name])).join('');
+    srcs.forEach(s => { if (bucket[s.name]) wireSrcRow(s.name); });
+
+    srcs.forEach(async (s) => {
+      if (bucket[s.name]) return; // already cached, no fetch needed
+      try {
+        const result = await checkSourceForInbox(s, topic);
+        if (!focusOpen || INBOX[focusIndex] !== it) return;
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        updateSrcRow(s.name, Object.assign({}, result, { timestamp }));
+        const cache = loadDigCache();
+        if (!cache[topic]) cache[topic] = {};
+        cache[topic][s.name] = Object.assign({}, result, { timestamp, savedAt: Date.now() });
+        saveDigCache(cache);
+      } catch (e) {
+        if (!focusOpen || INBOX[focusIndex] !== it) return;
+        updateSrcRow(s.name, { error: e.message || 'request failed' });
+      }
+    });
+  }
+
+  document.getElementById('ifocus-close').addEventListener('click', closeInboxFocus);
+  document.getElementById('ifocus-prev').addEventListener('click', () => moveInboxFocus(-1));
+  document.getElementById('ifocus-next').addEventListener('click', () => moveInboxFocus(1));
 
   function fmtDate(ts) {
     if (!ts) return '—';
@@ -1152,33 +1632,20 @@
     // Adopt: the filing becomes a declared priority here, and is marked
     // adopted on the docket so it stops showing up as untriaged. Strike
     // deletes it outright — same two verbs as the docket page, so the
-    // same act means the same thing wherever you do it.
+    // same act means the same thing wherever you do it. Both are shared
+    // with the focus overlay's own Adopt/Strike buttons below.
     const adopt = t.closest('[data-adopt]');
-    if (adopt) {
-      const id = adopt.dataset.adopt;
-      const it = INBOX.find(x => x.id === id);
-      if (!it) return;
-      addIssue(it.title);
-      INBOX = INBOX.filter(x => x.id !== id);
-      save(); renderAll();
-      fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, state: 'adopted' })
-      }).catch(() => { loadInbox(); });
-      return;
-    }
+    if (adopt) { adoptFiling(adopt.dataset.adopt); return; }
 
     const strike = t.closest('[data-strike]');
-    if (strike) {
-      const id = strike.dataset.strike;
-      INBOX = INBOX.filter(x => x.id !== id);
-      renderInbox(); counts();
-      fetch(API + '/api/filing?token=' + encodeURIComponent(P.token), {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-      }).catch(() => { loadInbox(); });
+    if (strike) { strikeFiling(strike.dataset.strike); return; }
+
+    // Open: anything else clicked on the card itself (not its action
+    // buttons, already handled above) opens the DIG-style focus view.
+    const openItem = t.closest('[data-open]');
+    if (openItem) {
+      const idx = INBOX.findIndex(x => x.id === openItem.dataset.open);
+      if (idx >= 0) openInboxFocus(idx);
       return;
     }
 
