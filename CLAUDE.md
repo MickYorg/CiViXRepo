@@ -31,8 +31,14 @@ see "Deliberately not yet done" below for why.
   link and a `mailto:` draft, and an "add to calendar" `.ics` download
   using the bill's own latest legislative-action date (explicitly labeled
   as that, not a confirmed rally/event — no event-data source exists yet).
-  Municipal and state sections are still sample content — no unified
-  public data source picked for either.
+  State section is also real: `functions/api/state-bills.js` resolves the
+  profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
+  matched bills from OpenStates, the same "one API covers all 50
+  legislatures" role congress.gov plays federally. State cards
+  deliberately have **no** Take Action button yet — `reps.js` only
+  resolves federal contacts, so reusing that button would show a state
+  bill's reader their federal rep. Municipal is still sample content —
+  no unified public data source exists for city/county government.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.
@@ -62,6 +68,7 @@ deployment (not just "Retry deployment") is required after adding one:
   Inbox/calendar-action AI drafting, which reuse the same endpoint).
 - `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
 - `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
+- `OPENSTATES_API_KEY` — powers `/api/state-bills` (free, openstates.org/api/register).
 
 ## Netlify → Cloudflare migration — done
 
@@ -113,15 +120,20 @@ paying for itself.
 ## The core loop — status and what's next
 
 The splash's pitch — profile → matched to civic calendar → action you
-control — is now proven end-to-end for one slice: federal bills, matched
-against a declared profile, with call/email drafting and a calendar
-reminder. Federal-only was deliberate — it's the only jurisdiction with a
-unified public data API (congress.gov); municipal/state don't have one.
-The natural next moves, in roughly the order they'd pay off, are:
+control — is now proven end-to-end for federal, and the calendar-matching
+half also covers state. The natural next moves, in roughly the order
+they'd pay off, are:
 
-- **Municipal/state calendar data** — no unified public API exists the way
-  congress.gov does for federal; needs its own source decision(s) before
-  it can leave placeholder status, likely per-state or even per-city.
+- **Municipal calendar data** — the one jurisdiction still on sample
+  content. No unified public API exists the way congress.gov/OpenStates
+  do federally/per-state; needs its own source decision(s), likely
+  per-city, before it can leave placeholder status.
+- **State Take Action** — state bills match against the profile but have
+  no call/email drafting yet, unlike federal. `functions/api/reps.js`
+  would need to resolve state legislators too (5calls supports this via
+  its `area` field — `StateUpper`/`StateLower` — reps.js currently
+  filters to federal only) before this is a small extension rather than
+  new infrastructure.
 - **Petition and rally/event actions** — the two action types explicitly
   deferred when call/email/calendar-add were built (27 Aug 2026); each
   needs its own data source picked (no petition partner, no local-events
