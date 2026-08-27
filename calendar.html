@@ -217,6 +217,42 @@
     color: var(--paper-dim);
   }
 
+  .fed-status {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--paper-dim);
+    margin: 0 0 12px;
+  }
+  .fed-status.is-error { color: var(--strike); }
+  .fed-status a { color: var(--amber-ink); }
+  .match-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .match-tag {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    color: var(--amber-ink);
+    background: var(--amber-wash);
+    border-radius: 20px;
+    padding: 2px 9px;
+  }
+  .card-title a { color: inherit; text-decoration: none; }
+  .card-title a:hover { text-decoration: underline; }
+  .build-cta {
+    border: 1px dashed var(--amber);
+    border-radius: 9px;
+    padding: 13px 16px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--paper-dim);
+  }
+  .build-cta a { color: var(--amber-ink); }
+
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -285,7 +321,7 @@
 
   <div class="wip">
     <span>&#9888;</span>
-    <span><strong>Work in progress —</strong> Calendar isn't built yet. Everything below is sample content standing in for what this module will eventually pull in from your profile, sources, and inbox. Thanks for poking around — check back as CiViX takes shape.</span>
+    <span><strong>Municipal and state are still placeholders —</strong> there's no unified public data source for either yet, so the cards below are sample content. Federal, below that, is live: real bill activity from congress.gov, matched against your profile where you have one.</span>
   </div>
 
 <p class="section-label">Municipal</p>
@@ -311,12 +347,8 @@
     <div class="card-body">Testimony window open for public and advocacy groups.</div>
   </div>
 <p class="section-label">Federal</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Markup session — Native American Sovereignty & Trust Modernization Act</span><span class="tag">Federal</span></div>
-    <div class="card-meta">Oct 8 · House Committee markup</div>
-    <div class="card-body">Follows the sustained call-in campaign CiViX users contributed to this summer.</div>
-  </div>
-
+  <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
+  <div id="fed-list"></div>
 
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
 </div>
@@ -336,6 +368,168 @@
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  // Hand-authored synonym map, keyed by the same slug() the builder uses
+  // for its fixed issue catalog. Bill titles rarely use the catalog's own
+  // phrasing ("Wages and labor" vs. "minimum wage"), so a literal substring
+  // match against the issue name alone misses almost everything.
+  const SYNONYMS = {
+    'wages-and-labor': ['minimum wage', 'wage', 'labor', 'union', 'worker', 'overtime'],
+    'taxes': ['tax', 'taxes', 'irs', 'tax credit', 'tax cut'],
+    'cost-of-living': ['inflation', 'cost of living', 'affordability'],
+    'small-business': ['small business', 'entrepreneur'],
+    'trade-and-tariffs': ['tariff', 'trade', 'import', 'export'],
+    'healthcare-access': ['healthcare', 'health care', 'medicaid', 'medicare', 'insurance'],
+    'drug-pricing': ['drug price', 'prescription drug', 'pharmaceutical', 'insulin'],
+    'public-health': ['public health', 'cdc', 'disease', 'vaccine'],
+    'reproductive-health': ['abortion', 'reproductive', 'contraception'],
+    'mental-health': ['mental health', 'suicide', 'substance abuse', 'opioid'],
+    'housing-affordability': ['housing', 'affordable housing', 'rent'],
+    'zoning-and-development': ['zoning', 'land use', 'development'],
+    'homelessness': ['homeless', 'homelessness', 'shelter'],
+    'tenant-rights': ['tenant', 'landlord', 'eviction'],
+    'public-schools': ['school', 'k-12', 'education funding', 'teacher'],
+    'higher-education-cost': ['student loan', 'college', 'university', 'tuition'],
+    'curriculum-and-books': ['curriculum', 'book ban', 'textbook'],
+    'childcare': ['childcare', 'child care', 'daycare'],
+    'climate-policy': ['climate', 'emissions', 'carbon', 'greenhouse gas'],
+    'energy-costs': ['energy', 'electricity', 'utility', 'fuel'],
+    'water-and-air-quality': ['water quality', 'air quality', 'pollution', 'clean water', 'clean air'],
+    'public-lands': ['public lands', 'national park', 'forest service', 'wilderness'],
+    'policing': ['police', 'policing', 'law enforcement'],
+    'criminal-justice-reform': ['criminal justice', 'sentencing', 'incarceration', 'prison'],
+    'gun-policy': ['gun', 'firearm', 'second amendment'],
+    'courts': ['court', 'judiciary', 'judge'],
+    'voting-access': ['voting', 'voter', 'ballot', 'election'],
+    'redistricting': ['redistricting', 'gerrymander'],
+    'campaign-finance': ['campaign finance', 'super pac', 'election spending'],
+    'government-transparency': ['transparency', 'foia', 'open government'],
+    'data-privacy': ['data privacy', 'privacy'],
+    'ai-regulation': ['artificial intelligence', ' ai '],
+    'platform-accountability': ['social media', 'platform', 'section 230'],
+    'broadband-access': ['broadband', 'internet access', 'rural broadband'],
+    'transit': ['transit', 'bus', 'rail', 'public transportation'],
+    'roads-and-bridges': ['infrastructure', 'road', 'bridge', 'highway'],
+    'immigration': ['immigration', 'immigrant', 'border', 'visa', 'asylum'],
+    'rural-access': ['rural']
+  };
+
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function keywordsFor(issue) {
+    const extra = SYNONYMS[issue.id] || [];
+    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return [issue.name.toLowerCase()].concat(extra, nameWords);
+  }
+
+  function loadProfile() {
+    try {
+      const raw = localStorage.getItem('civix-profile');
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      return (p && Array.isArray(p.issues) && p.issues.length) ? p : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function matchBills(bills, issues) {
+    const scored = bills.map(bill => {
+      const hay = (bill.title + ' ' + (bill.latestAction ? bill.latestAction.text : '')).toLowerCase();
+      const hits = [];
+      let score = 0;
+      issues.forEach(issue => {
+        const kws = keywordsFor(issue);
+        if (kws.some(k => hay.indexOf(k) !== -1)) {
+          score += issue.weight || 1;
+          hits.push(issue.name);
+        }
+      });
+      return { bill, score, hits };
+    });
+    return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+  }
+
+  function renderCard(bill, hits) {
+    const title = bill.url
+      ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
+      : esc(bill.title);
+    const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
+    const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
+    const tags = hits && hits.length
+      ? `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
+      : '';
+    return `
+      <div class="card">
+        <div class="card-top"><span class="card-title">${title}</span><span class="tag">Federal</span></div>
+        <div class="card-meta">${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}</div>
+        <div class="card-body">${action}</div>
+        ${tags}
+      </div>`;
+  }
+
+  async function boot() {
+    const statusEl = document.getElementById('fed-status');
+    const listEl = document.getElementById('fed-list');
+    const profile = loadProfile();
+
+    let data;
+    try {
+      const r = await fetch('/api/calendar');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      data = await r.json();
+      if (data.error) throw new Error(data.error.message || 'error');
+    } catch (e) {
+      statusEl.textContent = "Couldn't reach the federal calendar. Try reloading in a bit.";
+      statusEl.classList.add('is-error');
+      return;
+    }
+
+    const bills = data.bills || [];
+    if (!bills.length) {
+      statusEl.textContent = 'No recent federal activity came back — try again later.';
+      return;
+    }
+
+    if (!profile) {
+      statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your profile</a> to see this narrowed to what you actually care about.`;
+      listEl.innerHTML = bills.slice(0, 6).map(b => renderCard(b, [])).join('');
+      return;
+    }
+
+    const matched = matchBills(bills, profile.issues);
+    if (!matched.length) {
+      statusEl.innerHTML = `Checked ${bills.length} recently updated bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
+      listEl.innerHTML = bills.slice(0, 6).map(b => renderCard(b, [])).join('');
+      return;
+    }
+
+    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated bills against your profile, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
+    listEl.innerHTML = matched.slice(0, 8).map(m => renderCard(m.bill, m.hits)).join('');
+  }
+
+  boot();
 })();
 </script>
 </body>
