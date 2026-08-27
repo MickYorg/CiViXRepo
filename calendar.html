@@ -433,6 +433,10 @@
     <span><strong>Municipal is still a placeholder —</strong> there's no unified public data source for city/county government yet, so the cards below are sample content. State and Federal, below that, are both live.</span>
   </div>
 
+  <div class="build-cta" id="focus-banner" style="display:none;">
+    <span id="focus-banner-text"></span> <a href="calendar.html">Show everything</a>
+  </div>
+
 <p class="section-label">Municipal</p>
   <div class="card">
     <div class="card-top"><span class="card-title">Zoning variance hearing — Ward 4 corridor rezoning</span><span class="tag">Municipal</span></div>
@@ -533,6 +537,24 @@
     const extra = SYNONYMS[issue.id] || [];
     const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
     return [issue.name.toLowerCase()].concat(extra, nameWords);
+  }
+
+  // ?focus=<issue-id> arrives from builder.html's § 03 "N matched" links,
+  // so a specific declared priority can point straight at its own
+  // filtered view here instead of the reader hunting through everything.
+  function getFocusSlug() {
+    try { return new URLSearchParams(window.location.search).get('focus') || ''; } catch (e) { return ''; }
+  }
+  const FOCUS_SLUG = getFocusSlug();
+
+  function initFocusBanner(issueName) {
+    const banner = document.getElementById('focus-banner');
+    if (!FOCUS_SLUG || !banner || banner.dataset.shown) return;
+    banner.dataset.shown = '1';
+    banner.style.display = 'block';
+    document.getElementById('focus-banner-text').textContent = issueName
+      ? `Filtered to "${issueName}".`
+      : `That priority wasn't found in your profile — showing everything instead.`;
   }
 
   function loadProfile() {
@@ -970,6 +992,9 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
 
     const issues = profile.issues || [];
+    const focusIssue = FOCUS_SLUG ? issues.find(i => i.id === FOCUS_SLUG) : null;
+    if (FOCUS_SLUG) initFocusBanner(focusIssue ? focusIssue.name : null);
+
     if (!issues.length) {
       statusEl.innerHTML = `Showing the most recently updated bills in ${esc(data.state)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
       listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
@@ -977,6 +1002,19 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
 
     const matched = matchBills(bills, issues);
+
+    if (focusIssue) {
+      const focused = matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
+      if (focused.length) {
+        statusEl.textContent = `Showing ${focused.length} ${data.state} bill${focused.length === 1 ? '' : 's'} matched to "${focusIssue.name}".`;
+        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits)).join('');
+      } else {
+        statusEl.textContent = `No ${data.state} bills matched to "${focusIssue.name}" yet.`;
+        listEl.innerHTML = '';
+      }
+      return;
+    }
+
     if (!matched.length) {
       statusEl.textContent = `Checked ${bills.length} recently updated ${data.state} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
       listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
@@ -1017,7 +1055,24 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       return;
     }
 
+    const focusIssue = FOCUS_SLUG ? profile.issues.find(i => i.id === FOCUS_SLUG) : null;
+    if (FOCUS_SLUG) initFocusBanner(focusIssue ? focusIssue.name : null);
+
     const matched = matchBills(bills, profile.issues);
+
+    if (focusIssue) {
+      const focused = matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
+      if (focused.length) {
+        statusEl.textContent = `Showing ${focused.length} federal bill${focused.length === 1 ? '' : 's'} matched to "${focusIssue.name}".`;
+        CURRENT = focused.map(m => ({ bill: m.bill, hits: m.hits }));
+        listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
+      } else {
+        statusEl.textContent = `No federal bills matched to "${focusIssue.name}" yet.`;
+        listEl.innerHTML = '';
+      }
+      return;
+    }
+
     if (!matched.length) {
       statusEl.innerHTML = `Checked ${bills.length} recently updated bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
       CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));

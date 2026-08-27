@@ -291,6 +291,16 @@
   .prow:last-child { border-bottom: none; }
   .prow-name { font-size: 16px; font-weight: 600; }
   .prow-stance { grid-column: 1 / -1; }
+  .prow-matched { grid-column: 1 / -1; margin-top: 2px; }
+  .prow-matched a {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--amber-ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--amber);
+  }
+  .prow-matched a:hover { color: var(--paper); border-color: var(--paper-dim); }
   .weight { display: flex; gap: 4px; align-items: center; }
   .weight-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -1005,13 +1015,103 @@
     `).join('');
   }
 
+  // ---- Matched-activity link ------------------------------------------
+  // Adopting a topic used to be a dead end — it became a priority here,
+  // but nothing pointed to calendar.html, and nothing there pointed back
+  // to a specific priority either. This runs the same keyword match
+  // calendar.html itself uses (duplicated, not shared — no build system
+  // to share it through) against the same federal/state data, so a
+  // priority with real matched activity links straight to it, filtered.
+  const CAL_SYNONYMS = {
+    'wages-and-labor': ['minimum wage', 'wage', 'labor', 'union', 'worker', 'overtime'],
+    'taxes': ['tax', 'taxes', 'irs', 'tax credit', 'tax cut'],
+    'cost-of-living': ['inflation', 'cost of living', 'affordability'],
+    'small-business': ['small business', 'entrepreneur'],
+    'trade-and-tariffs': ['tariff', 'trade', 'import', 'export'],
+    'healthcare-access': ['healthcare', 'health care', 'medicaid', 'medicare', 'insurance'],
+    'drug-pricing': ['drug price', 'prescription drug', 'pharmaceutical', 'insulin'],
+    'public-health': ['public health', 'cdc', 'disease', 'vaccine'],
+    'reproductive-health': ['abortion', 'reproductive', 'contraception'],
+    'mental-health': ['mental health', 'suicide', 'substance abuse', 'opioid'],
+    'housing-affordability': ['housing', 'affordable housing', 'rent'],
+    'zoning-and-development': ['zoning', 'land use', 'development'],
+    'homelessness': ['homeless', 'homelessness', 'shelter'],
+    'tenant-rights': ['tenant', 'landlord', 'eviction'],
+    'public-schools': ['school', 'k-12', 'education funding', 'teacher'],
+    'higher-education-cost': ['student loan', 'college', 'university', 'tuition'],
+    'curriculum-and-books': ['curriculum', 'book ban', 'textbook'],
+    'childcare': ['childcare', 'child care', 'daycare'],
+    'climate-policy': ['climate', 'emissions', 'carbon', 'greenhouse gas'],
+    'energy-costs': ['energy', 'electricity', 'utility', 'fuel'],
+    'water-and-air-quality': ['water quality', 'air quality', 'pollution', 'clean water', 'clean air'],
+    'public-lands': ['public lands', 'national park', 'forest service', 'wilderness'],
+    'policing': ['police', 'policing', 'law enforcement'],
+    'criminal-justice-reform': ['criminal justice', 'sentencing', 'incarceration', 'prison'],
+    'gun-policy': ['gun', 'firearm', 'second amendment'],
+    'courts': ['court', 'judiciary', 'judge'],
+    'voting-access': ['voting', 'voter', 'ballot', 'election'],
+    'redistricting': ['redistricting', 'gerrymander'],
+    'campaign-finance': ['campaign finance', 'super pac', 'election spending'],
+    'government-transparency': ['transparency', 'foia', 'open government'],
+    'data-privacy': ['data privacy', 'privacy'],
+    'ai-regulation': ['artificial intelligence', ' ai '],
+    'platform-accountability': ['social media', 'platform', 'section 230'],
+    'broadband-access': ['broadband', 'internet access', 'rural broadband'],
+    'transit': ['transit', 'bus', 'rail', 'public transportation'],
+    'roads-and-bridges': ['infrastructure', 'road', 'bridge', 'highway'],
+    'immigration': ['immigration', 'immigrant', 'border', 'visa', 'asylum'],
+    'rural-access': ['rural']
+  };
+
+  let FED_BILLS = null;   // null = not loaded yet; [] = loaded, empty
+  let STATE_BILLS = null;
+  let lastFetchedZip = null;
+
+  function keywordsForMatch(issue) {
+    const extra = CAL_SYNONYMS[issue.id] || [];
+    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return [issue.name.toLowerCase()].concat(extra, nameWords);
+  }
+
+  function matchedCountFor(issue) {
+    const kws = keywordsForMatch(issue);
+    const hits = bills => (bills || []).filter(b => {
+      const hay = (b.title + ' ' + (b.latestAction ? b.latestAction.text : '')).toLowerCase();
+      return kws.some(k => hay.indexOf(k) !== -1);
+    }).length;
+    return hits(FED_BILLS) + hits(STATE_BILLS);
+  }
+
+  async function loadMatchBills() {
+    if (FED_BILLS === null) {
+      try {
+        const r = await fetch('/api/calendar');
+        const data = await r.json();
+        if (r.ok && !data.error) FED_BILLS = data.bills || [];
+      } catch (e) {}
+    }
+    const zip = P.place.zip;
+    if (zip && zip.length === 5 && zip !== lastFetchedZip) {
+      lastFetchedZip = zip;
+      try {
+        const r2 = await fetch('/api/state-bills?zip=' + encodeURIComponent(zip));
+        const data2 = await r2.json();
+        if (r2.ok && !data2.error) STATE_BILLS = data2.bills || [];
+      } catch (e) {}
+    }
+    renderPositions();
+  }
+
   function renderPositions() {
     const el = document.getElementById('positions-list');
     if (!P.issues.length) {
       el.innerHTML = `<div class="empty">Nothing picked yet. Choose what moves you above, or keep something from your inbox.</div>`;
       return;
     }
-    el.innerHTML = P.issues.map(i => `
+    const haveData = FED_BILLS !== null || STATE_BILLS !== null;
+    el.innerHTML = P.issues.map(i => {
+      const n = haveData ? matchedCountFor(i) : 0;
+      return `
       <div class="prow">
         <div class="prow-name">${esc(i.name)}</div>
         <div class="weight">
@@ -1022,8 +1122,9 @@
         <div class="prow-stance">
           <input class="field" type="text" data-stance="${i.id}" value="${esc(i.stance)}" placeholder="What would count as a win here?">
         </div>
-      </div>
-    `).join('');
+        ${n ? `<div class="prow-matched"><a href="calendar.html?focus=${encodeURIComponent(i.id)}">${n} matched — Take action &#8594;</a></div>` : ''}
+      </div>`;
+    }).join('');
   }
 
   // A source rated in DIG (localStorage 'dig-ratings', keyed by source
@@ -1827,6 +1928,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       P.place.zip = t.value.replace(/\D/g, '').slice(0, 5);
       if (t.value !== P.place.zip) t.value = P.place.zip;
       queueSave();
+      if (P.place.zip.length === 5) loadMatchBills();
     }
   });
 
@@ -1939,6 +2041,10 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     save();
   }
   renderAll();
+  // Fetched asynchronously and re-renders § 03 once it lands — same
+  // matched-activity data calendar.html itself fetches, just consumed
+  // here to link each priority straight to its filtered view there.
+  loadMatchBills();
   // Issued asynchronously so a slow or unreachable worker never blocks the
   // builder — everything else on this page works without an address.
   // ensureDrop() only loads the inbox itself when it has to mint a brand
