@@ -47,9 +47,9 @@ after a fresh deploy; explicit scoping on both sides fixed it.
 
 Verified live 25 Aug 2026: `mycivix.com/dig/` returns 200, and
 `/api/dig-stats` returns real accumulated data (sources, topics, ratings).
-The old `netlify.toml` / `netlify/functions/*.js` files may still be present
-in the repo as leftovers — worth confirming they're inert and safe to
-delete, but they are no longer what's serving traffic.
+The old `netlify.toml` / `netlify/functions/*.js` files were confirmed
+unreferenced elsewhere in the repo and deleted 27 Aug 2026 — migration is
+fully closed out.
 
 ## Known housekeeping debt
 
