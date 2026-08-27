@@ -5,33 +5,63 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 25 Aug 2026)
+## Current state (as of 27 Aug 2026)
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
 
-**Real, working:**
-- `index.html` — animated splash/landing page
-- `dig/index.html` + `netlify/functions/dig-check.js` + `dig-stats.js` — DIG,
-  an AI stance-checker across news/commentary sources. Has a real backend:
-  daily spend cap, per-IP rate limit, anonymous usage stats, all originally
-  built on Netlify Functions + `@netlify/blobs`.
-- `capture.html` + `manifest.webmanifest` + `sw.js` — "Send to CiViX", an
-  installable PWA share-target. Client-only, `localStorage`, no backend.
-
-**Substantial but not connected to anything:**
-- `builder.html` — the "build your profile" flow, the actual core product
-  mechanic (the splash's CTA points here). Doesn't yet read from DIG or
-  write anywhere the placeholder pages can consume.
+**Real, working — the core loop is wired end-to-end:**
+- `index.html` — animated splash/landing page. Mobile-tuned as of 27 Aug
+  (narrow-viewport overflow fixed, always-visible sticky CTA).
+- `builder.html` — the "build your profile" flow (ZIP, issues/weights,
+  positions, trusted sources, action authority). Its Inbox (§ 01) now has
+  DIG's full focus-mode treatment: open a filed item, it's auto-placed
+  under a general policy topic via `/api/dig-check`, checked against § 04's
+  sources with DIG's own stance-check prompt (sharing DIG's
+  `dig-results-cache` localStorage key), expandable summaries, 3-star
+  rating that sets the adopted issue's priority weight.
+- `calendar.html` — Federal section is real: `functions/api/calendar.js`
+  pulls recent bills from congress.gov, matched client-side against the
+  profile's declared issues (weighted, hand-authored synonym map). Each
+  matched bill has a **Take action** button opening a modal that looks up
+  the user's reps by ZIP (`functions/api/reps.js`, via the 5calls API),
+  drafts a call script and email (`/api/dig-check` again, using the
+  user's stated stance when they have one), offers a click-to-call `tel:`
+  link and a `mailto:` draft, and an "add to calendar" `.ics` download
+  using the bill's own latest legislative-action date (explicitly labeled
+  as that, not a confirmed rally/event — no event-data source exists yet).
+  Municipal and state sections are still sample content — no unified
+  public data source picked for either.
+- `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
+  an AI stance-checker across news/commentary sources. Real backend: daily
+  spend cap, per-IP rate limit, anonymous usage stats.
+- `capture.html` / `inbox.html` + `manifest.webmanifest` + `sw.js` —
+  "Send to CiViX", an installable PWA share-target backed by a real
+  Cloudflare Worker (`civix-capture.mycivix.workers.dev`, not in this
+  repo) for the docket/filings API that both pages and `builder.html`'s
+  Inbox read from.
 
 **Placeholders (styled to match, no real functionality):**
-- `inbox.html`, `calendar.html`, `connect.html`, `civil-dis.html`,
-  `civix-track.html`, `analytics.html`
+- `connect.html`, `civil-dis.html`, `civix-track.html`, `analytics.html`
 
 **Not in this repo at all:**
 - PolTraPro (poltrapro.com) — separate product, own domain, linked from the
   splash. Relationship to CiViX (same family vs. unrelated) not yet decided.
+- The `civix-capture` Cloudflare Worker (docket/filings backend) — separate
+  Worker project, referenced by URL from `capture.html`/`inbox.html`/
+  `builder.html` but its source isn't checked into this repo.
+
+## Required Cloudflare Pages secrets
+
+Set per-environment (Production + Preview) in the dashboard, never in
+`wrangler.toml` — see the Netlify migration note below for why a new
+deployment (not just "Retry deployment") is required after adding one:
+
+- `ANTHROPIC_API_KEY` — powers `/api/dig-check` (DIG's checks, and the
+  Inbox/calendar-action AI drafting, which reuse the same endpoint).
+- `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
+- `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
 
 ## Netlify → Cloudflare migration — done
 
@@ -50,6 +80,14 @@ Verified live 25 Aug 2026: `mycivix.com/dig/` returns 200, and
 The old `netlify.toml` / `netlify/functions/*.js` files were confirmed
 unreferenced elsewhere in the repo and deleted 27 Aug 2026 — migration is
 fully closed out.
+
+**Adding a new Pages secret needs an actual new deployment, not a
+retry.** Hit this 27 Aug 2026 adding `CONGRESS_API_KEY`: saving it in the
+dashboard and clicking "Retry deployment" on the latest build still left
+the function reporting the var as missing, because Retry reuses that
+deployment's original environment snapshot rather than the project's
+current variables. An empty commit (or any new push) forces a real new
+build, which does pick it up.
 
 ## Known housekeeping debt
 
@@ -72,11 +110,30 @@ revisit that is a logged-in profile that needs to be read on more than one
 page; that's genuine shared state and the point where a framework starts
 paying for itself.
 
-## Where the MVP is actually blocked
+## The core loop — status and what's next
 
 The splash's pitch — profile → matched to civic calendar → action you
-control — has every piece built as a separate, disconnected artifact.
-Recommended next move: pick **one geography + one action type**, wire
-`builder.html`'s output through to one real, live civic data source for that
-slice, and prove the loop end-to-end before generalizing. DIG and the docket
-are already independently useful and don't need to block this.
+control — is now proven end-to-end for one slice: federal bills, matched
+against a declared profile, with call/email drafting and a calendar
+reminder. Federal-only was deliberate — it's the only jurisdiction with a
+unified public data API (congress.gov); municipal/state don't have one.
+The natural next moves, in roughly the order they'd pay off, are:
+
+- **Municipal/state calendar data** — no unified public API exists the way
+  congress.gov does for federal; needs its own source decision(s) before
+  it can leave placeholder status, likely per-state or even per-city.
+- **Petition and rally/event actions** — the two action types explicitly
+  deferred when call/email/calendar-add were built (27 Aug 2026); each
+  needs its own data source picked (no petition partner, no local-events
+  feed exists yet) before it's a "wire it up" job rather than new
+  infrastructure.
+- **ZIP-only rep lookup is best-effort** — 5calls resolves a ZIP to a
+  district, but ZIPs don't map 1:1 to congressional districts, so it can
+  be wrong for a split ZIP. Precise lookup would mean asking for a full
+  address, which cuts against `builder.html`'s current "we never ask for
+  your address" positioning — a real tradeoff, not yet decided either way.
+- **DIG's own source list vs. the profile's § 04 sources** — still two
+  separate, independently-maintained lists (`dig-sources` in localStorage
+  vs. `P.sources` in the profile), despite § 04's own copy implying
+  they're the same set. Not reconciled yet; low urgency since both work
+  independently, but worth fixing before it causes visible confusion.
