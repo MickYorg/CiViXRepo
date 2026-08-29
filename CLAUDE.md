@@ -144,8 +144,25 @@ they'd pay off, are:
   be wrong for a split ZIP. Precise lookup would mean asking for a full
   address, which cuts against `builder.html`'s current "we never ask for
   your address" positioning — a real tradeoff, not yet decided either way.
-- **DIG's own source list vs. the profile's § 04 sources** — still two
-  separate, independently-maintained lists (`dig-sources` in localStorage
-  vs. `P.sources` in the profile), despite § 04's own copy implying
-  they're the same set. Not reconciled yet; low urgency since both work
-  independently, but worth fixing before it causes visible confusion.
+- **~~DIG's own source list vs. the profile's § 04 sources~~ — resolved
+  29 Aug 2026.** DIG now reads and writes `P.sources` directly (the same
+  `civix-profile` localStorage key `builder.html` uses) instead of its own
+  separate `dig-sources` key — one shared list, no sync step. DIG's
+  per-source rating also moved onto the shared source object
+  (`P.sources[i].ratings[topic] = { quality: 'accurate'|'off', stars: 1-5,
+  at }`), rekeyed per-topic instead of one ambiguous global value per
+  source, so rating a source's coverage of one topic can no longer
+  silently overwrite its rating on a different topic. `sourceTrust()` in
+  both files derives a "general trust" score as the average across
+  whatever topics a source has been rated on, rather than that being a
+  separate manual rating to maintain. DIG's focus card also now shows
+  "your stance" (read from the Manifesto's § 03, best-effort name match)
+  next to "their stance" it detected, instead of relying on a single
+  like/dislike to carry both "well covered" and "I agree" at once. A
+  one-time migration in `builder.html`'s boot brings in anything still
+  sitting in a pre-merge `dig-sources` list. DIG's header back-link now
+  points at `builder.html` ("← Your Manifesto") instead of the splash.
+  Not done in this pass: DIG's own UI copy still says "profile" (not yet
+  renamed to "manifesto"), and the two apps don't live-sync across tabs —
+  last write wins if both are open at once, same latent limitation
+  `builder.html` already had with itself.

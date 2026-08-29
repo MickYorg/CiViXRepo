@@ -941,11 +941,10 @@
         <span class="sec-caret">›</span>
       </div>
       <div class="sec-body">
-        <p class="sec-note">Outlets and voices you want weighted when CiViX reads coverage. Sources you've added and rated in DIG are pulled in automatically — use Sync to pick up ones you've added there since.</p>
+        <p class="sec-note">Outlets and voices you want weighted when CiViX reads coverage — the same list DIG rates against a topic, whichever of the two you add one from.</p>
         <div id="sources-list"></div>
         <div class="row" style="margin-top:6px;">
           <button class="btn" id="add-source" type="button">Add a source</button>
-          <button class="btn" id="sync-dig" type="button">Sync from DIG</button>
         </div>
         <div class="handoff">
           <p class="sec-note" style="margin:0 0 9px;">DIG checks how each of these is covering a topic, side by side.</p>
@@ -1139,13 +1138,12 @@
     token: '',
     place: { zip: '' },
     issues: [],        // { id, name, weight 1-3, stance }
-    sources: [],       // { name, hint }
+    sources: [],       // { name, hint, ratings? } — ratings (per-topic quality) are DIG's; same list either app edits
     actions: [],       // action keys
     traits: [],        // community-role tags from Easy mode, e.g. 'renter', 'parent'
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
-    updated: null,
-    digSyncedAt: null  // set once trusted sources have been pulled in from DIG
+    updated: null
   };
 
   let P = load();
@@ -1404,16 +1402,16 @@
   // name — DIG keeps one like/dislike + star rating per source, not per
   // topic) shows that rating here, so the trust signal DIG already
   // captured is visible where the source is actually declared trusted.
-  function digRatingBadge(name) {
-    let ratings;
-    try { ratings = JSON.parse(localStorage.getItem('dig-ratings') || '{}'); } catch (e) { return ''; }
-    const r = ratings[name];
-    if (!r || (!r.like && !r.stars)) return '';
-    const bits = [];
-    if (r.like === 'up') bits.push('\u{1F44D}');
-    if (r.like === 'down') bits.push('\u{1F44E}');
-    if (r.stars) bits.push('★'.repeat(r.stars));
-    return bits.length ? `<div class="srow-badge">${bits.join(' ')} rated in DIG</div>` : '';
+  // DIG rates a source's coverage per topic, stored right on the source
+  // object (P.sources[i].ratings[topic]) since the two apps share this
+  // list now. General trust is the average of those, across however many
+  // topics it's actually been rated on — same derivation DIG itself uses.
+  function digRatingBadge(source) {
+    const ratings = source.ratings || {};
+    const starsList = Object.keys(ratings).map(t => ratings[t].stars).filter(n => n > 0);
+    if (!starsList.length) return '';
+    const avg = Math.round((starsList.reduce((a, b) => a + b, 0) / starsList.length) * 10) / 10;
+    return `<div class="srow-badge">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} ${avg} in DIG, ${starsList.length} topic${starsList.length === 1 ? '' : 's'}</div>`;
   }
 
   function renderSources() {
@@ -1424,36 +1422,12 @@
     }
     el.innerHTML = P.sources.map((s, idx) => `
       <div class="srow">
-        ${digRatingBadge(s.name)}
+        ${digRatingBadge(s)}
         <input class="field" type="text" data-src-name="${idx}" value="${esc(s.name)}" placeholder="Name">
         <input class="field mono" type="text" data-src-hint="${idx}" value="${esc(s.hint)}" placeholder="Where to find them">
         <button type="button" class="btn btn-quiet" data-drop-src="${idx}" aria-label="Remove source">✕</button>
       </div>
     `).join('');
-  }
-
-  // ---- DIG source sync -------------------------------------------------
-  // One-way: DIG's own onboarding-built source list -> the Manifesto's
-  // § 04. Dedup by name; doesn't touch DIG's own list, and doesn't
-  // re-add anything the citizen has since removed here (only runs the
-  // silent auto-merge once per device, via P.digSyncedAt).
-  function loadDigSources() {
-    try { return JSON.parse(localStorage.getItem('dig-sources') || '[]'); } catch (e) { return []; }
-  }
-
-  function mergeDigSources() {
-    const digSources = loadDigSources();
-    if (!digSources.length) return 0;
-    const existing = new Set(P.sources.map(s => (s.name || '').trim().toLowerCase()));
-    let added = 0;
-    digSources.forEach(ds => {
-      const name = (ds.name || '').trim();
-      if (!name || existing.has(name.toLowerCase())) return;
-      P.sources.push({ name, hint: ds.hint || '' });
-      existing.add(name.toLowerCase());
-      added++;
-    });
-    return added;
   }
 
   // ---- Manifesto file export/import ------------------------------------
@@ -2033,20 +2007,6 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
 
     if (t.closest('#copy-doc')) { copy(asText(), t.closest('#copy-doc')); return; }
 
-    if (t.closest('#sync-dig')) {
-      const btn = t.closest('#sync-dig');
-      const added = mergeDigSources();
-      if (added) {
-        amend('add', added + ' source' + (added === 1 ? '' : 's') + ' from DIG');
-        save(); renderAll();
-        btn.textContent = 'Synced ' + added;
-      } else {
-        btn.textContent = 'Nothing new';
-      }
-      setTimeout(() => { btn.textContent = 'Sync from DIG'; }, 1600);
-      return;
-    }
-
     if (t.closest('#export-manifesto')) { exportManifesto(); return; }
     if (t.closest('#import-manifesto-btn')) { document.getElementById('import-manifesto-file').click(); return; }
 
@@ -2523,15 +2483,27 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     : 'CiViX — build your manifesto';
   document.getElementById('place-zip').value = P.place.zip || '';
   document.getElementById('time-budget').value = P.time || '';
-  // One-time, silent: pulls in whatever's already in DIG's own source list
-  // the first time this device sees this change, so existing manifestos
-  // get the same incorporation new ones do without re-running on every
-  // load and fighting sources the citizen has since removed here.
-  if (!P.digSyncedAt) {
-    const added = mergeDigSources();
-    P.digSyncedAt = Date.now();
-    if (added) amend('add', added + ' source' + (added === 1 ? '' : 's') + ' from DIG');
-    save();
+  // One-time only: DIG now reads/writes P.sources directly, so there's
+  // nothing left to keep syncing — but a citizen who used both before this
+  // change could have leftover sources sitting in DIG's old separate list
+  // that never made it here. Bring those in once, then never check again.
+  if (!localStorage.getItem('civix-dig-legacy-merged')) {
+    try {
+      const legacy = JSON.parse(localStorage.getItem('dig-sources') || '[]');
+      if (Array.isArray(legacy) && legacy.length) {
+        const existing = new Set(P.sources.map(s => (s.name || '').trim().toLowerCase()));
+        let added = 0;
+        legacy.forEach(ds => {
+          const name = (ds.name || '').trim();
+          if (!name || existing.has(name.toLowerCase())) return;
+          P.sources.push({ name, hint: ds.hint || '' });
+          existing.add(name.toLowerCase());
+          added++;
+        });
+        if (added) { amend('add', added + ' source' + (added === 1 ? '' : 's') + ' from DIG'); save(); }
+      }
+    } catch (e) {}
+    try { localStorage.setItem('civix-dig-legacy-merged', '1'); } catch (e) {}
   }
   renderAll();
   applyMode();

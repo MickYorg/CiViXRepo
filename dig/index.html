@@ -278,7 +278,8 @@
     color: var(--paper);
   }
 
-  .wd-summary.wd-dim { color: var(--paper-dim); font-style: italic; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .wd-dim { color: var(--paper-dim); }
+  .wd-summary.wd-dim { font-style: italic; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 
   .wd-retry-btn {
     background: none;
@@ -991,18 +992,52 @@
     .wd-focus-card.wd-slide-next { animation: wd-focus-in-next 0.22s ease both; }
     .wd-focus-card.wd-slide-prev { animation: wd-focus-in-prev 0.22s ease both; }
   }
-  .wd-focus-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  .wd-quality-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    width: 100%;
+    margin-bottom: 2px;
+  }
+  .wd-focus-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
   .wd-like-btn {
     background: none;
     border: 1px solid var(--line);
     color: var(--paper-dim);
-    font-size: 16px;
-    width: 38px; height: 38px;
-    border-radius: 50%;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 7px 12px;
+    border-radius: 20px;
     cursor: pointer;
+    white-space: nowrap;
   }
   .wd-like-btn.wd-like-active { border-color: var(--teal); color: var(--teal); background: rgba(111,168,147,0.15); }
   .wd-dislike-btn.wd-like-active { border-color: var(--rust); color: var(--rust); background: rgba(183,90,62,0.15); }
+  .wd-trust-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--amber);
+    margin-bottom: 10px;
+  }
+  .wd-source-list-trust { margin: -3px 0 9px 4px; font-size: 10.5px; }
+  .wd-stance-compare {
+    border-top: 1px solid var(--line);
+    margin-top: 14px;
+    padding-top: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .wd-stance-compare-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    margin-right: 6px;
+  }
   .wd-stars { display: flex; gap: 3px; }
   .wd-star {
     background: none;
@@ -1270,7 +1305,7 @@
 <div id="dig-root">
   <div class="wd-header">
     <div class="wd-header-left">
-      <a class="wd-back-link" href="../" title="Back to CiViX">&larr; CiViX</a>
+      <a class="wd-back-link" href="../builder.html" title="Back to your Manifesto">&larr; Your Manifesto</a>
       <div class="wd-title">DIG <span>/ stance by source</span></div>
     </div>
     <div class="wd-header-btns">
@@ -1757,7 +1792,6 @@
   const tableExpanded = new Set(); // row keys (`${topic}::${source}`) currently expanded in table view
   let previousSavedSources = []; // names present at last successful save/build, for diffing new adds
   let focusIndex = 0;
-  let ratingsLocal = {};   // source name -> { like: 'up'|'down'|null, stars: 0-5 } — kept on-device only
   let debateCache = {};    // `${topic}::${name}` -> array of points | { error } | 'loading'
 
   // Per-topic, per-source result cache. Lets adding/renaming one source (or
@@ -1779,19 +1813,59 @@
   // inbox) and consumed once, inside showApp() -- see there for why.
   let pendingTopicFromQuery = new URLSearchParams(window.location.search).get('topic') || '';
 
-  async function loadSources() {
-    let hasSavedProfile = false;
+  // ---- Shared Manifesto ---------------------------------------------
+  // DIG's sources (and each one's per-topic ratings, stored right on the
+  // source object) now live in the same "civix-profile" record the
+  // Manifesto builder reads and writes — one shared list instead of two
+  // independently-maintained ones. Plain synchronous localStorage here
+  // (not the storage.get/set wrapper) since it's the same underlying
+  // store either way and read-modify-write is simpler without the extra
+  // await plumbing.
+  const MANIFESTO_KEY = 'civix-profile';
+  function loadManifesto() {
     try {
-      const res = await storage.get('dig-sources');
-      if (res && res.value) {
-        const parsed = JSON.parse(res.value);
-        if (Array.isArray(parsed) && parsed.length) {
-          sources = parsed;
-          hasSavedProfile = true;
-        }
+      const raw = localStorage.getItem(MANIFESTO_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function saveManifestoSources(newSources) {
+    let m = loadManifesto();
+    if (!m || typeof m !== 'object') m = {};
+    m.sources = newSources;
+    m.updated = Date.now();
+    try { localStorage.setItem(MANIFESTO_KEY, JSON.stringify(m)); } catch (e) {}
+  }
+  // Best-effort match against the citizen's own declared positions (§ 03
+  // of the Manifesto) — DIG's topics are free text, not the Manifesto's
+  // controlled issue list, so this is a fuzzy name match, not a guarantee.
+  function findManifestoStance(topic) {
+    const m = loadManifesto();
+    if (!m || !Array.isArray(m.issues) || !topic) return '';
+    const t = topic.trim().toLowerCase();
+    const hit = m.issues.find(i => {
+      if (!i.name) return false;
+      const n = i.name.trim().toLowerCase();
+      return n === t || t.includes(n) || n.includes(t);
+    });
+    return (hit && hit.stance) ? hit.stance : '';
+  }
+
+  function loadSources() {
+    const m = loadManifesto();
+    let hasSavedProfile = false;
+    if (m && Array.isArray(m.sources) && m.sources.length) {
+      sources = m.sources;
+      hasSavedProfile = true;
+    } else {
+      // First time seeing the shared Manifesto (or it has no sources yet)
+      // — bring over anything saved under DIG's own pre-merge key so an
+      // existing DIG source list doesn't appear to vanish.
+      const legacy = loadLegacyDigSources();
+      if (legacy.length) {
+        sources = legacy;
+        hasSavedProfile = true;
+        saveManifestoSources(sources);
       }
-    } catch (e) {
-      // no saved list yet
     }
 
     if (hasSavedProfile) {
@@ -1799,6 +1873,17 @@
     } else {
       showOnboarding();
     }
+  }
+
+  function loadLegacyDigSources() {
+    try {
+      const raw = localStorage.getItem('dig-sources');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
   }
 
   function showApp() {
@@ -1962,7 +2047,7 @@
     sources = built;
     built.forEach(s => postStat('source', s.name));
     try {
-      await storage.set('dig-sources', JSON.stringify(sources));
+      saveManifestoSources(sources);
     } catch (e) {
       // will still work for this session even if save fails
     }
@@ -1973,7 +2058,7 @@
     sources = DEFAULT_SOURCES.slice();
     sources.forEach(s => postStat('source', s.name));
     try {
-      await storage.set('dig-sources', JSON.stringify(sources));
+      saveManifestoSources(sources);
     } catch (e) {}
     showApp();
   });
@@ -1992,7 +2077,7 @@
     sources = built;
     built.forEach(s => postStat('source', s.name));
     try {
-      await storage.set('dig-sources', JSON.stringify(sources));
+      saveManifestoSources(sources);
     } catch (e) {}
     showApp();
     drawAttentionToTopicInput();
@@ -2025,6 +2110,13 @@
         <button class="wd-remove-btn" data-remove="${i}">×</button>
       `;
       sourceListEl.appendChild(row);
+      const trust = sourceTrust(src);
+      if (trust) {
+        const badge = document.createElement('div');
+        badge.className = 'wd-trust-badge wd-source-list-trust';
+        badge.textContent = `General trust: ${'★'.repeat(Math.round(trust.avg))}${'☆'.repeat(5 - Math.round(trust.avg))} (${trust.avg}, ${trust.count} topic${trust.count === 1 ? '' : 's'})`;
+        sourceListEl.appendChild(badge);
+      }
     });
 
     sourceListEl.querySelectorAll('input').forEach(inp => {
@@ -2095,7 +2187,7 @@
     newNames.forEach(n => postStat('source', n));
     previousSavedSources = sources.map(s => s.name);
     try {
-      await storage.set('dig-sources', JSON.stringify(sources));
+      saveManifestoSources(sources);
       saveNote.textContent = 'Saved — your profile is looking good.';
     } catch (e) {
       saveNote.textContent = 'Could not save — will reset next session.';
@@ -2674,21 +2766,11 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     trendingGhostEl.classList.toggle('wd-ghost-visible', !topicInput.value.trim());
   });
 
-  // ---- Focus mode: one card at a time, swipeable, with like/dislike,
-  // star rating, and on-demand debate talking points ----
-
-  async function loadRatingsLocal() {
-    try {
-      const res = await storage.get('dig-ratings');
-      if (res && res.value) ratingsLocal = JSON.parse(res.value) || {};
-    } catch (e) {
-      ratingsLocal = {};
-    }
-  }
-
-  function saveRatingsLocal() {
-    try { storage.set('dig-ratings', JSON.stringify(ratingsLocal)); } catch (e) {}
-  }
+  // ---- Focus mode: one card at a time, swipeable, with a per-topic
+  // quality rating (fed into a derived general-trust score), and
+  // on-demand debate talking points. Ratings live on each source object
+  // in the shared Manifesto now — see setSourceRating()/sourceTrust()
+  // further down, near renderFocusCard(). ----
 
   // ---- Per-topic result cache (avoid re-querying unchanged sources) ----
 
@@ -2847,15 +2929,13 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
   });
 
   deleteEverythingBtn.addEventListener('click', async () => {
-    if (!confirm("Delete everything on this device? This clears your sources, ratings, topic history, and cached results, and can't be undone.")) return;
+    if (!confirm("Clear your DIG sources and ratings, topic history, and cached results? Your Manifesto's priorities, positions, and authorized actions are untouched. This can't be undone.")) return;
     sources = [];
-    ratingsLocal = {};
     resultsCache = {};
     topicHistory = [];
     debateCache = {};
+    saveManifestoSources([]); // clears sources (and each one's ratings, stored on it) in the shared Manifesto
     try {
-      await storage.set('dig-sources', JSON.stringify([]));
-      await storage.set('dig-ratings', JSON.stringify({}));
       await storage.set('dig-results-cache', JSON.stringify({}));
       await storage.set('dig-topic-history', JSON.stringify([]));
     } catch (e) { /* best-effort */ }
@@ -2924,10 +3004,31 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     return `<span class="wd-focus-hint">${escapeHtml(clean)}</span>`;
   }
 
+  // A source's general trust is derived, not set directly — the average
+  // of its per-topic quality star ratings, across however many topics
+  // it's actually been rated on. That's what lets "I vibe with them on
+  // almost everything" show up honestly, without a second manual rating
+  // to keep in sync with the per-topic ones.
+  function sourceTrust(src) {
+    const ratings = (src && src.ratings) || {};
+    const starsList = Object.keys(ratings).map(t => ratings[t].stars).filter(n => n > 0);
+    if (!starsList.length) return null;
+    const avg = starsList.reduce((a, b) => a + b, 0) / starsList.length;
+    return { avg: Math.round(avg * 10) / 10, count: starsList.length };
+  }
+
+  function setSourceRating(src, topic, patch) {
+    if (!src.ratings) src.ratings = {};
+    const current = src.ratings[topic] || { quality: null, stars: 0 };
+    src.ratings[topic] = { ...current, ...patch, at: Date.now() };
+    saveManifestoSources(sources);
+  }
+
   function renderFocusCard(direction) {
     const src = sources[focusIndex];
     const r = resultsState[src.name];
-    const rating = ratingsLocal[src.name] || { like: null, stars: 0 };
+    const rating = (src.ratings && src.ratings[currentTopic]) || { quality: null, stars: 0 };
+    const trust = sourceTrust(src);
 
     focusPrev.disabled = focusIndex === 0;
     focusNext.disabled = focusIndex === sources.length - 1;
@@ -2940,17 +3041,36 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
         ? `<div class="wd-focus-summary wd-dim">Couldn't retrieve this one: ${escapeHtml(r.error)}</div>`
         : `<div class="wd-focus-summary">${escapeHtml(r.summary || 'No summary returned.')}</div>`;
 
+    const trustHtml = trust
+      ? `<div class="wd-trust-badge" title="Your average coverage-quality rating for ${escapeAttr(src.name)}, across ${trust.count} topic${trust.count === 1 ? '' : 's'} rated">General trust: ${'★'.repeat(Math.round(trust.avg))}${'☆'.repeat(5 - Math.round(trust.avg))} (${trust.avg})</div>`
+      : '';
+
+    // "Their stance" comes from this check; "your stance" comes straight
+    // from § 03 of the Manifesto, if you've set one for a matching issue.
+    // Juxtaposing the two — instead of one rating that tries to mean
+    // both "well covered" and "I agree" — is what keeps a thumbs-up on
+    // sharp coverage of something you oppose from reading as endorsement.
+    const yourStance = findManifestoStance(currentTopic);
+    const stanceCompareHtml = (r && !r.error && r.stance) ? `
+      <div class="wd-stance-compare">
+        <div><span class="wd-stance-compare-label">Their stance</span>${escapeHtml(r.stance)}</div>
+        <div><span class="wd-stance-compare-label">Your stance</span>${yourStance ? escapeHtml(yourStance) : '<span class="wd-dim">not set — add one in your Manifesto</span>'}</div>
+      </div>` : '';
+
     focusCardEl.classList.remove('wd-slide-next', 'wd-slide-prev');
     focusCardEl.innerHTML = `
       <div class="wd-focus-header">
         <div class="wd-focus-source">${escapeHtml(src.name)}</div>
         ${focusHintHtml(src.hint)}
       </div>
+      ${trustHtml}
       ${stanceHtml}
       ${summaryHtml}
+      ${stanceCompareHtml}
       <div class="wd-focus-actions">
-        <button class="wd-like-btn" data-like="up" title="Like this framing">👍</button>
-        <button class="wd-like-btn wd-dislike-btn" data-like="down" title="Dislike this framing">👎</button>
+        <div class="wd-quality-label">How was their coverage of this topic?</div>
+        <button class="wd-like-btn" data-quality="accurate" title="Fair and accurate coverage of this topic">✓ Fair &amp; accurate</button>
+        <button class="wd-like-btn wd-dislike-btn" data-quality="off" title="Off the mark on this topic">✗ Off the mark</button>
         <div class="wd-stars" id="wd-focus-stars"></div>
         <button class="wd-debate-btn" id="wd-debate-btn">DEBATE ⇄</button>
       </div>
@@ -2959,8 +3079,8 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (direction === 'next') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-next');
     else if (direction === 'prev') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-prev');
 
-    focusCardEl.querySelector('[data-like="up"]').classList.toggle('wd-like-active', rating.like === 'up');
-    focusCardEl.querySelector('[data-like="down"]').classList.toggle('wd-like-active', rating.like === 'down');
+    focusCardEl.querySelector('[data-quality="accurate"]').classList.toggle('wd-like-active', rating.quality === 'accurate');
+    focusCardEl.querySelector('[data-quality="off"]').classList.toggle('wd-like-active', rating.quality === 'off');
 
     renderStars(rating.stars || 0);
     wireFocusActions(src.name);
@@ -3000,24 +3120,23 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       btn.addEventListener('click', () => {
         const n = parseInt(btn.dataset.star, 10);
         const src = sources[focusIndex];
-        ratingsLocal[src.name] = { ...(ratingsLocal[src.name] || {}), stars: n };
-        saveRatingsLocal();
-        renderStars(n);
+        setSourceRating(src, currentTopic, { stars: n });
+        renderFocusCard(); // also refreshes the general-trust badge above
         postStat('rating', src.name, { action: 'star', stars: n });
       });
     });
   }
 
   function wireFocusActions(name) {
-    focusCardEl.querySelectorAll('[data-like]').forEach(btn => {
+    focusCardEl.querySelectorAll('[data-quality]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const dir = btn.dataset.like;
-        const current = ratingsLocal[name] || {};
-        const newVal = current.like === dir ? null : dir; // click again to unset
-        ratingsLocal[name] = { ...current, like: newVal };
-        saveRatingsLocal();
+        const dir = btn.dataset.quality;
+        const src = sources[focusIndex];
+        const current = (src.ratings && src.ratings[currentTopic]) || {};
+        const newVal = current.quality === dir ? null : dir; // click again to unset
+        setSourceRating(src, currentTopic, { quality: newVal });
         renderFocusCard();
-        if (newVal) postStat('rating', name, { action: newVal === 'up' ? 'like' : 'dislike' });
+        if (newVal) postStat('rating', name, { action: newVal === 'accurate' ? 'like' : 'dislike' });
       });
     });
 
@@ -3134,7 +3253,6 @@ POINT: <talking point in a single sentence>
 
   (async () => {
     await migrateLegacyStorage();
-    loadRatingsLocal();
     loadResultsCache();
     loadTopicHistory();
     loadTrendingTopics();
