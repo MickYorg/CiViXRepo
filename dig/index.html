@@ -926,11 +926,22 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 4px;
-    padding: 22px;
     flex: 1;
     min-height: 320px;
     max-height: 84dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* .wd-focus-scroll below does the actual scrolling */
+  }
+  /* Everything that can run long (summary, stance compare, debate points)
+     scrolls in here; the rating controls below stay put as a footer, so
+     they're never something you have to scroll past unread text to
+     reach — the whole point on a small screen. */
+  .wd-focus-scroll {
+    padding: 22px;
     overflow-y: auto;
+    flex: 1;
+    min-height: 0;
     touch-action: pan-y;
   }
   .wd-focus-counter {
@@ -1001,7 +1012,16 @@
     width: 100%;
     margin-bottom: 2px;
   }
-  .wd-focus-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .wd-focus-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 14px 22px;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
   .wd-like-btn {
     background: none;
     border: 1px solid var(--line);
@@ -1113,7 +1133,7 @@
 
   /* Themed scrollbar (webkit + firefox) for anything that scrolls inside
      the widget — table wrap, focus card, chip grid overflow, etc. */
-  #dig-root, .wd-table-wrap, .wd-focus-card { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #dig-root, .wd-table-wrap, .wd-focus-scroll { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   #dig-root *::-webkit-scrollbar { width: 8px; height: 8px; }
   #dig-root *::-webkit-scrollbar-track { background: transparent; }
   #dig-root *::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
@@ -1220,7 +1240,7 @@
     .wd-delete-btn, .wd-recent-topic-chip {
       min-height: 40px;
     }
-    .wd-like-btn, .wd-dislike-btn { width: 44px; height: 44px; font-size: 18px; }
+    .wd-like-btn, .wd-dislike-btn { min-height: 44px; font-size: 13px; padding: 9px 14px; }
     .wd-focus-nav { width: 44px; height: 44px; font-size: 24px; }
     .wd-star { font-size: 22px; padding: 4px; }
 
@@ -1281,7 +1301,9 @@
 
     .wd-focus-overlay { padding: 8px 4px; }
     .wd-focus-stage { gap: 6px; }
-    .wd-focus-card { padding: 16px; min-height: 260px; max-height: 88dvh; }
+    .wd-focus-card { min-height: 260px; max-height: 88dvh; }
+    .wd-focus-scroll { padding: 16px; }
+    .wd-focus-actions { padding: 12px 16px; }
     .wd-focus-close { top: 10px; right: 10px; padding: 8px 10px; }
     .wd-focus-source { font-size: 15px; }
     .wd-focus-summary { font-size: 14px; }
@@ -3059,14 +3081,17 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
 
     focusCardEl.classList.remove('wd-slide-next', 'wd-slide-prev');
     focusCardEl.innerHTML = `
-      <div class="wd-focus-header">
-        <div class="wd-focus-source">${escapeHtml(src.name)}</div>
-        ${focusHintHtml(src.hint)}
+      <div class="wd-focus-scroll">
+        <div class="wd-focus-header">
+          <div class="wd-focus-source">${escapeHtml(src.name)}</div>
+          ${focusHintHtml(src.hint)}
+        </div>
+        ${trustHtml}
+        ${stanceHtml}
+        ${summaryHtml}
+        ${stanceCompareHtml}
+        <div class="wd-debate-points" id="wd-debate-points" style="display:none;"></div>
       </div>
-      ${trustHtml}
-      ${stanceHtml}
-      ${summaryHtml}
-      ${stanceCompareHtml}
       <div class="wd-focus-actions">
         <div class="wd-quality-label">How was their coverage of this topic?</div>
         <button class="wd-like-btn" data-quality="accurate" title="Fair and accurate coverage of this topic">✓ Fair &amp; accurate</button>
@@ -3074,7 +3099,6 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
         <div class="wd-stars" id="wd-focus-stars"></div>
         <button class="wd-debate-btn" id="wd-debate-btn">DEBATE ⇄</button>
       </div>
-      <div class="wd-debate-points" id="wd-debate-points" style="display:none;"></div>
     `;
     if (direction === 'next') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-next');
     else if (direction === 'prev') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-prev');
