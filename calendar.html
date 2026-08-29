@@ -426,7 +426,7 @@
 <div class="wrap">
   <p class="crumb"><span class="sec">§ 03</span> · get engaged</p>
   <h1>Calendar</h1>
-  <p class="dek">The municipal, state, and federal legislative calendar, matched against what's actually in your profile.</p>
+  <p class="dek">The municipal, state, and federal legislative calendar, matched against what's actually in your manifesto.</p>
 
   <div class="wip">
     <span>&#9888;</span>
@@ -554,7 +554,7 @@
     banner.style.display = 'block';
     document.getElementById('focus-banner-text').textContent = issueName
       ? `Filtered to "${issueName}".`
-      : `That priority wasn't found in your profile — showing everything instead.`;
+      : `That priority wasn't found in your manifesto — showing everything instead.`;
   }
 
   function loadProfile() {
@@ -803,7 +803,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 
     let repsSection;
     if (ACTIVE.noZip) {
-      repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your profile</a> to find your representatives and draft a call or email.</p>`;
+      repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your manifesto</a> to find your representatives and draft a call or email.</p>`;
     } else if (ACTIVE.repsError) {
       repsSection = `<p class="action-empty">Couldn't look up your representatives: ${esc(ACTIVE.repsError)}</p>`;
     } else if (!ACTIVE.reps) {
@@ -970,7 +970,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const zip = profile && profile.place && profile.place.zip;
 
     if (!zip) {
-      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your profile</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
+      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
       return;
     }
 
@@ -1021,7 +1021,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       return;
     }
 
-    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated ${data.state} bills against your profile, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
+    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated ${data.state} bills against your manifesto, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
     listEl.innerHTML = matched.slice(0, 8).map(m => renderStateCard(m.bill, m.hits)).join('');
   }
 
@@ -1049,7 +1049,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
 
     if (!profile) {
-      statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your profile</a> to see this narrowed to what you actually care about.`;
+      statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your manifesto</a> to see this narrowed to what you actually care about.`;
       CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));
       listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
       return;
@@ -1080,7 +1080,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       return;
     }
 
-    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated bills against your profile, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
+    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated bills against your manifesto, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
     CURRENT = matched.slice(0, 8).map(m => ({ bill: m.bill, hits: m.hits }));
     listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
   }

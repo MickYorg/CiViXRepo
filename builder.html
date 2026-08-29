@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0A0F1C" id="theme-color-meta">
-<title>CiViX — build your profile</title>
+<title>CiViX — build your manifesto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -18,9 +18,9 @@
 </script>
 <style>
   /* ============================================================
-     CiViX — profile builder ("the demo" / manifesto)
+     CiViX — manifesto builder ("the demo")
 
-     Carries the splash's concept into the product: the profile IS a
+     Carries the splash's concept into the product: the manifesto IS a
      document. It renders as a bill with numbered sections, and every
      change is logged as an amendment — struck language for what you
      removed, underlined for what you added. Editing your values and
@@ -195,7 +195,7 @@
   .guided-step-label { font-size: 11px; color: var(--paper-dim); white-space: nowrap; }
   .guided-bar #guided-back:disabled { opacity: 0.35; cursor: default; }
 
-  /* ---- Easy mode — swipe-card profile builder ---- */
+  /* ---- Easy mode — swipe-card manifesto builder ---- */
   .easy-shell {
     max-width: 460px;
     margin: 18px auto 0;
@@ -208,6 +208,14 @@
   .easy-progress-bar {
     height: 100%; width: 0%; background: var(--amber);
     transition: width 0.25s ease;
+  }
+  .easy-privacy-note {
+    text-align: center;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--paper-dim);
+    margin: 10px 0 0;
   }
   .easy-stage { position: relative; min-height: 420px; }
   .easy-card-slot { position: relative; }
@@ -813,7 +821,7 @@
 </header>
 
 <div class="mode-bar">
-  <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Profile builder mode">
+  <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
     <div class="mode-thumb" id="mode-thumb"></div>
     <button type="button" class="mode-stop" data-mode="easy" data-idx="0" role="radio" title="Swipe through a few cards. Fast, fun, free.">
       <span class="mode-emoji" aria-hidden="true">&#127881;</span>
@@ -823,7 +831,7 @@
       <span class="mode-emoji" aria-hidden="true">&#129504;</span>
       <span class="mode-label">Smarty Pants</span>
     </button>
-    <button type="button" class="mode-stop" data-mode="pro" data-idx="2" role="radio" title="Every section, open, all at once. For power users.">
+    <button type="button" class="mode-stop" data-mode="pro" data-idx="2" role="radio" title="Every section, open, all at once. For citizens who want full control.">
       <span class="mode-emoji" aria-hidden="true">&#127891;</span>
       <span class="mode-label">Pro</span>
     </button>
@@ -832,6 +840,7 @@
 
 <div class="easy-shell" id="easy-shell" hidden>
   <div class="easy-progress"><div class="easy-progress-bar" id="easy-progress-bar"></div></div>
+  <p class="easy-privacy-note">&#128274; Private &amp; secure — everything here stays on this device, never shared or sold.</p>
   <div class="easy-stage">
     <div class="easy-card-slot" id="easy-card-slot"></div>
   </div>
@@ -1043,7 +1052,7 @@
   const ACTION_EMOJI = { email: '✉️', call: '☎️', comment: '📝', testify: '🎤', attend: '🏛️', share: '📣' };
 
   // ---- Easy-mode swipe deck content ------------------------------------
-  // Community-role tags a citizen can swipe onto their profile. They're
+  // Community-role tags a citizen can swipe onto their manifesto. They're
   // purely local flavor with one real job: TRAIT_HINTS uses them to move
   // the most relevant issue categories to the front of the deck, so the
   // "predictive" framing has an actual effect instead of being decorative.
@@ -1173,7 +1182,7 @@
   }
 
   // The docket lives on the server, so it is never written into the saved
-  // profile — INBOX is a cache of what the worker last told us, and the
+  // manifesto — INBOX is a cache of what the worker last told us, and the
   // worker stays the source of truth.
   let INBOX = [];
   let inboxState = 'idle';   // 'idle' | 'loading' | 'error'
@@ -1231,7 +1240,7 @@
   }
 
   // Every substantive change is recorded as an amendment. This is the
-  // splash's concept carried into the product: the profile is a document,
+  // splash's concept carried into the product: the manifesto is a document,
   // and revising it is amending it.
   function amend(kind, text) {
     P.log.unshift({ at: Date.now(), kind: kind, text: text });
@@ -1426,7 +1435,7 @@
   // ---- DIG source sync -------------------------------------------------
   // One-way: DIG's own onboarding-built source list -> the Manifesto's
   // § 04. Dedup by name; doesn't touch DIG's own list, and doesn't
-  // re-add anything the user has since removed here (only runs the
+  // re-add anything the citizen has since removed here (only runs the
   // silent auto-merge once per device, via P.digSyncedAt).
   function loadDigSources() {
     try { return JSON.parse(localStorage.getItem('dig-sources') || '[]'); } catch (e) { return []; }
@@ -1448,7 +1457,7 @@
   }
 
   // ---- Manifesto file export/import ------------------------------------
-  // The profile's only path off this device used to be "Copy as text" —
+  // The manifesto's only path off this device used to be "Copy as text" —
   // readable, but lossy (weights become words, no structure to reload).
   // This is the real thing: the exact P object, downloadable and
   // reloadable, docket token included on purpose so the same docket
@@ -1477,7 +1486,7 @@
         alert("That doesn't look like a CiViX manifesto file — nothing was imported.");
         return;
       }
-      if (!confirm("Import this manifesto? It replaces everything currently on this device — profile, sources, and your Send to CiViX address — with what's in the file. This can't be undone.")) return;
+      if (!confirm("Import this manifesto? It replaces everything currently on this device — manifesto, sources, and your Send to CiViX address — with what's in the file. This can't be undone.")) return;
       P = Object.assign({}, BLANK, parsed);
       save();
       renderAll();
@@ -1763,7 +1772,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       }
     }
 
-    // Bail if the user moved to a different item while this was in flight.
+    // Bail if the citizen moved to a different item while this was in flight.
     if (!focusOpen || INBOX[focusIndex] !== it) return;
     topicValEl.textContent = entry.topic + (entry.fellBack ? ' (couldn\u2019t generalize \u2014 showing as filed)' : '');
     if (digLinkEl) digLinkEl.href = digUrl(entry.topic);
@@ -2042,7 +2051,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     if (t.closest('#import-manifesto-btn')) { document.getElementById('import-manifesto-file').click(); return; }
 
     if (t.closest('#wipe')) {
-      if (confirm('Delete your profile from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
+      if (confirm('Delete your manifesto from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
         try { localStorage.removeItem(KEY); } catch (e) {}
         P = Object.assign({}, BLANK);
         save(); renderAll(); ensureDrop(true);
@@ -2168,8 +2177,8 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       const m = localStorage.getItem(MODE_KEY);
       if (MODE_ORDER.indexOf(m) !== -1) return m;
     } catch (e) {}
-    // A profile with anything already in it came from Pro (or an import) —
-    // land it back there. A brand-new profile gets the fast, fun default.
+    // A manifesto with anything already in it came from Pro (or an import) —
+    // land it back there. A brand-new manifesto gets the fast, fun default.
     return (P.issues.length || P.sources.length || P.actions.length) ? 'pro' : 'easy';
   }
   let MODE = loadMode();
@@ -2255,17 +2264,30 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   let deckIndex = 0;
   let chosenCategories = [];
 
+  // A citizen with nothing set yet gets the short version — a handful of
+  // traits, two issues per category instead of every one, three action
+  // types instead of six. Anyone topping up an existing manifesto gets
+  // the full remaining set, since they've already opted into going deeper.
+  let firstPass = true;
+  const FIRST_PASS_TRAITS = 6;
+  const FIRST_PASS_ISSUES_PER_CATEGORY = 2;
+  const FIRST_PASS_ACTIONS = 3;
+
   function startEasyMode() {
+    firstPass = !P.issues.length && !P.traits.length && !P.actions.length && !P.place.zip;
     chosenCategories = [];
     deckIndex = 0;
+    const traitPool = TRAITS.filter(t => P.traits.indexOf(t[0]) === -1);
+    const actionPool = ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1);
     deck = [
       { type: 'welcome' },
-      ...TRAITS.filter(t => P.traits.indexOf(t[0]) === -1)
+      ...(firstPass ? traitPool.slice(0, FIRST_PASS_TRAITS) : traitPool)
         .map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb })),
       { type: 'categories-marker' },
+      { type: 'encourage' },
       { type: 'issues-marker' },
       { type: 'zip' },
-      ...ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1)
+      ...(firstPass ? actionPool.slice(0, FIRST_PASS_ACTIONS) : actionPool)
         .map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb })),
       { type: 'done' }
     ];
@@ -2291,8 +2313,9 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     const cards = [];
     CATALOG.forEach(([cat, issues]) => {
       if (chosenCategories.indexOf(cat) === -1) return;
-      issues.forEach(name => {
-        if (findIssue(slug(name))) return; // already a priority — nothing to swipe
+      let unswiped = issues.filter(name => !findIssue(slug(name))); // already a priority — nothing to swipe
+      if (firstPass) unswiped = unswiped.slice(0, FIRST_PASS_ISSUES_PER_CATEGORY);
+      unswiped.forEach(name => {
         cards.push({ type: 'issue', id: name, title: name, emoji: '📌', blurb: ISSUE_BLURBS[name] || '' });
       });
     });
@@ -2384,8 +2407,8 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     return `
       <div class="easy-card easy-card-static easy-card-done">
         <div class="easy-emoji">🎉</div>
-        <div class="easy-title">Nice — you’ve got a profile</div>
-        <p class="easy-blurb">${bits.join(', ')}. Everything’s saved right here on this device — nothing shared, nothing sent anywhere.</p>
+        <div class="easy-title">Nice — your manifesto’s coming together</div>
+        <p class="easy-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
         <div class="easy-done-row">
           <a class="btn btn-primary easy-cta" href="calendar.html">See what’s happening now &#8594;</a>
           <button type="button" class="btn easy-cta" id="easy-to-pro">Fine-tune it (Pro mode) &#8594;</button>
@@ -2413,12 +2436,26 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
 
     if (card.type === 'welcome') {
       controls.style.display = 'none';
+      const returning = !!(P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip);
       slot.innerHTML = `
         <div class="easy-card easy-card-static">
           <div class="easy-emoji">👋</div>
-          <div class="easy-title">Let’s build your CiViX profile</div>
-          <p class="easy-blurb">Swipe right for “yes, that’s me” — left to skip. About two minutes, and it all stays on this device.</p>
+          <div class="easy-title">${returning ? 'Let’s refine your CiViX manifesto' : 'Let’s build your CiViX manifesto'}</div>
+          <p class="easy-blurb">Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.</p>
           <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Let’s go &#8594;</button>
+        </div>`;
+      document.getElementById('easy-advance').addEventListener('click', () => advanceEasy());
+      return;
+    }
+
+    if (card.type === 'encourage') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="easy-card easy-card-static">
+          <div class="easy-emoji">✨</div>
+          <div class="easy-title">You’re doing great</div>
+          <p class="easy-blurb">That’s the big picture sorted. Next up: the specifics, so CiViX knows exactly what to watch for you.</p>
+          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Keep going &#8594;</button>
         </div>`;
       document.getElementById('easy-advance').addEventListener('click', () => advanceEasy());
       return;
@@ -2481,12 +2518,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   });
 
   // ---- Boot -----------------------------------------------------------
+  document.title = (P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip)
+    ? 'CiViX — refine your manifesto'
+    : 'CiViX — build your manifesto';
   document.getElementById('place-zip').value = P.place.zip || '';
   document.getElementById('time-budget').value = P.time || '';
   // One-time, silent: pulls in whatever's already in DIG's own source list
   // the first time this device sees this change, so existing manifestos
   // get the same incorporation new ones do without re-running on every
-  // load and fighting sources the user has since removed here.
+  // load and fighting sources the citizen has since removed here.
   if (!P.digSyncedAt) {
     const added = mergeDigSources();
     P.digSyncedAt = Date.now();

@@ -305,6 +305,57 @@
     color: var(--line);
   }
 
+  /* ---- Mode picker — same three stops as the builder's, so the choice
+     made here just carries straight through when "Build your manifesto"
+     is clicked. ---- */
+  .mode-track {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 360px;
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px;
+    margin-top: 18px;
+  }
+  .mode-thumb {
+    position: absolute;
+    top: 5px; bottom: 5px; left: 5px;
+    width: calc((100% - 10px) / 3);
+    background: var(--amber-wash);
+    border: 1px solid var(--amber);
+    border-radius: 999px;
+    transition: transform 0.28s cubic-bezier(.2, .8, .2, 1);
+    pointer-events: none;
+  }
+  .mode-track[data-on="1"] .mode-thumb { transform: translateX(100%); }
+  .mode-track[data-on="2"] .mode-thumb { transform: translateX(200%); }
+  .mode-stop {
+    position: relative;
+    z-index: 1;
+    appearance: none;
+    background: none;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 9px 6px;
+    cursor: pointer;
+    border-radius: 999px;
+    color: var(--paper-dim);
+    transition: color 0.15s ease;
+  }
+  .mode-stop.is-on { color: var(--amber-ink); }
+  .mode-emoji { font-size: 19px; line-height: 1; }
+  .mode-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
   .cta {
     appearance: none;
     border: none;
@@ -351,7 +402,7 @@
   /* §01 pairs its text with launch links for the modules that exist
      today (DIG, PolTraPro). They sit on the same row as the text but
      stay fully invisible until the whole amendment sequence resolves
-     (or the user hits Skip), then dissolve in one at a time — DIG,
+     (or the citizen hits Skip), then dissolve in one at a time — DIG,
      then PolTraPro half a second later — so they read as the payoff
      of the sequence rather than competing with it. */
   .line-row {
@@ -528,12 +579,27 @@
 
     <div class="resolve">
       <div class="resolve-copy">
-        <p class="pitch">Build a private profile of what you actually care about. CiViX matches it against the municipal, state, and federal calendar, then turns it into action you control.</p>
+        <p class="pitch">Build a private manifesto of what you actually care about. CiViX matches it against the municipal, state, and federal calendar, then turns it into action you control.</p>
         <div class="principles">
           <span>Trustless</span><span>Distributed</span><span>Private</span><span>Truth</span>
         </div>
+        <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
+          <div class="mode-thumb" id="mode-thumb"></div>
+          <button type="button" class="mode-stop" data-mode="easy" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+            <span class="mode-emoji" aria-hidden="true">&#127881;</span>
+            <span class="mode-label">Easy</span>
+          </button>
+          <button type="button" class="mode-stop" data-mode="smart" role="radio" title="The same form, one friendly step at a time.">
+            <span class="mode-emoji" aria-hidden="true">&#129504;</span>
+            <span class="mode-label">Smarty Pants</span>
+          </button>
+          <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
+            <span class="mode-emoji" aria-hidden="true">&#127891;</span>
+            <span class="mode-label">Pro</span>
+          </button>
+        </div>
       </div>
-      <button class="cta" id="cta">Build your profile</button>
+      <button class="cta" id="cta">Build your manifesto</button>
     </div>
   </main>
 </div>
@@ -544,7 +610,7 @@
 </div>
 
 <div class="cta-sticky">
-  <button class="cta" id="cta-sticky">Build your profile</button>
+  <button class="cta" id="cta-sticky">Build your manifesto</button>
 </div>
 
 <script>
@@ -688,12 +754,47 @@
   skipBtn.addEventListener('click', finish);
   replayBtn.addEventListener('click', play);
 
-  cta.addEventListener('click', () => {
-    window.location.href = 'builder.html';
+  // ---- Mode picker ------------------------------------------------------
+  // A returning citizen with an existing manifesto keeps whatever mode
+  // they last used there (defaulting to Pro, same as the builder itself);
+  // anyone new starts on Easy. Whatever's picked here is handed straight
+  // to the builder via the same 'civix-mode' key it reads on load.
+  const MODE_ORDER = ['easy', 'smart', 'pro'];
+  let hasManifesto = false;
+  try { hasManifesto = !!localStorage.getItem('civix-profile'); } catch (e) {}
+  let splashMode = 'easy';
+  if (hasManifesto) {
+    try {
+      const saved = localStorage.getItem('civix-mode');
+      splashMode = MODE_ORDER.indexOf(saved) !== -1 ? saved : 'pro';
+    } catch (e) { splashMode = 'pro'; }
+  }
+
+  const ctaLabel = hasManifesto ? 'Refine your manifesto' : 'Build your manifesto';
+  cta.textContent = ctaLabel;
+  document.getElementById('cta-sticky').textContent = ctaLabel;
+
+  const modeTrack = document.getElementById('mode-track');
+  function applySplashMode() {
+    const idx = MODE_ORDER.indexOf(splashMode);
+    modeTrack.setAttribute('data-on', String(idx));
+    document.querySelectorAll('.mode-stop').forEach(btn => {
+      const on = btn.dataset.mode === splashMode;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-checked', String(on));
+    });
+  }
+  document.querySelectorAll('.mode-stop').forEach(btn => {
+    btn.addEventListener('click', () => { splashMode = btn.dataset.mode; applySplashMode(); });
   });
-  document.getElementById('cta-sticky').addEventListener('click', () => {
+  applySplashMode();
+
+  function goToBuilder() {
+    try { localStorage.setItem('civix-mode', splashMode); } catch (e) {}
     window.location.href = 'builder.html';
-  });
+  }
+  cta.addEventListener('click', goToBuilder);
+  document.getElementById('cta-sticky').addEventListener('click', goToBuilder);
 })();
 </script>
 </body>
