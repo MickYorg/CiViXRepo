@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Docket — CiViX</title>
+<title>Send to CiViX</title>
 <meta name="theme-color" content="#14161a">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
@@ -302,6 +302,10 @@
     text-transform: uppercase; padding: 7px 12px; border-radius: 2px; cursor: pointer;
   }
   .addr button.ghost:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .addr-done-row { display: none; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .addr.is-done .addr-done-row { display: flex; }
+  .addr.is-done .addr-full { display: none; }
+  .addr-done-check { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
 
   /* ---------- error + loading ---------- */
   .errbar {
@@ -327,7 +331,7 @@
 
   <header>
     <span class="mark">Ci<b>Vi</b>X</span>
-    <span class="masthead-label">Docket</span>
+    <span class="masthead-label">Send to CiViX</span>
     <button class="theme-btn" id="themeBtn" type="button">Light</button>
   </header>
 
@@ -339,12 +343,18 @@
   </div>
 
   <div class="addr" id="addrPanel" hidden>
-    <span class="eyebrow">Your capture address</span>
-    <p class="value" id="addrValue">—</p>
-    <div class="row">
-      <a class="cta" id="vcardLink" href="#">Add CiViX to contacts</a>
-      <button class="ghost" type="button" id="copyAddr">Copy address</button>
-      <button class="ghost" type="button" id="copyDocket">Copy docket link</button>
+    <div class="addr-done-row" id="addrDoneRow">
+      <span class="addr-done-check">&#10003; Send to CiViX is set up</span>
+      <button class="ghost" type="button" id="addrExpand">Details</button>
+    </div>
+    <div class="addr-full" id="addrFull">
+      <span class="eyebrow">Your Send to CiViX address</span>
+      <p class="value" id="addrValue">—</p>
+      <div class="row">
+        <a class="cta" id="vcardLink" href="#">Add CiViX to contacts</a>
+        <button class="ghost" type="button" id="copyAddr">Copy address</button>
+        <button class="ghost" type="button" id="copyDocket">Copy docket link</button>
+      </div>
     </div>
   </div>
 
@@ -385,8 +395,22 @@
 
   var API = 'https://civix-capture.mycivix.workers.dev';
   var TOKEN_KEY = 'civix.token';
+  var CONTACT_FLAG = 'civix-contact-added';
+  var dropForceExpand = false;
 
   var state = { token: null, address: '', items: [], view: 'docket' };
+
+  function contactAdded() {
+    try { return localStorage.getItem(CONTACT_FLAG) === '1'; } catch (e) { return false; }
+  }
+  function setContactAdded() {
+    try { localStorage.setItem(CONTACT_FLAG, '1'); } catch (e) {}
+  }
+  function renderAddrPanel() {
+    var panel = document.getElementById('addrPanel');
+    if (!panel || panel.hidden) return;
+    panel.classList.toggle('is-done', contactAdded() && !dropForceExpand);
+  }
 
   var listEl = document.getElementById('list');
   var errBar = document.getElementById('errBar');
@@ -540,6 +564,7 @@
         document.getElementById('vcardLink').href =
           API + '/api/vcard?token=' + encodeURIComponent(state.token);
         document.getElementById('addrPanel').hidden = false;
+        renderAddrPanel();
         render();
       })
       .catch(function (e) {
@@ -705,6 +730,15 @@
   });
   document.getElementById('copyDocket').addEventListener('click', function () {
     copy(docketUrl(), 'Docket link copied.');
+  });
+  document.getElementById('vcardLink').addEventListener('click', function () {
+    setContactAdded();
+    dropForceExpand = false;
+    renderAddrPanel();
+  });
+  document.getElementById('addrExpand').addEventListener('click', function () {
+    dropForceExpand = true;
+    renderAddrPanel();
   });
 
   /* ---------------------------------------------------------------

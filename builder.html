@@ -122,6 +122,139 @@
   }
   .saved-flag.is-on { opacity: 1; }
 
+  /* ---- Mode slider — easy/fun/free on the left, smarty pants in the
+     middle, pro/power/academic on the right. Purely presentational: all
+     three modes read and write the same P object, so switching between
+     them never loses or converts data. ---- */
+  .mode-bar { max-width: 1400px; margin: 0 auto; padding: 16px clamp(16px, 2.5vw, 30px) 0; }
+  .mode-track {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px;
+  }
+  .mode-thumb {
+    position: absolute;
+    top: 5px; bottom: 5px; left: 5px;
+    width: calc((100% - 10px) / 3);
+    background: var(--amber-wash);
+    border: 1px solid var(--amber);
+    border-radius: 999px;
+    transition: transform 0.28s cubic-bezier(.2, .8, .2, 1);
+    pointer-events: none;
+  }
+  .mode-track[data-on="1"] .mode-thumb { transform: translateX(100%); }
+  .mode-track[data-on="2"] .mode-thumb { transform: translateX(200%); }
+  .mode-stop {
+    position: relative;
+    z-index: 1;
+    appearance: none;
+    background: none;
+    border: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 8px;
+    cursor: pointer;
+    border-radius: 999px;
+    color: var(--paper-dim);
+    transition: color 0.15s ease;
+  }
+  .mode-stop.is-on { color: var(--amber-ink); }
+  .mode-emoji { font-size: 22px; line-height: 1; }
+  .mode-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ---- Guided (Smarty Pants) stepper — a fixed footer bar that drives
+     which one of the existing §01-06 sections is open. Reuses every
+     section's real markup and data wiring; nothing is duplicated. ---- */
+  .guided-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+    background: var(--ink-raised);
+    border-top: 1px solid var(--line);
+    padding: 10px clamp(16px, 2.5vw, 30px);
+    display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  .guided-bar[hidden] { display: none; }
+  body.is-guided .shell { padding-bottom: 96px; }
+  .guided-dots { display: flex; gap: 6px; }
+  .guided-dot {
+    width: 8px; height: 8px; border-radius: 50%; border: 0; padding: 0;
+    background: var(--line); cursor: pointer;
+  }
+  .guided-dot.is-on { background: var(--amber); }
+  .guided-nav { display: flex; align-items: center; gap: 14px; }
+  .guided-step-label { font-size: 11px; color: var(--paper-dim); white-space: nowrap; }
+  .guided-bar #guided-back:disabled { opacity: 0.35; cursor: default; }
+
+  /* ---- Easy mode — swipe-card profile builder ---- */
+  .easy-shell {
+    max-width: 460px;
+    margin: 18px auto 0;
+    padding: 0 clamp(16px, 2.5vw, 30px) 40px;
+  }
+  .easy-progress {
+    height: 4px; border-radius: 2px; background: var(--line-soft);
+    overflow: hidden; margin-bottom: 18px;
+  }
+  .easy-progress-bar {
+    height: 100%; width: 0%; background: var(--amber);
+    transition: width 0.25s ease;
+  }
+  .easy-stage { position: relative; min-height: 420px; }
+  .easy-card-slot { position: relative; }
+  .easy-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 34px 26px;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    touch-action: pan-y;
+    cursor: grab;
+    user-select: none;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  }
+  .easy-card:active { cursor: grabbing; }
+  .easy-card-static { cursor: default; }
+  .easy-emoji { font-size: 64px; line-height: 1; margin-bottom: 18px; }
+  .easy-title { font-size: clamp(21px, 3.5vw, 27px); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 10px; }
+  .easy-blurb { font-size: 15.5px; color: var(--paper-dim); line-height: 1.5; margin: 0 0 6px; max-width: 34ch; }
+  .easy-card-static .easy-blurb { margin-bottom: 22px; }
+  .easy-cta { margin-top: 6px; }
+  .easy-zip-field { max-width: 180px; text-align: center; margin: 4px 0 18px; }
+  .easy-done-row { display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 260px; }
+  .easy-done-row .btn { text-decoration: none; display: block; text-align: center; }
+  .easy-controls {
+    display: flex; justify-content: center; gap: 26px; margin-top: 22px;
+  }
+  .easy-btn {
+    appearance: none; border: 1px solid var(--line); background: var(--ink-raised);
+    color: var(--paper-dim); width: 58px; height: 58px; border-radius: 50%;
+    font-size: 24px; cursor: pointer;
+    display: grid; place-items: center;
+    transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .easy-btn:active { transform: scale(0.92); }
+  .easy-btn-no:hover { color: var(--strike); border-color: var(--strike); }
+  .easy-btn-yes:hover { color: var(--amber-ink); border-color: var(--amber); }
+  @media (max-width: 480px) {
+    .easy-card { padding: 26px 20px; min-height: 340px; }
+    .easy-emoji { font-size: 52px; }
+  }
+
   /* ---- Layout ---- */
   .shell {
     max-width: 1400px;
@@ -396,6 +529,14 @@
     color: var(--paper-dim);
     margin: 0;
   }
+  .drop-done-row { display: none; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .drop.is-done .drop-done-row { display: flex; }
+  .drop.is-done .drop-full { display: none; }
+  .drop-done-check {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    color: var(--amber-ink);
+  }
 
   .item {
     border: 1px solid var(--line);
@@ -566,13 +707,11 @@
     .dig-link { display: none; } /* the in-context one in § 04 still covers it */
   }
 
-  /* ---- Inbox focus mode — DIG's carousel/check/rating pattern, applied
-     to filed items instead of one topic's sources. A filing has no AI
-     summary of its own, so opening one first asks the model to place it
-     under a general, durable policy topic (never the raw headline), then
-     runs the same per-source stance check DIG runs, against § 04's
-     sources — sharing DIG's own localStorage result cache so a topic
-     checked from either surface is cached for both. */
+  /* ---- Inbox focus mode. A filing has no AI summary of its own, so
+     opening one first asks the model to place it under a general, durable
+     policy topic (never the raw headline). From there: send it to DIG for
+     real per-source research, rate how much it matters, or push it
+     straight to the matching calendar activity. */
   .item { cursor: pointer; transition: border-color 0.15s ease; }
   .item:hover { border-color: var(--paper-dim); }
 
@@ -630,26 +769,6 @@
     font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--paper-dim);
   }
   .ifocus-topic-val { font-weight: 600; font-size: 15px; color: var(--amber-ink); }
-  .ifocus-checks { margin-bottom: 16px; }
-  .ifocus-empty { font-size: 12.5px; color: var(--paper-dim); line-height: 1.55; }
-  .ifocus-empty a { color: var(--amber-ink); }
-  .ifocus-src { border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin-bottom: 8px; background: var(--ink-sunk); }
-  .ifocus-src-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
-  .ifocus-src-name { font-size: 12.5px; font-weight: 600; }
-  .ifocus-src-time {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: 9.5px; color: var(--paper-dim); white-space: nowrap;
-  }
-  .ifocus-stance {
-    display: inline-block;
-    font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: 10px; color: var(--amber-ink);
-    background: var(--amber-wash); border-radius: 20px;
-    padding: 2px 9px; margin-bottom: 6px;
-  }
-  .ifocus-src-summary { font-size: 13.5px; line-height: 1.55; }
-  .ifocus-src-summary.ifocus-full { margin-top: 4px; }
-  .ifocus-expand { font-size: 10px; margin-top: 4px; padding: 3px 4px; }
   .ifocus-rate { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .ifocus-rate-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -693,6 +812,44 @@
   </div>
 </header>
 
+<div class="mode-bar">
+  <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Profile builder mode">
+    <div class="mode-thumb" id="mode-thumb"></div>
+    <button type="button" class="mode-stop" data-mode="easy" data-idx="0" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+      <span class="mode-emoji" aria-hidden="true">&#127881;</span>
+      <span class="mode-label">Easy</span>
+    </button>
+    <button type="button" class="mode-stop" data-mode="smart" data-idx="1" role="radio" title="The same form, one friendly step at a time.">
+      <span class="mode-emoji" aria-hidden="true">&#129504;</span>
+      <span class="mode-label">Smarty Pants</span>
+    </button>
+    <button type="button" class="mode-stop" data-mode="pro" data-idx="2" role="radio" title="Every section, open, all at once. For power users.">
+      <span class="mode-emoji" aria-hidden="true">&#127891;</span>
+      <span class="mode-label">Pro</span>
+    </button>
+  </div>
+</div>
+
+<div class="easy-shell" id="easy-shell" hidden>
+  <div class="easy-progress"><div class="easy-progress-bar" id="easy-progress-bar"></div></div>
+  <div class="easy-stage">
+    <div class="easy-card-slot" id="easy-card-slot"></div>
+  </div>
+  <div class="easy-controls" id="easy-controls">
+    <button type="button" class="easy-btn easy-btn-no" id="easy-no" aria-label="Skip this one">&#10005;</button>
+    <button type="button" class="easy-btn easy-btn-yes" id="easy-yes" aria-label="Yes, that's me">&#9825;</button>
+  </div>
+</div>
+
+<div class="guided-bar" id="guided-bar" hidden>
+  <div class="guided-dots" id="guided-dots"></div>
+  <div class="guided-nav">
+    <button type="button" class="btn" id="guided-back">&#8592; Back</button>
+    <span class="guided-step-label mono" id="guided-step-label"></span>
+    <button type="button" class="btn btn-primary" id="guided-next">Continue &#8594;</button>
+  </div>
+</div>
+
 <div class="shell">
   <div class="panes-tab">
     <button type="button" data-pane-btn="build" class="is-on">Build</button>
@@ -711,17 +868,23 @@
       <div class="sec-body">
         <p class="sec-note">Things you share to your CiViX address land here. Adopt what still matters and it becomes a priority below; strike the rest.</p>
 
-        <div class="drop">
-          <div class="doc-kicker">Send things here</div>
-          <div class="drop-addr">
-            <code id="drop-addr">—</code>
-            <button class="btn" id="copy-drop" type="button">Copy</button>
-            <button class="btn btn-quiet" id="rotate-drop" type="button">New address</button>
+        <div class="drop" id="drop-panel">
+          <div class="drop-done-row" id="drop-done-row">
+            <span class="drop-done-check">&#10003; Send to CiViX is set up</span>
+            <button type="button" class="btn btn-quiet" id="drop-expand">Details</button>
           </div>
-          <div class="finish-row" style="margin-top:10px;">
-            <a class="btn btn-primary" id="vcard-drop" href="#">Add CiViX to contacts</a>
+          <div class="drop-full" id="drop-full">
+            <div class="doc-kicker">Send things here</div>
+            <div class="drop-addr">
+              <code id="drop-addr">—</code>
+              <button class="btn" id="copy-drop" type="button">Copy</button>
+              <button class="btn btn-quiet" id="rotate-drop" type="button">New address</button>
+            </div>
+            <div class="finish-row" style="margin-top:10px;">
+              <a class="btn btn-primary" id="vcard-drop" href="#">Add CiViX to contacts</a>
+            </div>
+            <p class="drop-warn">Save the contact, then share to it from any app — Mail, and pick CiViX. The address is your account: no login, no name, nothing of yours on file. Anyone holding it can read what you send, so keep it to yourself.</p>
           </div>
-          <p class="drop-warn">Save the contact, then share to it from any app — Mail, and pick CiViX. The address is your account: no login, no name, nothing of yours on file. Anyone holding it can read what you send, so keep it to yourself.</p>
         </div>
 
         <div id="inbox-list"></div>
@@ -877,6 +1040,88 @@
     ['attend', 'Show up', 'Flag hearings, town halls, council meetings'],
     ['share', 'Spread it', 'Prepare posts and explainers to circulate']
   ];
+  const ACTION_EMOJI = { email: '✉️', call: '☎️', comment: '📝', testify: '🎤', attend: '🏛️', share: '📣' };
+
+  // ---- Easy-mode swipe deck content ------------------------------------
+  // Community-role tags a citizen can swipe onto their profile. They're
+  // purely local flavor with one real job: TRAIT_HINTS uses them to move
+  // the most relevant issue categories to the front of the deck, so the
+  // "predictive" framing has an actual effect instead of being decorative.
+  const TRAITS = [
+    ['renter', 'Renter', '🏠', 'You rent your home.'],
+    ['homeowner', 'Homeowner', '🏡', 'You own your home.'],
+    ['parent', 'Parent or guardian', '👶', 'You’re raising a kid.'],
+    ['student', 'Student', '🎓', 'You’re in school right now.'],
+    ['small-biz', 'Small-business owner', '🧾', 'You run or co-run a small business.'],
+    ['union', 'Union member', '✊', 'You belong to a union.'],
+    ['veteran', 'Veteran', '🎖️', 'You served in the military.'],
+    ['retired', 'Retired', '🌤️', 'You’re retired.'],
+    ['caregiver', 'Caregiver', '🤝', 'You care for a family member.'],
+    ['newcomer', 'New to the area', '📦', 'You moved here recently.']
+  ];
+  const TRAIT_HINTS = {
+    renter: ['Tenant rights', 'Housing affordability'],
+    homeowner: ['Housing affordability', 'Zoning and development'],
+    parent: ['Public schools', 'Childcare'],
+    student: ['Higher education cost', 'Public schools'],
+    'small-biz': ['Small business', 'Taxes'],
+    union: ['Wages and labor'],
+    veteran: ['Healthcare access', 'Mental health'],
+    retired: ['Healthcare access', 'Drug pricing'],
+    caregiver: ['Mental health', 'Healthcare access'],
+    newcomer: ['Transit', 'Rural access']
+  };
+  const CATEGORY_META = {
+    'Economy & work': ['💼', 'Jobs, wages, prices, and small business.'],
+    'Health': ['🩺', 'Care you can get and afford.'],
+    'Housing & land': ['🏘️', 'What it costs to have a roof.'],
+    'Education': ['📚', 'Schools, college, and childcare.'],
+    'Environment & energy': ['🌎', 'Climate, energy, and the outdoors.'],
+    'Justice & safety': ['⚖️', 'Policing, courts, and public safety.'],
+    'Democracy': ['🗳️', 'Voting, maps, and how government runs.'],
+    'Tech & privacy': ['🔒', 'Your data, AI, and the internet.'],
+    'Movement': ['🚌', 'Getting around, and who gets to.']
+  };
+  const ISSUE_BLURBS = {
+    'Wages and labor': 'Minimum wage, overtime, and worker protections.',
+    'Taxes': 'Who pays what, and where it goes.',
+    'Cost of living': 'Why everything costs more than it used to.',
+    'Small business': 'Rules and support for local business owners.',
+    'Trade and tariffs': 'What crossing a border costs a product.',
+    'Healthcare access': 'Getting covered, and getting seen.',
+    'Drug pricing': 'What prescriptions cost, and why.',
+    'Public health': 'Disease prevention and health emergencies.',
+    'Reproductive health': 'Reproductive care and choices.',
+    'Mental health': 'Access to therapy, crisis care, and support.',
+    'Housing affordability': 'Rent, mortgages, and keeping up.',
+    'Zoning and development': 'What can get built, and where.',
+    'Homelessness': 'Shelter, services, and street-level policy.',
+    'Tenant rights': 'Protections for renters against landlords.',
+    'Public schools': 'K-12 funding, teachers, and classrooms.',
+    'Higher education cost': 'Tuition, student debt, financial aid.',
+    'Curriculum and books': 'What gets taught, and what gets banned.',
+    'Childcare': 'Getting your kid somewhere safe and affordable.',
+    'Climate policy': 'Emissions, resilience, and the warming planet.',
+    'Energy costs': 'Keeping the lights on without breaking the bank.',
+    'Water and air quality': 'What’s actually in what you breathe and drink.',
+    'Public lands': 'Parks, forests, and who gets to use them.',
+    'Policing': 'How neighborhoods are policed, and by whom.',
+    'Criminal justice reform': 'Sentencing, prisons, and second chances.',
+    'Gun policy': 'Who can buy what, and how.',
+    'Courts': 'Judges, backlogs, and how justice moves.',
+    'Voting access': 'Who can vote, and how easy it is.',
+    'Redistricting': 'Who draws the lines, and why it matters.',
+    'Campaign finance': 'Who’s paying for the ads you see.',
+    'Government transparency': 'What officials have to show you.',
+    'Data privacy': 'Who has your data, and what they do with it.',
+    'AI regulation': 'Guardrails on artificial intelligence.',
+    'Platform accountability': 'What tech platforms owe their users.',
+    'Broadband access': 'Getting everyone a real internet connection.',
+    'Transit': 'Buses, trains, and getting around without a car.',
+    'Roads and bridges': 'The infrastructure under your commute.',
+    'Immigration': 'Who gets in, how, and what happens after.',
+    'Rural access': 'Services and infrastructure outside the cities.'
+  };
 
   const BLANK = {
     version: 1,
@@ -887,6 +1132,7 @@
     issues: [],        // { id, name, weight 1-3, stance }
     sources: [],       // { name, hint }
     actions: [],       // action keys
+    traits: [],        // community-role tags from Easy mode, e.g. 'renter', 'parent'
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
     updated: null,
@@ -964,6 +1210,24 @@
     } catch (e) {
       if (el) el.textContent = 'could not reach CiViX — reload to retry';
     }
+  }
+
+  // Adding the CiViX contact is one-and-done — once it's confirmed, the
+  // setup UI just wastes space every time the Inbox is opened. This flag
+  // is shared (same localStorage key) with capture.html, so doing it from
+  // either surface silences both.
+  const CONTACT_FLAG = 'civix-contact-added';
+  let dropForceExpand = false;
+  function contactAdded() {
+    try { return localStorage.getItem(CONTACT_FLAG) === '1'; } catch (e) { return false; }
+  }
+  function setContactAdded() {
+    try { localStorage.setItem(CONTACT_FLAG, '1'); } catch (e) {}
+  }
+  function renderDropPanel() {
+    const panel = document.getElementById('drop-panel');
+    if (!panel) return;
+    panel.classList.toggle('is-done', contactAdded() && !dropForceExpand);
   }
 
   // Every substantive change is recorded as an amendment. This is the
@@ -1213,7 +1477,7 @@
         alert("That doesn't look like a CiViX manifesto file — nothing was imported.");
         return;
       }
-      if (!confirm("Import this manifesto? It replaces everything currently on this device — profile, sources, and your capture address — with what's in the file. This can't be undone.")) return;
+      if (!confirm("Import this manifesto? It replaces everything currently on this device — profile, sources, and your Send to CiViX address — with what's in the file. This can't be undone.")) return;
       P = Object.assign({}, BLANK, parsed);
       save();
       renderAll();
@@ -1304,14 +1568,15 @@
   }
 
   // ---- Inbox focus mode -------------------------------------------------
-  // Ports DIG's carousel/check/rating pattern from dig/index.html onto
-  // filed items. A filing has no AI summary of its own — first it's placed
-  // under a general, durable policy topic (never the raw headline, per the
-  // same "broad and ongoing, not a single event" framing DIG uses for its
-  // own trending topics), then that topic is run through DIG's own
-  // per-source stance check against § 04's sources. Results are cached in
-  // DIG's own 'dig-results-cache' localStorage key (same shape it already
-  // uses), so a topic checked from either surface is cached for both.
+  // A filed item gets one AI touch here — placed under a general, durable
+  // policy topic (never the raw headline, per the same "broad and ongoing,
+  // not a single event" framing DIG uses for its own trending topics) —
+  // then three things a citizen can do with it: send it to DIG for real
+  // per-source research, rate how much it matters (which becomes the
+  // adopted issue's weight), or push straight to the matching calendar
+  // activity. The old inline multi-source check (running every § 04 source
+  // against every filing) got cut 29 Aug 2026 — too much for a triage
+  // surface; that research now happens on DIG's own page instead.
   let focusOpen = false;
   let focusIndex = 0;
   let focusRatings = {};       // filing id -> 1-3, becomes the adopted issue's weight
@@ -1323,23 +1588,8 @@
   function saveInboxTopics() {
     try { localStorage.setItem('civix-inbox-topics', JSON.stringify(inboxTopics)); } catch (e) {}
   }
-  function loadDigCache() {
-    try { return JSON.parse(localStorage.getItem('dig-results-cache') || '{}'); } catch (e) { return {}; }
-  }
-  function saveDigCache(cache) {
-    try { localStorage.setItem('dig-results-cache', JSON.stringify(cache)); } catch (e) {}
-  }
-
-  function previewText(summary) {
-    const oneLine = String(summary || '').replace(/\s+/g, ' ').trim();
-    const LIMIT = 140;
-    if (oneLine.length <= LIMIT) return { preview: oneLine, truncated: false };
-    const cut = oneLine.slice(0, LIMIT);
-    const lastSpace = cut.lastIndexOf(' ');
-    return { preview: (lastSpace > 80 ? cut.slice(0, lastSpace) : cut) + '…', truncated: true };
-  }
-  function cssEscapeLocal(s) {
-    return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&');
+  function digUrl(topic) {
+    return 'dig/?topic=' + encodeURIComponent(topic);
   }
   async function digCheckCall(prompt) {
     const r = await fetch('/api/dig-check', {
@@ -1368,31 +1618,6 @@ Captured item: "${it.title}"${it.note ? `\nTheir note: "${it.note}"` : ''}${it.h
 Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy area this falls under (e.g. "Housing affordability", "Immigration and border policy", "Criminal justice reform") — general enough that it would still make sense as a topic next month, not tied to this one event. No markdown, no explanation, no surrounding quotes.`;
     const text = await digCheckCall(prompt);
     return text.replace(/^["']|["']$/g, '').trim();
-  }
-
-  // Identical prompt/parsing to checkSource() in dig/index.html, so a
-  // result cached from here is indistinguishable from one DIG produced.
-  async function checkSourceForInbox(src, topic) {
-    const prompt = `You are tracking how a specific independent commentator or outlet is covering a news topic, for a media-monitoring tool.
-
-Source: ${src.name}${src.hint ? ` (find via: ${src.hint})` : ''}
-Topic: ${topic}
-
-Search the web for this source's own recent coverage or commentary on this topic — their site, channel, Substack, podcast, or social posts. Many independent commentators and analysts don't primarily publish under their own byline — they show up as guests on OTHER people's podcasts, YouTube shows, and panel discussions. If a search limited to their own outlet doesn't turn up anything, broaden it: search their name together with the topic, and also try their name plus terms like "interview," "podcast," or "panel" to surface appearances on other shows where they've addressed it. Use a few different search angles before concluding there's nothing — don't stop after a single search if the first one comes up empty.
-
-Then respond in exactly this plain-text format, no markdown:
-
-STANCE: <a short tag of 8 words or fewer capturing their core framing or position>
-SUMMARY: <2-3 sentences, in your own words, on how they've covered it and what they emphasize — mention a specific piece, episode, or interview if you found one>
-
-Only use STANCE: "no coverage found" if you've genuinely searched multiple angles (their own outlet AND guest appearances elsewhere) and still found nothing — not just because the first search came up empty.`;
-    const text = await digCheckCall(prompt);
-    const stanceMatch = text.match(/STANCE:\s*(.+)/i);
-    const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
-    return {
-      stance: stanceMatch ? stanceMatch[1].split('\n')[0].trim() : '',
-      summary: summaryMatch ? summaryMatch[1].trim() : text
-    };
   }
 
   function openInboxFocus(index) {
@@ -1485,13 +1710,14 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
         <span class="ifocus-topic-label">Policy topic</span>
         <span class="ifocus-topic-val" id="ifocus-topic-val">…</span>
       </div>
-      <div class="ifocus-checks" id="ifocus-checks"></div>
       <div class="ifocus-rate">
         <span class="ifocus-rate-label">How much does this matter to you?</span>
         <div class="ib-stars" id="ifocus-stars"></div>
       </div>
       <div class="ifocus-actions">
-        <button class="btn btn-primary" id="ifocus-adopt" type="button">Adopt as priority</button>
+        <a class="btn btn-quiet" id="ifocus-dig" href="${esc(digUrl(it.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>
+        <button class="btn btn-primary" id="ifocus-adopt" type="button">Prioritize</button>
+        <button class="btn btn-primary" id="ifocus-push" type="button">Push to actions</button>
         <button class="btn btn-quiet" id="ifocus-strike" type="button">Strike</button>
       </div>
     `;
@@ -1502,17 +1728,26 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       adoptFiling(it.id, { name: topic || it.title, weight: focusRatings[it.id] });
       advanceInboxFocus();
     });
+    document.getElementById('ifocus-push').addEventListener('click', () => {
+      const topic = inboxTopics[it.id] && inboxTopics[it.id].topic;
+      const name = topic || it.title;
+      adoptFiling(it.id, { name: name, weight: focusRatings[it.id] });
+      window.location.href = 'calendar.html?focus=' + encodeURIComponent(slug(name));
+    });
     document.getElementById('ifocus-strike').addEventListener('click', () => {
       strikeFiling(it.id);
       advanceInboxFocus();
     });
 
-    loadTopicAndChecks(it);
+    loadInboxTopic(it);
   }
 
-  async function loadTopicAndChecks(it) {
+  // Places the filing under a durable policy topic (cached, so it costs at
+  // most one AI call per filing), then upgrades the DIG link from the raw
+  // headline to that topic once it resolves.
+  async function loadInboxTopic(it) {
     const topicValEl = document.getElementById('ifocus-topic-val');
-    const checksEl = document.getElementById('ifocus-checks');
+    const digLinkEl = document.getElementById('ifocus-dig');
     if (!topicValEl) return;
 
     let entry = inboxTopics[it.id];
@@ -1531,102 +1766,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     // Bail if the user moved to a different item while this was in flight.
     if (!focusOpen || INBOX[focusIndex] !== it) return;
     topicValEl.textContent = entry.topic + (entry.fellBack ? ' (couldn\u2019t generalize \u2014 showing as filed)' : '');
-
-    runInboxChecks(it, entry.topic, checksEl);
-  }
-
-  function srcRowHtml(name, cached) {
-    if (!cached) {
-      return `
-        <div class="ifocus-src" data-src="${esc(name)}">
-          <div class="ifocus-src-head">
-            <span class="ifocus-src-name">${esc(name)}</span>
-            <span class="ifocus-src-time">checking&hellip;</span>
-          </div>
-          <div class="ifocus-src-summary" style="opacity:.6;">Reaching out&hellip;</div>
-        </div>`;
-    }
-    const { preview, truncated } = previewText(cached.summary || '');
-    return `
-      <div class="ifocus-src" data-src="${esc(name)}">
-        <div class="ifocus-src-head">
-          <span class="ifocus-src-name">${esc(name)}</span>
-          <span class="ifocus-src-time">${esc(cached.timestamp || '')} · cached</span>
-        </div>
-        ${cached.stance ? `<div class="ifocus-stance">${esc(cached.stance)}</div>` : ''}
-        <div class="ifocus-src-summary ifocus-brief">${esc(preview)}</div>
-        ${truncated ? `<div class="ifocus-src-summary ifocus-full" hidden>${esc(cached.summary)}</div><button type="button" class="btn btn-quiet ifocus-expand" data-expand>Read more</button>` : ''}
-      </div>`;
-  }
-
-  function wireSrcRow(name) {
-    const row = document.querySelector(`.ifocus-src[data-src="${cssEscapeLocal(name)}"]`);
-    if (!row) return;
-    const btn = row.querySelector('[data-expand]');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      const brief = row.querySelector('.ifocus-brief');
-      const full = row.querySelector('.ifocus-full');
-      const isOpen = !full.hidden;
-      full.hidden = isOpen;
-      brief.style.display = isOpen ? '' : 'none';
-      btn.textContent = isOpen ? 'Read more' : 'Collapse';
-    });
-  }
-
-  function updateSrcRow(name, r) {
-    const row = document.querySelector(`.ifocus-src[data-src="${cssEscapeLocal(name)}"]`);
-    if (!row) return;
-    if (r.error) {
-      row.innerHTML = `
-        <div class="ifocus-src-head">
-          <span class="ifocus-src-name">${esc(name)}</span>
-          <span class="ifocus-src-time">error</span>
-        </div>
-        <div class="ifocus-src-summary">Couldn't retrieve this one: ${esc(r.error)}</div>`;
-      return;
-    }
-    const { preview, truncated } = previewText(r.summary || 'No summary returned.');
-    row.innerHTML = `
-      <div class="ifocus-src-head">
-        <span class="ifocus-src-name">${esc(name)}</span>
-        <span class="ifocus-src-time">${esc(r.timestamp || '')}</span>
-      </div>
-      ${r.stance ? `<div class="ifocus-stance">${esc(r.stance)}</div>` : ''}
-      <div class="ifocus-src-summary ifocus-brief">${esc(preview)}</div>
-      ${truncated ? `<div class="ifocus-src-summary ifocus-full" hidden>${esc(r.summary)}</div><button type="button" class="btn btn-quiet ifocus-expand" data-expand>Read more</button>` : ''}
-    `;
-    wireSrcRow(name);
-  }
-
-  function runInboxChecks(it, topic, checksEl) {
-    const srcs = P.sources.filter(s => s.name);
-    if (!srcs.length) {
-      checksEl.innerHTML = `<p class="ifocus-empty">No trusted sources yet — add some in &sect; 04 to see this checked side by side.</p>`;
-      return;
-    }
-
-    const digCache = loadDigCache();
-    const bucket = digCache[topic] || {};
-    checksEl.innerHTML = srcs.map(s => srcRowHtml(s.name, bucket[s.name])).join('');
-    srcs.forEach(s => { if (bucket[s.name]) wireSrcRow(s.name); });
-
-    srcs.forEach(async (s) => {
-      if (bucket[s.name]) return; // already cached, no fetch needed
-      try {
-        const result = await checkSourceForInbox(s, topic);
-        if (!focusOpen || INBOX[focusIndex] !== it) return;
-        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        updateSrcRow(s.name, Object.assign({}, result, { timestamp }));
-        const cache = loadDigCache();
-        if (!cache[topic]) cache[topic] = {};
-        cache[topic][s.name] = Object.assign({}, result, { timestamp, savedAt: Date.now() });
-        saveDigCache(cache);
-      } catch (e) {
-        if (!focusOpen || INBOX[focusIndex] !== it) return;
-        updateSrcRow(s.name, { error: e.message || 'request failed' });
-      }
-    });
+    if (digLinkEl) digLinkEl.href = digUrl(entry.topic);
   }
 
   document.getElementById('ifocus-close').addEventListener('click', closeInboxFocus);
@@ -1723,6 +1863,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       vc.href = P.token ? API + '/api/vcard?token=' + encodeURIComponent(P.token) : '#';
       vc.style.opacity = P.token ? '' : '.5';
     }
+    renderDropPanel();
   }
 
   // Closing panel. Deliberately not blanket praise: it reports what's
@@ -1860,6 +2001,10 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
 
     if (t.closest('#copy-drop')) { copy(P.drop, t.closest('#copy-drop')); return; }
 
+    if (t.closest('#vcard-drop')) { setContactAdded(); dropForceExpand = false; renderDropPanel(); return; }
+
+    if (t.closest('#drop-expand')) { dropForceExpand = true; renderDropPanel(); return; }
+
     if (t.closest('#rotate-drop')) {
       if (confirm('Issue a new address? The old one stops working — which is how you cut off anything spamming it — and anything already sent to it stays on the old docket.')) {
         ensureDrop(true);
@@ -1897,7 +2042,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (t.closest('#import-manifesto-btn')) { document.getElementById('import-manifesto-file').click(); return; }
 
     if (t.closest('#wipe')) {
-      if (confirm('Delete your profile from this device? Priorities, positions, sources, and your capture address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
+      if (confirm('Delete your profile from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
         try { localStorage.removeItem(KEY); } catch (e) {}
         P = Object.assign({}, BLANK);
         save(); renderAll(); ensureDrop(true);
@@ -2010,6 +2155,314 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     return L.join('\n');
   }
 
+  // ---- Mode slider ------------------------------------------------------
+  // Easy / Smarty Pants / Pro are three faces on the same P object — no
+  // conversion, no separate storage. Switching modes just changes which
+  // DOM is visible and (for Smarty Pants) how the existing §01-06 sections
+  // are navigated.
+  const MODE_KEY = 'civix-mode';
+  const MODE_ORDER = ['easy', 'smart', 'pro'];
+
+  function loadMode() {
+    try {
+      const m = localStorage.getItem(MODE_KEY);
+      if (MODE_ORDER.indexOf(m) !== -1) return m;
+    } catch (e) {}
+    // A profile with anything already in it came from Pro (or an import) —
+    // land it back there. A brand-new profile gets the fast, fun default.
+    return (P.issues.length || P.sources.length || P.actions.length) ? 'pro' : 'easy';
+  }
+  let MODE = loadMode();
+  function saveMode(m) { try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
+
+  function setMode(m) {
+    if (MODE_ORDER.indexOf(m) === -1) return;
+    MODE = m;
+    saveMode(m);
+    applyMode();
+  }
+
+  function applyMode() {
+    const idx = MODE_ORDER.indexOf(MODE);
+    document.getElementById('mode-track').setAttribute('data-on', String(idx));
+    document.querySelectorAll('.mode-stop').forEach(btn => {
+      const on = btn.dataset.mode === MODE;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-checked', String(on));
+    });
+
+    document.getElementById('easy-shell').hidden = MODE !== 'easy';
+    document.querySelector('.shell').style.display = MODE === 'easy' ? 'none' : '';
+    document.getElementById('guided-bar').hidden = MODE !== 'smart';
+    document.body.classList.toggle('is-guided', MODE === 'smart');
+
+    if (MODE === 'easy') {
+      startEasyMode();
+    } else {
+      // Coming from Easy mode, pro-facing views need to catch up with
+      // whatever got swiped in.
+      renderAll();
+      if (MODE === 'smart') applyGuidedStep();
+    }
+  }
+
+  document.querySelectorAll('.mode-stop').forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+
+  // ---- Smarty Pants: guided stepper over the real §01-06 sections -------
+  const GUIDED_STEPS = [
+    ['inbox', 'Inbox'],
+    ['issues', 'What moves you'],
+    ['positions', 'Where you stand'],
+    ['sources', 'Who you trust'],
+    ['place', 'Where you vote'],
+    ['actions', 'What you’ll authorize']
+  ];
+  let guidedIndex = 0;
+
+  document.getElementById('guided-dots').innerHTML = GUIDED_STEPS.map((s, i) =>
+    `<button type="button" class="guided-dot" data-step="${i}" title="${esc(s[1])}"></button>`
+  ).join('');
+
+  function applyGuidedStep() {
+    const sec = GUIDED_STEPS[guidedIndex][0];
+    document.querySelectorAll('.shell .sec').forEach(el => {
+      el.classList.toggle('is-open', el.dataset.sec === sec);
+    });
+    document.getElementById('guided-step-label').textContent =
+      (guidedIndex + 1) + ' / ' + GUIDED_STEPS.length + ' · ' + GUIDED_STEPS[guidedIndex][1];
+    document.getElementById('guided-back').disabled = guidedIndex === 0;
+    document.getElementById('guided-next').textContent =
+      guidedIndex === GUIDED_STEPS.length - 1 ? 'Done' : 'Continue →';
+    document.querySelectorAll('.guided-dot').forEach((d, i) => d.classList.toggle('is-on', i === guidedIndex));
+    const target = document.querySelector('.shell .sec[data-sec="' + sec + '"]');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.getElementById('guided-back').addEventListener('click', () => {
+    if (guidedIndex > 0) { guidedIndex--; applyGuidedStep(); }
+  });
+  document.getElementById('guided-next').addEventListener('click', () => {
+    if (guidedIndex < GUIDED_STEPS.length - 1) { guidedIndex++; applyGuidedStep(); }
+    else setMode('pro'); // "Done" on the last step opens everything up together
+  });
+  document.querySelectorAll('.guided-dot').forEach(d => {
+    d.addEventListener('click', () => { guidedIndex = Number(d.dataset.step); applyGuidedStep(); });
+  });
+
+  // ---- Easy mode: swipe deck ---------------------------------------------
+  let deck = [];
+  let deckIndex = 0;
+  let chosenCategories = [];
+
+  function startEasyMode() {
+    chosenCategories = [];
+    deckIndex = 0;
+    deck = [
+      { type: 'welcome' },
+      ...TRAITS.filter(t => P.traits.indexOf(t[0]) === -1)
+        .map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb })),
+      { type: 'categories-marker' },
+      { type: 'issues-marker' },
+      { type: 'zip' },
+      ...ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1)
+        .map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb })),
+      { type: 'done' }
+    ];
+    renderEasyCard();
+  }
+
+  // Ranks categories by how many of their issues a swiped-in trait hints
+  // at, so the deck leads with what's likely most relevant.
+  function categoryBoost(issues) {
+    let score = 0;
+    P.traits.forEach(t => {
+      (TRAIT_HINTS[t] || []).forEach(name => { if (issues.indexOf(name) !== -1) score++; });
+    });
+    return score;
+  }
+  function buildCategoryCards() {
+    return CATALOG.map(([cat, issues]) => {
+      const meta = CATEGORY_META[cat] || ['📌', ''];
+      return { type: 'category', id: cat, title: cat, emoji: meta[0], blurb: meta[1], issues };
+    }).sort((a, b) => categoryBoost(b.issues) - categoryBoost(a.issues));
+  }
+  function buildIssueCards() {
+    const cards = [];
+    CATALOG.forEach(([cat, issues]) => {
+      if (chosenCategories.indexOf(cat) === -1) return;
+      issues.forEach(name => {
+        if (findIssue(slug(name))) return; // already a priority — nothing to swipe
+        cards.push({ type: 'issue', id: name, title: name, emoji: '📌', blurb: ISSUE_BLURBS[name] || '' });
+      });
+    });
+    return cards;
+  }
+
+  function resolveEasyCard(card, direction) {
+    if (direction !== 'right') return;
+    if (card.type === 'trait') {
+      if (P.traits.indexOf(card.id) === -1) P.traits.push(card.id);
+    } else if (card.type === 'category') {
+      chosenCategories.push(card.id);
+    } else if (card.type === 'issue') {
+      if (addIssue(card.title)) {
+        const iss = findIssue(slug(card.title));
+        if (iss) iss.weight = 2;
+      }
+    } else if (card.type === 'action') {
+      if (P.actions.indexOf(card.id) === -1) P.actions.push(card.id);
+    }
+    save();
+  }
+
+  function updateEasyProgress() {
+    const pct = deck.length ? Math.min(100, Math.round((deckIndex / deck.length) * 100)) : 0;
+    document.getElementById('easy-progress-bar').style.width = pct + '%';
+  }
+
+  function advanceEasy(direction) {
+    const card = deck[deckIndex];
+    if (card && direction) resolveEasyCard(card, direction);
+    deckIndex++;
+    renderEasyCard();
+  }
+
+  function wireSwipeGestures(el) {
+    let startX = 0, dx = 0, dragging = false;
+    el.addEventListener('pointerdown', (e) => {
+      dragging = true; startX = e.clientX; dx = 0;
+      el.style.transition = 'none';
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      dx = e.clientX - startX;
+      el.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 18) + 'deg)';
+      el.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / 400));
+    });
+    const release = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.style.transition = '';
+      const THRESH = 90;
+      if (dx > THRESH) commitSwipe('right');
+      else if (dx < -THRESH) commitSwipe('left');
+      else { el.style.transform = ''; el.style.opacity = ''; }
+      dx = 0;
+    };
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+  }
+
+  function commitSwipe(direction) {
+    const el = document.getElementById('easy-active-card');
+    if (el) {
+      el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+      el.style.transform = 'translateX(' + (direction === 'right' ? 100 : -100) + 'vw) rotate(' + (direction === 'right' ? 20 : -20) + 'deg)';
+      el.style.opacity = '0';
+    }
+    window.setTimeout(() => advanceEasy(direction), 180);
+  }
+  document.getElementById('easy-yes').addEventListener('click', () => commitSwipe('right'));
+  document.getElementById('easy-no').addEventListener('click', () => commitSwipe('left'));
+  document.addEventListener('keydown', (e) => {
+    if (MODE !== 'easy') return;
+    if (!document.getElementById('easy-active-card')) return; // welcome/ZIP/done aren't swipeable
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+    if (e.key === 'ArrowRight') commitSwipe('right');
+    else if (e.key === 'ArrowLeft') commitSwipe('left');
+  });
+
+  function renderEasyDone() {
+    const nIssues = P.issues.length;
+    const nActions = P.actions.length;
+    const bits = [nIssues + ' ' + (nIssues === 1 ? 'priority' : 'priorities') + ' set'];
+    if (P.place.zip) bits.push('ZIP ' + esc(P.place.zip));
+    if (nActions) bits.push(nActions + ' action ' + (nActions === 1 ? 'type' : 'types') + ' authorized');
+    return `
+      <div class="easy-card easy-card-static easy-card-done">
+        <div class="easy-emoji">🎉</div>
+        <div class="easy-title">Nice — you’ve got a profile</div>
+        <p class="easy-blurb">${bits.join(', ')}. Everything’s saved right here on this device — nothing shared, nothing sent anywhere.</p>
+        <div class="easy-done-row">
+          <a class="btn btn-primary easy-cta" href="calendar.html">See what’s happening now &#8594;</a>
+          <button type="button" class="btn easy-cta" id="easy-to-pro">Fine-tune it (Pro mode) &#8594;</button>
+          <button type="button" class="btn btn-quiet easy-cta" id="easy-restart">Swipe through more</button>
+        </div>
+      </div>`;
+  }
+
+  function renderEasyCard() {
+    let card = deck[deckIndex];
+    if (card && card.type === 'categories-marker') {
+      deck.splice(deckIndex, 1, ...buildCategoryCards());
+      card = deck[deckIndex];
+    }
+    if (card && card.type === 'issues-marker') {
+      deck.splice(deckIndex, 1, ...buildIssueCards());
+      card = deck[deckIndex];
+    }
+
+    const slot = document.getElementById('easy-card-slot');
+    const controls = document.getElementById('easy-controls');
+    if (!card) { renderAll(); return; }
+
+    updateEasyProgress();
+
+    if (card.type === 'welcome') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="easy-card easy-card-static">
+          <div class="easy-emoji">👋</div>
+          <div class="easy-title">Let’s build your CiViX profile</div>
+          <p class="easy-blurb">Swipe right for “yes, that’s me” — left to skip. About two minutes, and it all stays on this device.</p>
+          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Let’s go &#8594;</button>
+        </div>`;
+      document.getElementById('easy-advance').addEventListener('click', () => advanceEasy());
+      return;
+    }
+
+    if (card.type === 'zip') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="easy-card easy-card-static">
+          <div class="easy-emoji">📍</div>
+          <div class="easy-title">Last thing — your ZIP?</div>
+          <p class="easy-blurb">So we can match your council, legislature, and delegation. CiViX never asks for your name or address.</p>
+          <input class="field mono easy-zip-field" id="easy-zip" type="text" inputmode="numeric" maxlength="5" placeholder="ZIP code" value="${esc(P.place.zip || '')}">
+          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Continue &#8594;</button>
+        </div>`;
+      document.getElementById('easy-advance').addEventListener('click', () => {
+        const v = document.getElementById('easy-zip').value.replace(/\D/g, '').slice(0, 5);
+        P.place.zip = v;
+        document.getElementById('place-zip').value = v;
+        save();
+        advanceEasy();
+      });
+      return;
+    }
+
+    if (card.type === 'done') {
+      controls.style.display = 'none';
+      slot.innerHTML = renderEasyDone();
+      document.getElementById('easy-to-pro').addEventListener('click', () => setMode('pro'));
+      document.getElementById('easy-restart').addEventListener('click', () => startEasyMode());
+      renderAll();
+      return;
+    }
+
+    controls.style.display = 'flex';
+    slot.innerHTML = `
+      <div class="easy-card" id="easy-active-card">
+        <div class="easy-emoji">${card.emoji}</div>
+        <div class="easy-title">${esc(card.title)}</div>
+        <p class="easy-blurb">${esc(card.blurb)}</p>
+      </div>`;
+    wireSwipeGestures(document.getElementById('easy-active-card'));
+  }
+
   // ---- Theme ----------------------------------------------------------
   const THEME_COLORS = { dark: '#0A0F1C', light: '#FBFAF7' };
   const themeMeta = document.getElementById('theme-color-meta');
@@ -2041,6 +2494,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     save();
   }
   renderAll();
+  applyMode();
   // Fetched asynchronously and re-renders § 03 once it lands — same
   // matched-activity data calendar.html itself fetches, just consumed
   // here to link each priority straight to its filtered view there.
