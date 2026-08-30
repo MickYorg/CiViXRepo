@@ -115,10 +115,8 @@
     display: flex;
     align-items: center;
     gap: clamp(10px, 2vw, 18px);
-    flex: 1 1 auto;
   }
   .mark-sub {
-    flex-shrink: 0;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: clamp(9.5px, 1.05vw, 11px);
     letter-spacing: 0.17em;
@@ -528,23 +526,23 @@
 
 <header class="topbar">
   <div class="mark">C<em>i</em>V<em>i</em>X</div>
+  <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
+    <div class="mode-thumb" id="mode-thumb"></div>
+    <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+      <span class="mode-emoji" aria-hidden="true">&#x1F64B;</span>
+      <span class="mode-label">Citizen</span>
+    </button>
+    <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
+      <span class="mode-emoji" aria-hidden="true">&#x270A;</span>
+      <span class="mode-label">Activist</span>
+    </button>
+    <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
+      <span class="mode-emoji" aria-hidden="true">&#x1F3DB;&#xFE0F;</span>
+      <span class="mode-label">Pro</span>
+    </button>
+  </div>
   <div class="topbar-right">
     <span class="mark-sub">A platform for civic engagement</span>
-    <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
-      <div class="mode-thumb" id="mode-thumb"></div>
-      <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
-        <span class="mode-emoji" aria-hidden="true">&#x1F64B;</span>
-        <span class="mode-label">Citizen</span>
-      </button>
-      <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
-        <span class="mode-emoji" aria-hidden="true">&#x270A;</span>
-        <span class="mode-label">Activist</span>
-      </button>
-      <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
-        <span class="mode-emoji" aria-hidden="true">&#x1F3DB;&#xFE0F;</span>
-        <span class="mode-label">Pro</span>
-      </button>
-    </div>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
