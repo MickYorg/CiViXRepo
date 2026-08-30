@@ -263,6 +263,16 @@
   .citizen-zip-field { max-width: 180px; text-align: center; margin: 4px 0 18px; }
   .citizen-done-row { display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 260px; }
   .citizen-done-row .btn { text-decoration: none; display: block; text-align: center; }
+  /* Quiz answers are full sentences, not the short labels .citizen-
+     done-row's 260px cap and .btn's default white-space: nowrap were
+     built for — that combination sent anything longer than the box
+     straight off the edge instead of wrapping. Full card width instead,
+     left-aligned since centered multi-line sentences read poorly. */
+  .citizen-quiz-options { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+  /* Descendant selector, not a bare class — .btn's own white-space: nowrap
+     is declared later in this stylesheet, so a same-specificity .citizen-
+     quiz-opt rule loses to it on source order alone. */
+  .citizen-quiz-options .citizen-quiz-opt { text-decoration: none; display: block; white-space: normal; text-align: left; line-height: 1.35; width: 100%; }
   .citizen-controls {
     display: flex; justify-content: center; gap: 26px; margin-top: 22px;
   }
@@ -1138,6 +1148,186 @@
     'Rural access': 'Services and infrastructure outside the cities.'
   };
 
+  // ---- Citizen-mode archetype quiz -----------------------------------
+  // Replaces the trait/category/issue swipe grind for first-time citizens
+  // (see startCitizenMode): a handful of tap-choice questions infer an
+  // archetype instead of asking the citizen to build their manifesto item
+  // by item, where almost everything sounds agreeable in isolation and
+  // nothing ends up feeling like a real priority. Two independent axes —
+  // "values" (loosely Moral-Foundations-flavored: care/liberty/order) and
+  // "engagement" (loosely civic-participation-flavored: watchful/
+  // individual/organizer) — score which archetype fits best; confirming
+  // one seeds real, differentiated weights (1-3, the same scale the rest
+  // of the manifesto uses) instead of the flat weight: 2 every swipe-right
+  // produces today.
+  const ARCHETYPES = [
+    {
+      id: 'watchdog', name: 'The Watchdog', emoji: '🔍',
+      reflectionLine: 'You keep receipts. Nothing unfair gets past you unnoticed.',
+      valueCluster: 'care', engagementStyle: 'watchful',
+      seedTraits: ['caregiver'],
+      seedIssues: [
+        { name: 'Government transparency', weight: 3 },
+        { name: 'Healthcare access', weight: 3 },
+        { name: 'Drug pricing', weight: 2 }
+      ],
+      seedActions: ['comment', 'email', 'share']
+    },
+    {
+      id: 'caretaker', name: 'The Caretaker', emoji: '🫶',
+      reflectionLine: 'You show up for the people who need it most.',
+      valueCluster: 'care', engagementStyle: 'individual',
+      seedTraits: ['caregiver', 'parent'],
+      seedIssues: [
+        { name: 'Healthcare access', weight: 3 },
+        { name: 'Mental health', weight: 3 },
+        { name: 'Childcare', weight: 2 }
+      ],
+      seedActions: ['call', 'email']
+    },
+    {
+      id: 'connector', name: 'The Connector', emoji: '🤝',
+      reflectionLine: 'You bring people together around what’s fair — the one who gets the phone tree going.',
+      valueCluster: 'care', engagementStyle: 'organizer',
+      seedTraits: ['union', 'caregiver'],
+      seedIssues: [
+        { name: 'Wages and labor', weight: 3 },
+        { name: 'Healthcare access', weight: 3 },
+        { name: 'Housing affordability', weight: 2 }
+      ],
+      seedActions: ['attend', 'share', 'email']
+    },
+    {
+      id: 'skeptic', name: 'The Skeptic', emoji: '🧐',
+      reflectionLine: 'You question everything before you trust it, and you’re rarely wrong.',
+      valueCluster: 'liberty', engagementStyle: 'watchful',
+      seedTraits: ['small-biz'],
+      seedIssues: [
+        { name: 'Government transparency', weight: 3 },
+        { name: 'Data privacy', weight: 3 },
+        { name: 'Taxes', weight: 2 }
+      ],
+      seedActions: ['comment', 'share']
+    },
+    {
+      id: 'rugged-individualist', name: 'The Rugged Individualist', emoji: '🪵',
+      reflectionLine: 'You handle things yourself, and your neighbors know it — the one they look to as a leader.',
+      valueCluster: 'liberty', engagementStyle: 'individual',
+      seedTraits: ['homeowner', 'veteran'],
+      seedIssues: [
+        { name: 'Small business', weight: 3 },
+        { name: 'Taxes', weight: 3 },
+        { name: 'Zoning and development', weight: 2 }
+      ],
+      seedActions: ['call', 'email']
+    },
+    {
+      id: 'firebrand', name: 'The Firebrand', emoji: '🔥',
+      reflectionLine: 'You don’t wait for permission — you rally people to push back.',
+      valueCluster: 'liberty', engagementStyle: 'organizer',
+      seedTraits: ['small-biz'],
+      seedIssues: [
+        { name: 'Government transparency', weight: 3 },
+        { name: 'Campaign finance', weight: 3 },
+        { name: 'Voting access', weight: 2 }
+      ],
+      seedActions: ['attend', 'share', 'testify']
+    },
+    {
+      id: 'historian', name: 'The Historian', emoji: '📜',
+      reflectionLine: 'You remember how we got here, and you make sure nobody forgets.',
+      valueCluster: 'order', engagementStyle: 'watchful',
+      seedTraits: ['retired', 'veteran'],
+      seedIssues: [
+        { name: 'Government transparency', weight: 3 },
+        { name: 'Courts', weight: 3 },
+        { name: 'Public lands', weight: 2 }
+      ],
+      seedActions: ['comment', 'share']
+    },
+    {
+      id: 'steward', name: 'The Steward', emoji: '🌳',
+      reflectionLine: 'You protect what your community built — one conversation, one vote, one meeting at a time.',
+      valueCluster: 'order', engagementStyle: 'individual',
+      seedTraits: ['homeowner', 'retired'],
+      seedIssues: [
+        { name: 'Zoning and development', weight: 3 },
+        { name: 'Public schools', weight: 3 },
+        { name: 'Roads and bridges', weight: 2 }
+      ],
+      seedActions: ['attend', 'email']
+    },
+    {
+      id: 'anchor', name: 'The Anchor', emoji: '⚓',
+      reflectionLine: 'People orbit around you — you hold the neighborhood together.',
+      valueCluster: 'order', engagementStyle: 'organizer',
+      seedTraits: ['parent', 'homeowner'],
+      seedIssues: [
+        { name: 'Public schools', weight: 3 },
+        { name: 'Housing affordability', weight: 3 },
+        { name: 'Transit', weight: 2 }
+      ],
+      seedActions: ['attend', 'share', 'email']
+    }
+  ];
+
+  const QUIZ_QUESTIONS = [
+    {
+      axis: 'values',
+      prompt: 'Something’s not right in your town. What bugs you most?',
+      options: [
+        { label: 'People are getting hurt by this.', bucket: 'care' },
+        { label: 'Nobody with power asked us first.', bucket: 'liberty' },
+        { label: 'This isn’t how our community is supposed to work.', bucket: 'order' }
+      ]
+    },
+    {
+      axis: 'values',
+      prompt: 'Pick the headline that would ruin your morning.',
+      options: [
+        { label: 'Families losing coverage after benefit cuts', bucket: 'care' },
+        { label: 'New permit required for something you’ve always just done', bucket: 'liberty' },
+        { label: 'A local institution shuts its doors for good', bucket: 'order' }
+      ]
+    },
+    {
+      axis: 'values',
+      prompt: 'Which sounds most like you?',
+      options: [
+        { label: 'I’ll take the hit myself before I let someone else take it.', bucket: 'care' },
+        { label: 'Let me handle it — I don’t need someone else’s rules for that.', bucket: 'liberty' },
+        { label: 'We’ve always figured this out together, and we will again.', bucket: 'order' }
+      ]
+    },
+    {
+      axis: 'engagement',
+      prompt: 'When something needs to change, you’re most likely to…',
+      options: [
+        { label: 'Read everything I can get my hands on first.', bucket: 'watchful' },
+        { label: 'Just go do something about it myself.', bucket: 'individual' },
+        { label: 'Get everyone I know involved.', bucket: 'organizer' }
+      ]
+    },
+    {
+      axis: 'engagement',
+      prompt: 'A neighbor asks for help getting the word out. You…',
+      options: [
+        { label: 'Quietly keep tabs and share what I find when it matters.', bucket: 'watchful' },
+        { label: 'Show up myself and make my voice heard directly.', bucket: 'individual' },
+        { label: 'Start a group chat and rally the block.', bucket: 'organizer' }
+      ]
+    },
+    {
+      axis: 'engagement',
+      prompt: 'Your idea of “doing something” is…',
+      options: [
+        { label: 'Knowing more than everyone else in the room.', bucket: 'watchful' },
+        { label: 'One well-placed call or letter.', bucket: 'individual' },
+        { label: 'A room full of people who agree with you.', bucket: 'organizer' }
+      ]
+    }
+  ];
+
   const BLANK = {
     version: 1,
     rev: 0,
@@ -1150,7 +1340,8 @@
     traits: [],        // community-role tags from Citizen mode, e.g. 'renter', 'parent'
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
-    updated: null
+    updated: null,
+    archetype: ''      // id of the matched Citizen-mode quiz archetype, once confirmed
   };
 
   let P = load();
@@ -2172,7 +2363,11 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     applyMode();
   }
 
-  function applyMode() {
+  // Split out from applyMode() so resize can reposition the thumb without
+  // re-triggering startCitizenMode() — that used to wipe an in-progress
+  // swipe deck (or the archetype quiz) on every resize/rotation, since
+  // applyMode() was the resize handler too and always called it.
+  function positionModeThumb() {
     const modeThumb = document.getElementById('mode-thumb');
     document.querySelectorAll('.mode-stop').forEach(btn => {
       const on = btn.dataset.mode === MODE;
@@ -2183,6 +2378,10 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         modeThumb.style.width = btn.offsetWidth + 'px';
       }
     });
+  }
+
+  function applyMode() {
+    positionModeThumb();
 
     document.getElementById('citizen-shell').hidden = MODE !== 'citizen';
     document.querySelector('.shell').style.display = MODE === 'citizen' ? 'none' : '';
@@ -2247,15 +2446,20 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   let deck = [];
   let deckIndex = 0;
   let chosenCategories = [];
+  let quizTally = null;
 
-  // A citizen with nothing set yet gets the short version — a handful of
-  // traits, two issues per category instead of every one, three action
-  // types instead of six. Anyone topping up an existing manifesto gets
-  // the full remaining set, since they've already opted into going deeper.
+  // A citizen with nothing set yet gets the short version — the archetype
+  // quiz instead of the full swipe grind (see below). Anyone topping up an
+  // existing manifesto gets the full remaining set, since they've already
+  // opted into going deeper than a 30-second guess.
   let firstPass = true;
-  const FIRST_PASS_TRAITS = 6;
-  const FIRST_PASS_ISSUES_PER_CATEGORY = 2;
-  const FIRST_PASS_ACTIONS = 3;
+
+  function buildTraitCards(pool) {
+    return pool.map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb }));
+  }
+  function buildActionCards(pool) {
+    return pool.map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb }));
+  }
 
   function startCitizenMode() {
     firstPass = !P.issues.length && !P.traits.length && !P.actions.length && !P.place.zip;
@@ -2263,18 +2467,64 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     deckIndex = 0;
     const traitPool = TRAITS.filter(t => P.traits.indexOf(t[0]) === -1);
     const actionPool = ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1);
-    deck = [
-      { type: 'welcome' },
-      ...(firstPass ? traitPool.slice(0, FIRST_PASS_TRAITS) : traitPool)
-        .map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb })),
+    if (firstPass) {
+      quizTally = { values: { care: 0, liberty: 0, order: 0 }, engagement: { watchful: 0, individual: 0, organizer: 0 } };
+      deck = [
+        { type: 'welcome' },
+        ...QUIZ_QUESTIONS.map(q => ({ type: 'quiz-question', ...q })),
+        { type: 'archetype-reveal' },
+        { type: 'zip' },
+        { type: 'done' }
+      ];
+    } else {
+      deck = [
+        { type: 'welcome' },
+        ...buildTraitCards(traitPool),
+        { type: 'categories-marker' },
+        { type: 'encourage' },
+        { type: 'issues-marker' },
+        { type: 'zip' },
+        ...buildActionCards(actionPool),
+        { type: 'done' }
+      ];
+    }
+    renderCitizenCard();
+  }
+
+  // ---- Archetype quiz scoring / application ---------------------------
+  function scoreArchetype(a, tally) {
+    return (tally.values[a.valueCluster] || 0) + (tally.engagement[a.engagementStyle] || 0);
+  }
+
+  function applyArchetype(a) {
+    P.archetype = a.id;
+    a.seedTraits.forEach(id => { if (P.traits.indexOf(id) === -1) P.traits.push(id); });
+    a.seedIssues.forEach(({ name, weight }) => {
+      if (addIssue(name)) { const iss = findIssue(slug(name)); if (iss) iss.weight = weight; }
+    });
+    a.seedActions.forEach(id => { if (P.actions.indexOf(id) === -1) P.actions.push(id); });
+    amend('add', 'Matched archetype: ' + a.name);
+    save();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+  }
+
+  // Rejecting the archetype twice (original guess, then the runner-up)
+  // drops into the same full trait/category/issue/action deck the
+  // "topping up" path already uses, rather than inventing a third guess —
+  // same splice-in-place precedent renderCitizenCard() uses for
+  // categories-marker/issues-marker.
+  function downgradeToFullDeck() {
+    firstPass = false;
+    const traitPool = TRAITS.filter(t => P.traits.indexOf(t[0]) === -1);
+    const actionPool = ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1);
+    deck.splice(deckIndex, 2, // removes archetype-reveal and the zip card right after it
+      ...buildTraitCards(traitPool),
       { type: 'categories-marker' },
       { type: 'encourage' },
       { type: 'issues-marker' },
       { type: 'zip' },
-      ...(firstPass ? actionPool.slice(0, FIRST_PASS_ACTIONS) : actionPool)
-        .map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb })),
-      { type: 'done' }
-    ];
+      ...buildActionCards(actionPool)
+    );
     renderCitizenCard();
   }
 
@@ -2294,11 +2544,13 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     }).sort((a, b) => categoryBoost(b.issues) - categoryBoost(a.issues));
   }
   function buildIssueCards() {
+    // Only reachable from the non-firstPass (topping-up) deck now — the
+    // firstPass deck goes through the archetype quiz instead — so this
+    // always shows the full unswiped list per chosen category, no cap.
     const cards = [];
     CATALOG.forEach(([cat, issues]) => {
       if (chosenCategories.indexOf(cat) === -1) return;
-      let unswiped = issues.filter(name => !findIssue(slug(name))); // already a priority — nothing to swipe
-      if (firstPass) unswiped = unswiped.slice(0, FIRST_PASS_ISSUES_PER_CATEGORY);
+      const unswiped = issues.filter(name => !findIssue(slug(name))); // already a priority — nothing to swipe
       unswiped.forEach(name => {
         cards.push({ type: 'issue', id: name, title: name, emoji: '📌', blurb: ISSUE_BLURBS[name] || '' });
       });
@@ -2421,12 +2673,14 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
 
     if (card.type === 'welcome') {
       controls.style.display = 'none';
-      const returning = !!(P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip);
+      const blurb = firstPass
+        ? 'A few quick questions — about 30 seconds — then we’ll tell you what we think you’re about. Private and secure the whole way — it all stays on this device, never shared or sold.'
+        : 'Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.';
       slot.innerHTML = `
         <div class="citizen-card citizen-card-static">
           <div class="citizen-emoji">👋</div>
-          <div class="citizen-title">${returning ? 'Let’s refine your CiViX manifesto' : 'Let’s build your CiViX manifesto'}</div>
-          <p class="citizen-blurb">Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.</p>
+          <div class="citizen-title">${firstPass ? 'Let’s build your CiViX manifesto' : 'Let’s refine your CiViX manifesto'}</div>
+          <p class="citizen-blurb">${blurb}</p>
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Let’s go &#8594;</button>
         </div>`;
       document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
@@ -2443,6 +2697,53 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Keep going &#8594;</button>
         </div>`;
       document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
+      return;
+    }
+
+    if (card.type === 'quiz-question') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">🤔</div>
+          <div class="citizen-title">${esc(card.prompt)}</div>
+          <div class="citizen-quiz-options">
+            ${card.options.map((opt, i) => `<button type="button" class="btn citizen-quiz-opt" data-quiz-opt="${i}">${esc(opt.label)}</button>`).join('')}
+          </div>
+        </div>`;
+      card.options.forEach((opt, i) => {
+        document.querySelector(`[data-quiz-opt="${i}"]`).addEventListener('click', () => {
+          quizTally[card.axis][opt.bucket]++;
+          advanceCitizen();
+        });
+      });
+      return;
+    }
+
+    if (card.type === 'archetype-reveal') {
+      controls.style.display = 'none';
+      if (!card.candidates) {
+        card.candidates = ARCHETYPES.slice().sort((a, b) => scoreArchetype(b, quizTally) - scoreArchetype(a, quizTally));
+        card.rank = 0;
+      }
+      const archetype = card.candidates[card.rank];
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">${archetype.emoji}</div>
+          <div class="citizen-title">${esc(archetype.name)}</div>
+          <p class="citizen-blurb">${esc(archetype.reflectionLine)}</p>
+          <div class="citizen-done-row">
+            <button type="button" class="btn btn-primary citizen-cta" id="archetype-yes">Yes, that’s me &#8594;</button>
+            <button type="button" class="btn btn-quiet citizen-cta" id="archetype-no">Not quite</button>
+          </div>
+        </div>`;
+      document.getElementById('archetype-yes').addEventListener('click', () => {
+        applyArchetype(archetype);
+        advanceCitizen();
+      });
+      document.getElementById('archetype-no').addEventListener('click', () => {
+        if (card.rank === 0) { card.rank = 1; renderCitizenCard(); }
+        else downgradeToFullDeck();
+      });
       return;
     }
 
@@ -2532,14 +2833,17 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
   renderAll();
   applyMode();
-  // applyMode's thumb positioning depends on the mode pills' real
-  // rendered width, which can be off against fallback-font metrics on
-  // first call, or stale after a resize/rotation — re-run in both cases.
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(applyMode);
+  // Thumb positioning depends on the mode pills' real rendered width,
+  // which can be off against fallback-font metrics on first call, or
+  // stale after a resize/rotation — re-run in both cases. Deliberately
+  // positionModeThumb(), not applyMode() — the latter also calls
+  // startCitizenMode(), which would wipe an in-progress swipe deck or
+  // archetype quiz every time this fires.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(positionModeThumb);
   let modeResizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(modeResizeTimer);
-    modeResizeTimer = setTimeout(applyMode, 150);
+    modeResizeTimer = setTimeout(positionModeThumb, 150);
   });
   // Fetched asynchronously and re-renders § 03 once it lands — same
   // matched-activity data calendar.html itself fetches, just consumed
