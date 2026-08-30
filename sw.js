@@ -3,13 +3,13 @@
    1. Exist, with a fetch handler — Chrome requires this for the app to be
       installable, and the app must be installed for the share target to
       appear in the OS share sheet.
-   2. Keep the capture page available offline, so a share never dead-ends
-      when the user has no signal. */
+   2. Keep the Send to CiViX page available offline, so a share never
+      dead-ends when the user has no signal. */
 
-const CACHE = 'civix-shell-v1';
+const CACHE = 'civix-shell-v2';
 const SHELL = [
   '/',
-  '/capture.html',
+  '/send-to-civix.html',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png'
@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   // the cache lookup so a shared link still resolves to the cached page.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => caches.match(url.pathname) || caches.match('/capture.html'))
+      fetch(req).catch(() => caches.match(url.pathname) || caches.match('/send-to-civix.html'))
     );
     return;
   }

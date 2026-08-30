@@ -13,7 +13,7 @@
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
-    "action": "/capture.html",
+    "action": "/send-to-civix.html",
     "method": "GET",
     "params": {
       "title": "title",

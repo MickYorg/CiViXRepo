@@ -42,7 +42,7 @@ see "Deliberately not yet done" below for why.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.
-- `capture.html` / `inbox.html` + `manifest.webmanifest` + `sw.js` —
+- `send-to-civix.html` / `inbox.html` + `manifest.webmanifest` + `sw.js` —
   "Send to CiViX", an installable PWA share-target backed by a real
   Cloudflare Worker (`civix-capture.mycivix.workers.dev`, not in this
   repo) for the docket/filings API that both pages and `builder.html`'s
@@ -55,8 +55,10 @@ see "Deliberately not yet done" below for why.
 - PolTraPro (poltrapro.com) — separate product, own domain, linked from the
   splash. Relationship to CiViX (same family vs. unrelated) not yet decided.
 - The `civix-capture` Cloudflare Worker (docket/filings backend) — separate
-  Worker project, referenced by URL from `capture.html`/`inbox.html`/
-  `builder.html` but its source isn't checked into this repo.
+  Worker project, referenced by URL from `send-to-civix.html`/`inbox.html`/
+  `builder.html` but its source isn't checked into this repo. (The Worker's
+  own hostname, `civix-capture.mycivix.workers.dev`, is unrelated to the
+  page rename below and was intentionally left as-is.)
 
 ## Required Cloudflare Pages secrets
 
@@ -103,8 +105,8 @@ build, which does pick it up.
   25 Aug 2026 (10 commits). The old "no git history" debt is resolved.
 - **Design tokens are hand-copied per page**, and have already drifted:
   `index.html`/`calendar.html`/`builder.html` share one token system (navy/
-  paper/amber, Newsreader + IBM Plex Mono); `capture.html` runs a visibly
-  different one (different amber, different fonts — JetBrains Mono + Source
+  paper/amber, Newsreader + IBM Plex Mono); `send-to-civix.html` runs a
+  visibly different one (different amber, different fonts — JetBrains Mono + Source
   Serif 4). Worth extracting into one shared stylesheet all pages `<link>` to.
 - `package.json` is still named `dig-selfhosted` — a leftover from before the
   folder held more than one tool.

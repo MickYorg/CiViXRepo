@@ -3,7 +3,7 @@
 ## Files, all at the site root
 
 ```
-/capture.html
+/send-to-civix.html
 /manifest.webmanifest
 /sw.js
 /icon-192.png
@@ -23,7 +23,7 @@ Add to the `<head>` of `index.html` (and any other page):
 <link rel="manifest" href="/manifest.webmanifest">
 ```
 
-`capture.html` already links it and registers the service worker itself.
+`send-to-civix.html` already links it and registers the service worker itself.
 
 ## Netlify
 
@@ -49,7 +49,7 @@ The share target only appears **after the app is installed**. Sequence:
 
 1. Open the site in Chrome on Android (or desktop Chrome/Edge).
 2. Menu → *Install app* / *Add to Home screen*. The in-app install bar on
-   `/capture.html` fires the same prompt when the browser offers it.
+   `/send-to-civix.html` fires the same prompt when the browser offers it.
 3. Open any other app — news, browser, Reddit, mail — and hit share.
 4. CiViX appears in the sheet. Pick it. The link lands on your docket.
 
@@ -57,7 +57,7 @@ To test the receiving logic without installing anything, just visit the action
 URL with the params by hand:
 
 ```
-/capture.html?title=Test%20item&text=some%20note&url=https://example.com/x
+/send-to-civix.html?title=Test%20item&text=some%20note&url=https://example.com/x
 ```
 
 Chrome DevTools → Application → Manifest will also flag any manifest or icon
