@@ -1479,6 +1479,7 @@
   </div>
 </div>
 
+<script src="../civics.js"></script>
 <script>
 (function() {
   // Self-hosted build: no window.storage API here (that's a claude.ai
@@ -3044,6 +3045,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     const current = src.ratings[topic] || { quality: null, stars: 0 };
     src.ratings[topic] = { ...current, ...patch, at: Date.now() };
     saveManifestoSources(sources);
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
   function renderFocusCard(direction) {

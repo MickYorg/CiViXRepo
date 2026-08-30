@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CiViX — dev personas</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --ink: #0A0F1C; --ink-raised: #121A2C; --line: #222C42;
+    --paper: #ECEAE2; --paper-dim: #8792A8; --amber: #E0A93F; --amber-ink: #E0A93F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ink); color: var(--paper);
+    font-family: Georgia, serif; padding: 32px 20px 60px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .sub {
+    font-family: ui-monospace, monospace; font-size: 12px; color: var(--paper-dim);
+    margin: 0 0 28px; line-height: 1.6;
+  }
+  .sub b { color: var(--amber-ink); }
+  .card {
+    background: var(--ink-raised); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 17px; margin: 0 0 6px; }
+  .card p { font-size: 14px; color: var(--paper-dim); margin: 0 0 14px; line-height: 1.5; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    appearance: none; border: 1px solid var(--line); background: none; color: var(--paper);
+    font-family: ui-monospace, monospace; font-size: 12px; padding: 9px 14px;
+    border-radius: 7px; cursor: pointer;
+  }
+  button.primary { background: var(--amber); border-color: var(--amber); color: #0A0F1C; font-weight: 600; }
+  button:hover { filter: brightness(1.08); }
+  #status {
+    font-family: ui-monospace, monospace; font-size: 12px; color: var(--amber-ink);
+    margin-top: 20px; min-height: 18px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Persona switcher</h1>
+  <p class="sub">
+    Local testing tool only — not linked from anywhere on the site, not part of the product.
+    Each button overwrites this browser's <b>civix-profile</b> and <b>civix-mode</b>, then sends you
+    to the splash so you can run the real flow as that persona. Nothing here touches any server —
+    it's all local to this browser.
+  </p>
+
+  <div class="card">
+    <h2>🆕 Brand new citizen</h2>
+    <p>No manifesto at all — first visit, nothing set. Splash should say "Build your manifesto" and default to Citizen mode.</p>
+    <div class="row">
+      <button class="primary" data-persona="new" data-go="index.html">Load &amp; go to splash</button>
+      <button data-persona="new" data-go="builder.html">Load &amp; go straight to builder</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🧭 Modest manifesto</h2>
+    <p>Someone who did a partial Citizen-mode pass a few days ago: 4 priorities, a couple with stances, 2 sources, a ZIP, 2 authorized actions.</p>
+    <div class="row">
+      <button class="primary" data-persona="medium" data-go="index.html">Load &amp; go to splash</button>
+      <button data-persona="medium" data-go="builder.html">Load &amp; go straight to builder</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎓 Policy wonk</h2>
+    <p>Days of accumulated effort: 18 priorities across most categories with real stances, 6 trusted sources, all 6 actions authorized, a long amendment log.</p>
+    <div class="row">
+      <button class="primary" data-persona="wonk" data-go="index.html">Load &amp; go to splash</button>
+      <button data-persona="wonk" data-go="builder.html">Load &amp; go straight to builder</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗑️ Reset</h2>
+    <p>Wipes civix-profile, civix-mode, and the inbox-topic cache from this browser entirely — the same as never having visited.</p>
+    <div class="row">
+      <button data-persona="clear" data-go="index.html">Clear</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function daysAgo(n) { return Date.now() - n * 86400000; }
+
+  var PERSONAS = {
+    medium: {
+      version: 1, rev: 6, drop: '', token: '',
+      place: { zip: '94110' },
+      issues: [
+        { id: 'housing-affordability', name: 'Housing affordability', weight: 3, stance: 'Rent is eating my paycheck — I want more affordable units built, fast.' },
+        { id: 'public-schools', name: 'Public schools', weight: 2, stance: '' },
+        { id: 'climate-policy', name: 'Climate policy', weight: 2, stance: 'Serious about emissions targets, skeptical of half-measures.' },
+        { id: 'healthcare-access', name: 'Healthcare access', weight: 1, stance: '' }
+      ],
+      sources: [
+        { name: 'The Dispatch', hint: 'thedispatch.com' },
+        { name: 'Marketplace', hint: 'marketplace.org' }
+      ],
+      actions: ['email', 'share'],
+      traits: ['renter'],
+      time: 'A few minutes a week',
+      log: [
+        { at: daysAgo(4), kind: 'add', text: 'Housing affordability' },
+        { at: daysAgo(4), kind: 'add', text: 'Public schools' },
+        { at: daysAgo(2), kind: 'add', text: 'Climate policy' },
+        { at: daysAgo(1), kind: 'add', text: 'Healthcare access' },
+        { at: daysAgo(1), kind: 'add', text: 'The Dispatch' },
+        { at: daysAgo(0), kind: 'add', text: 'Marketplace' }
+      ],
+      updated: Date.now(),
+      digSyncedAt: Date.now()
+    },
+
+    wonk: {
+      version: 1, rev: 42, drop: '', token: '',
+      place: { zip: '20002' },
+      issues: [
+        { id: 'wages-and-labor', name: 'Wages and labor', weight: 3, stance: 'Index minimum wage to regional cost of living; strengthen overtime enforcement.' },
+        { id: 'taxes', name: 'Taxes', weight: 2, stance: 'Close the carried-interest loophole; simplify filing for W-2 earners.' },
+        { id: 'small-business', name: 'Small business', weight: 2, stance: 'Cut red tape on local licensing; expand microloan access.' },
+        { id: 'healthcare-access', name: 'Healthcare access', weight: 3, stance: 'Public option at minimum; cap out-of-pocket maximums.' },
+        { id: 'drug-pricing', name: 'Drug pricing', weight: 3, stance: 'Direct Medicare negotiation, extended to all major drug classes.' },
+        { id: 'mental-health', name: 'Mental health', weight: 2, stance: 'Parity enforcement with real teeth, not just paperwork.' },
+        { id: 'housing-affordability', name: 'Housing affordability', weight: 3, stance: 'Upzone by right near transit; fund social-housing pilots.' },
+        { id: 'zoning-and-development', name: 'Zoning and development', weight: 2, stance: 'End single-family-only zoning citywide.' },
+        { id: 'tenant-rights', name: 'Tenant rights', weight: 2, stance: 'Just-cause eviction standard, statewide.' },
+        { id: 'public-schools', name: 'Public schools', weight: 2, stance: 'Weighted per-pupil funding tied to need, not property-tax base.' },
+        { id: 'higher-education-cost', name: 'Higher education cost', weight: 1, stance: '' },
+        { id: 'climate-policy', name: 'Climate policy', weight: 3, stance: 'Binding emissions targets with enforcement, not just pledges.' },
+        { id: 'energy-costs', name: 'Energy costs', weight: 2, stance: 'Grid modernization funded through green bonds, not rate hikes.' },
+        { id: 'voting-access', name: 'Voting access', weight: 3, stance: 'Automatic registration, same-day registration, no-excuse absentee.' },
+        { id: 'government-transparency', name: 'Government transparency', weight: 2, stance: 'Real-time lobbying disclosure, not annual filings.' },
+        { id: 'data-privacy', name: 'Data privacy', weight: 2, stance: 'Opt-in data collection by default, real penalties for breaches.' },
+        { id: 'ai-regulation', name: 'AI regulation', weight: 1, stance: "Disclosure requirements before restriction — don't regulate blind." },
+        { id: 'transit', name: 'Transit', weight: 2, stance: 'Frequency over coverage — fund the routes people actually ride.' }
+      ],
+      sources: [
+        { name: 'The Dispatch', hint: 'thedispatch.com' },
+        { name: 'Slow Boring', hint: 'slowboring.com' },
+        { name: 'NPR Politics', hint: 'npr.org/politics' },
+        { name: 'Reason', hint: 'reason.com' },
+        { name: 'The Ezra Klein Show', hint: 'podcast, NYT' },
+        { name: 'Marginal Revolution', hint: 'marginalrevolution.com' }
+      ],
+      actions: ['email', 'call', 'comment', 'testify', 'attend', 'share'],
+      traits: ['homeowner', 'union', 'small-biz'],
+      time: 'Several hours a week',
+      log: (function () {
+        // Spread the 18 issues + 6 sources across three weeks so the
+        // amendment log in the Manifesto view reads like real accumulated
+        // effort instead of one big dump.
+        var items = [
+          'Wages and labor', 'Taxes', 'Healthcare access', 'Voting access',
+          'Housing affordability', 'The Dispatch', 'Drug pricing', 'Climate policy',
+          'Slow Boring', 'Zoning and development', 'Tenant rights', 'NPR Politics',
+          'Mental health', 'Small business', 'Public schools', 'Reason',
+          'Energy costs', 'Government transparency', 'The Ezra Klein Show',
+          'Data privacy', 'AI regulation', 'Marginal Revolution', 'Transit',
+          'Higher education cost'
+        ];
+        return items.map(function (text, i) {
+          return { at: daysAgo(21 - Math.floor(i * 21 / items.length)), kind: 'add', text: text };
+        }).reverse();
+      })(),
+      updated: Date.now(),
+      digSyncedAt: Date.now()
+    }
+  };
+
+  function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+  document.querySelectorAll('button[data-persona]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var persona = btn.dataset.persona;
+      var go = btn.dataset.go;
+      try {
+        if (persona === 'clear') {
+          localStorage.removeItem('civix-profile');
+          localStorage.removeItem('civix-mode');
+          localStorage.removeItem('civix-inbox-topics');
+        } else if (persona === 'new') {
+          localStorage.removeItem('civix-profile');
+          localStorage.removeItem('civix-mode');
+          localStorage.removeItem('civix-inbox-topics');
+        } else {
+          localStorage.setItem('civix-profile', JSON.stringify(PERSONAS[persona]));
+          localStorage.setItem('civix-mode', persona === 'wonk' ? 'pro' : 'activist');
+          localStorage.removeItem('civix-inbox-topics');
+        }
+      } catch (e) {
+        setStatus('localStorage write failed: ' + e.message);
+        return;
+      }
+      setStatus('Set. Heading to ' + go + '…');
+      window.setTimeout(function () { window.location.href = go; }, 250);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -122,10 +122,11 @@
   }
   .saved-flag.is-on { opacity: 1; }
 
-  /* ---- Mode slider — easy/fun/free on the left, smarty pants in the
-     middle, pro/power/academic on the right. Purely presentational: all
-     three modes read and write the same P object, so switching between
-     them never loses or converts data. ---- */
+  /* ---- Mode slider — Citizen (fast/fun/free) on the left, Activist
+     (guided, one step at a time) in the middle, Pro (power/academic) on
+     the right. Purely presentational: all three modes read and write the
+     same P object, so switching between them never loses or converts
+     data. ---- */
   .mode-bar { max-width: 1400px; margin: 0 auto; padding: 16px clamp(16px, 2.5vw, 30px) 0; }
   .mode-track {
     position: relative;
@@ -173,7 +174,7 @@
     text-transform: uppercase;
   }
 
-  /* ---- Guided (Smarty Pants) stepper — a fixed footer bar that drives
+  /* ---- Guided (Activist) stepper — a fixed footer bar that drives
      which one of the existing §01-06 sections is open. Reuses every
      section's real markup and data wiring; nothing is duplicated. ---- */
   .guided-bar {
@@ -195,21 +196,21 @@
   .guided-step-label { font-size: 11px; color: var(--paper-dim); white-space: nowrap; }
   .guided-bar #guided-back:disabled { opacity: 0.35; cursor: default; }
 
-  /* ---- Easy mode — swipe-card manifesto builder ---- */
-  .easy-shell {
+  /* ---- Citizen mode — swipe-card manifesto builder ---- */
+  .citizen-shell {
     max-width: 460px;
     margin: 18px auto 0;
     padding: 0 clamp(16px, 2.5vw, 30px) 40px;
   }
-  .easy-progress {
+  .citizen-progress {
     height: 4px; border-radius: 2px; background: var(--line-soft);
     overflow: hidden; margin-bottom: 18px;
   }
-  .easy-progress-bar {
+  .citizen-progress-bar {
     height: 100%; width: 0%; background: var(--amber);
     transition: width 0.25s ease;
   }
-  .easy-privacy-note {
+  .citizen-privacy-note {
     text-align: center;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -217,9 +218,9 @@
     color: var(--paper-dim);
     margin: 10px 0 0;
   }
-  .easy-stage { position: relative; min-height: 420px; }
-  .easy-card-slot { position: relative; }
-  .easy-card {
+  .citizen-stage { position: relative; min-height: 420px; }
+  .citizen-card-slot { position: relative; }
+  .citizen-card {
     background: var(--ink-raised);
     border: 1px solid var(--line);
     border-radius: 18px;
@@ -235,32 +236,32 @@
     user-select: none;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   }
-  .easy-card:active { cursor: grabbing; }
-  .easy-card-static { cursor: default; }
-  .easy-emoji { font-size: 64px; line-height: 1; margin-bottom: 18px; }
-  .easy-title { font-size: clamp(21px, 3.5vw, 27px); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 10px; }
-  .easy-blurb { font-size: 15.5px; color: var(--paper-dim); line-height: 1.5; margin: 0 0 6px; max-width: 34ch; }
-  .easy-card-static .easy-blurb { margin-bottom: 22px; }
-  .easy-cta { margin-top: 6px; }
-  .easy-zip-field { max-width: 180px; text-align: center; margin: 4px 0 18px; }
-  .easy-done-row { display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 260px; }
-  .easy-done-row .btn { text-decoration: none; display: block; text-align: center; }
-  .easy-controls {
+  .citizen-card:active { cursor: grabbing; }
+  .citizen-card-static { cursor: default; }
+  .citizen-emoji { font-size: 64px; line-height: 1; margin-bottom: 18px; }
+  .citizen-title { font-size: clamp(21px, 3.5vw, 27px); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 10px; }
+  .citizen-blurb { font-size: 15.5px; color: var(--paper-dim); line-height: 1.5; margin: 0 0 6px; max-width: 34ch; }
+  .citizen-card-static .citizen-blurb { margin-bottom: 22px; }
+  .citizen-cta { margin-top: 6px; }
+  .citizen-zip-field { max-width: 180px; text-align: center; margin: 4px 0 18px; }
+  .citizen-done-row { display: flex; flex-direction: column; gap: 9px; width: 100%; max-width: 260px; }
+  .citizen-done-row .btn { text-decoration: none; display: block; text-align: center; }
+  .citizen-controls {
     display: flex; justify-content: center; gap: 26px; margin-top: 22px;
   }
-  .easy-btn {
+  .citizen-btn {
     appearance: none; border: 1px solid var(--line); background: var(--ink-raised);
     color: var(--paper-dim); width: 58px; height: 58px; border-radius: 50%;
     font-size: 24px; cursor: pointer;
     display: grid; place-items: center;
     transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
   }
-  .easy-btn:active { transform: scale(0.92); }
-  .easy-btn-no:hover { color: var(--strike); border-color: var(--strike); }
-  .easy-btn-yes:hover { color: var(--amber-ink); border-color: var(--amber); }
+  .citizen-btn:active { transform: scale(0.92); }
+  .citizen-btn-no:hover { color: var(--strike); border-color: var(--strike); }
+  .citizen-btn-yes:hover { color: var(--amber-ink); border-color: var(--amber); }
   @media (max-width: 480px) {
-    .easy-card { padding: 26px 20px; min-height: 340px; }
-    .easy-emoji { font-size: 52px; }
+    .citizen-card { padding: 26px 20px; min-height: 340px; }
+    .citizen-emoji { font-size: 52px; }
   }
 
   /* ---- Layout ---- */
@@ -823,13 +824,13 @@
 <div class="mode-bar">
   <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
     <div class="mode-thumb" id="mode-thumb"></div>
-    <button type="button" class="mode-stop" data-mode="easy" data-idx="0" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+    <button type="button" class="mode-stop" data-mode="citizen" data-idx="0" role="radio" title="Swipe through a few cards. Fast, fun, free.">
       <span class="mode-emoji" aria-hidden="true">&#127881;</span>
-      <span class="mode-label">Easy</span>
+      <span class="mode-label">Citizen</span>
     </button>
-    <button type="button" class="mode-stop" data-mode="smart" data-idx="1" role="radio" title="The same form, one friendly step at a time.">
+    <button type="button" class="mode-stop" data-mode="activist" data-idx="1" role="radio" title="The same form, one friendly step at a time.">
       <span class="mode-emoji" aria-hidden="true">&#129504;</span>
-      <span class="mode-label">Smarty Pants</span>
+      <span class="mode-label">Activist</span>
     </button>
     <button type="button" class="mode-stop" data-mode="pro" data-idx="2" role="radio" title="Every section, open, all at once. For citizens who want full control.">
       <span class="mode-emoji" aria-hidden="true">&#127891;</span>
@@ -838,15 +839,15 @@
   </div>
 </div>
 
-<div class="easy-shell" id="easy-shell" hidden>
-  <div class="easy-progress"><div class="easy-progress-bar" id="easy-progress-bar"></div></div>
-  <p class="easy-privacy-note">&#128274; Private &amp; secure — everything here stays on this device, never shared or sold.</p>
-  <div class="easy-stage">
-    <div class="easy-card-slot" id="easy-card-slot"></div>
+<div class="citizen-shell" id="citizen-shell" hidden>
+  <div class="citizen-progress"><div class="citizen-progress-bar" id="citizen-progress-bar"></div></div>
+  <p class="citizen-privacy-note">&#128274; Private &amp; secure — everything here stays on this device, never shared or sold.</p>
+  <div class="citizen-stage">
+    <div class="citizen-card-slot" id="citizen-card-slot"></div>
   </div>
-  <div class="easy-controls" id="easy-controls">
-    <button type="button" class="easy-btn easy-btn-no" id="easy-no" aria-label="Skip this one">&#10005;</button>
-    <button type="button" class="easy-btn easy-btn-yes" id="easy-yes" aria-label="Yes, that's me">&#9825;</button>
+  <div class="citizen-controls" id="citizen-controls">
+    <button type="button" class="citizen-btn citizen-btn-no" id="citizen-no" aria-label="Skip this one">&#10005;</button>
+    <button type="button" class="citizen-btn citizen-btn-yes" id="citizen-yes" aria-label="Yes, that's me">&#9825;</button>
   </div>
 </div>
 
@@ -1018,6 +1019,7 @@
   </div>
 </div>
 
+<script src="civics.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1050,7 +1052,7 @@
   ];
   const ACTION_EMOJI = { email: '✉️', call: '☎️', comment: '📝', testify: '🎤', attend: '🏛️', share: '📣' };
 
-  // ---- Easy-mode swipe deck content ------------------------------------
+  // ---- Citizen-mode swipe deck content ------------------------------------
   // Community-role tags a citizen can swipe onto their manifesto. They're
   // purely local flavor with one real job: TRAIT_HINTS uses them to move
   // the most relevant issue categories to the front of the deck, so the
@@ -1140,7 +1142,7 @@
     issues: [],        // { id, name, weight 1-3, stance }
     sources: [],       // { name, hint, ratings? } — ratings (per-topic quality) are DIG's; same list either app edits
     actions: [],       // action keys
-    traits: [],        // community-role tags from Easy mode, e.g. 'renter', 'parent'
+    traits: [],        // community-role tags from Citizen mode, e.g. 'renter', 'parent'
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
     updated: null
@@ -1264,6 +1266,7 @@
     if (!id || findIssue(id)) return false;
     P.issues.push({ id: id, name: clean, weight: 2, stance: '' });
     amend('add', clean);
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
     return true;
   }
   function removeIssue(id) {
@@ -2053,6 +2056,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       if (t.checked) { if (!P.actions.includes(key)) P.actions.push(key); }
       else P.actions = P.actions.filter(k => k !== key);
       save(); renderActions(); renderDoc(); renderFinish(); counts();
+      if (t.checked && window.CivicsEngine) window.CivicsEngine.maybeShow();
     } else if (t.id === 'time-budget') {
       P.time = t.value; save(); renderDoc(); renderFinish();
     }
@@ -2125,12 +2129,12 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
 
   // ---- Mode slider ------------------------------------------------------
-  // Easy / Smarty Pants / Pro are three faces on the same P object — no
+  // Citizen / Activist / Pro are three faces on the same P object — no
   // conversion, no separate storage. Switching modes just changes which
-  // DOM is visible and (for Smarty Pants) how the existing §01-06 sections
+  // DOM is visible and (for Activist) how the existing §01-06 sections
   // are navigated.
   const MODE_KEY = 'civix-mode';
-  const MODE_ORDER = ['easy', 'smart', 'pro'];
+  const MODE_ORDER = ['citizen', 'activist', 'pro'];
 
   function loadMode() {
     try {
@@ -2139,7 +2143,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     } catch (e) {}
     // A manifesto with anything already in it came from Pro (or an import) —
     // land it back there. A brand-new manifesto gets the fast, fun default.
-    return (P.issues.length || P.sources.length || P.actions.length) ? 'pro' : 'easy';
+    return (P.issues.length || P.sources.length || P.actions.length) ? 'pro' : 'citizen';
   }
   let MODE = loadMode();
   function saveMode(m) { try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
@@ -2160,18 +2164,18 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       btn.setAttribute('aria-checked', String(on));
     });
 
-    document.getElementById('easy-shell').hidden = MODE !== 'easy';
-    document.querySelector('.shell').style.display = MODE === 'easy' ? 'none' : '';
-    document.getElementById('guided-bar').hidden = MODE !== 'smart';
-    document.body.classList.toggle('is-guided', MODE === 'smart');
+    document.getElementById('citizen-shell').hidden = MODE !== 'citizen';
+    document.querySelector('.shell').style.display = MODE === 'citizen' ? 'none' : '';
+    document.getElementById('guided-bar').hidden = MODE !== 'activist';
+    document.body.classList.toggle('is-guided', MODE === 'activist');
 
-    if (MODE === 'easy') {
-      startEasyMode();
+    if (MODE === 'citizen') {
+      startCitizenMode();
     } else {
-      // Coming from Easy mode, pro-facing views need to catch up with
+      // Coming from Citizen mode, pro-facing views need to catch up with
       // whatever got swiped in.
       renderAll();
-      if (MODE === 'smart') applyGuidedStep();
+      if (MODE === 'activist') applyGuidedStep();
     }
   }
 
@@ -2179,7 +2183,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
 
-  // ---- Smarty Pants: guided stepper over the real §01-06 sections -------
+  // ---- Activist: guided stepper over the real §01-06 sections -------
   const GUIDED_STEPS = [
     ['inbox', 'Inbox'],
     ['issues', 'What moves you'],
@@ -2219,7 +2223,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     d.addEventListener('click', () => { guidedIndex = Number(d.dataset.step); applyGuidedStep(); });
   });
 
-  // ---- Easy mode: swipe deck ---------------------------------------------
+  // ---- Citizen mode: swipe deck ---------------------------------------------
   let deck = [];
   let deckIndex = 0;
   let chosenCategories = [];
@@ -2233,7 +2237,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   const FIRST_PASS_ISSUES_PER_CATEGORY = 2;
   const FIRST_PASS_ACTIONS = 3;
 
-  function startEasyMode() {
+  function startCitizenMode() {
     firstPass = !P.issues.length && !P.traits.length && !P.actions.length && !P.place.zip;
     chosenCategories = [];
     deckIndex = 0;
@@ -2251,7 +2255,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         .map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb })),
       { type: 'done' }
     ];
-    renderEasyCard();
+    renderCitizenCard();
   }
 
   // Ranks categories by how many of their issues a swiped-in trait hints
@@ -2282,7 +2286,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     return cards;
   }
 
-  function resolveEasyCard(card, direction) {
+  function resolveCitizenCard(card, direction) {
     if (direction !== 'right') return;
     if (card.type === 'trait') {
       if (P.traits.indexOf(card.id) === -1) P.traits.push(card.id);
@@ -2297,18 +2301,19 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       if (P.actions.indexOf(card.id) === -1) P.actions.push(card.id);
     }
     save();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
-  function updateEasyProgress() {
+  function updateCitizenProgress() {
     const pct = deck.length ? Math.min(100, Math.round((deckIndex / deck.length) * 100)) : 0;
-    document.getElementById('easy-progress-bar').style.width = pct + '%';
+    document.getElementById('citizen-progress-bar').style.width = pct + '%';
   }
 
-  function advanceEasy(direction) {
+  function advanceCitizen(direction) {
     const card = deck[deckIndex];
-    if (card && direction) resolveEasyCard(card, direction);
+    if (card && direction) resolveCitizenCard(card, direction);
     deckIndex++;
-    renderEasyCard();
+    renderCitizenCard();
   }
 
   function wireSwipeGestures(el) {
@@ -2339,45 +2344,45 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
 
   function commitSwipe(direction) {
-    const el = document.getElementById('easy-active-card');
+    const el = document.getElementById('citizen-active-card');
     if (el) {
       el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
       el.style.transform = 'translateX(' + (direction === 'right' ? 100 : -100) + 'vw) rotate(' + (direction === 'right' ? 20 : -20) + 'deg)';
       el.style.opacity = '0';
     }
-    window.setTimeout(() => advanceEasy(direction), 180);
+    window.setTimeout(() => advanceCitizen(direction), 180);
   }
-  document.getElementById('easy-yes').addEventListener('click', () => commitSwipe('right'));
-  document.getElementById('easy-no').addEventListener('click', () => commitSwipe('left'));
+  document.getElementById('citizen-yes').addEventListener('click', () => commitSwipe('right'));
+  document.getElementById('citizen-no').addEventListener('click', () => commitSwipe('left'));
   document.addEventListener('keydown', (e) => {
-    if (MODE !== 'easy') return;
-    if (!document.getElementById('easy-active-card')) return; // welcome/ZIP/done aren't swipeable
+    if (MODE !== 'citizen') return;
+    if (!document.getElementById('citizen-active-card')) return; // welcome/ZIP/done aren't swipeable
     const active = document.activeElement;
     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
     if (e.key === 'ArrowRight') commitSwipe('right');
     else if (e.key === 'ArrowLeft') commitSwipe('left');
   });
 
-  function renderEasyDone() {
+  function renderCitizenDone() {
     const nIssues = P.issues.length;
     const nActions = P.actions.length;
     const bits = [nIssues + ' ' + (nIssues === 1 ? 'priority' : 'priorities') + ' set'];
     if (P.place.zip) bits.push('ZIP ' + esc(P.place.zip));
     if (nActions) bits.push(nActions + ' action ' + (nActions === 1 ? 'type' : 'types') + ' authorized');
     return `
-      <div class="easy-card easy-card-static easy-card-done">
-        <div class="easy-emoji">🎉</div>
-        <div class="easy-title">Nice — your manifesto’s coming together</div>
-        <p class="easy-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
-        <div class="easy-done-row">
-          <a class="btn btn-primary easy-cta" href="calendar.html">See what’s happening now &#8594;</a>
-          <button type="button" class="btn easy-cta" id="easy-to-pro">Fine-tune it (Pro mode) &#8594;</button>
-          <button type="button" class="btn btn-quiet easy-cta" id="easy-restart">Swipe through more</button>
+      <div class="citizen-card citizen-card-static citizen-card-done">
+        <div class="citizen-emoji">🎉</div>
+        <div class="citizen-title">Nice — your manifesto’s coming together</div>
+        <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
+        <div class="citizen-done-row">
+          <a class="btn btn-primary citizen-cta" href="calendar.html">See what’s happening now &#8594;</a>
+          <button type="button" class="btn citizen-cta" id="citizen-to-pro">Fine-tune it (Pro mode) &#8594;</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-restart">Swipe through more</button>
         </div>
       </div>`;
   }
 
-  function renderEasyCard() {
+  function renderCitizenCard() {
     let card = deck[deckIndex];
     if (card && card.type === 'categories-marker') {
       deck.splice(deckIndex, 1, ...buildCategoryCards());
@@ -2388,76 +2393,76 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       card = deck[deckIndex];
     }
 
-    const slot = document.getElementById('easy-card-slot');
-    const controls = document.getElementById('easy-controls');
+    const slot = document.getElementById('citizen-card-slot');
+    const controls = document.getElementById('citizen-controls');
     if (!card) { renderAll(); return; }
 
-    updateEasyProgress();
+    updateCitizenProgress();
 
     if (card.type === 'welcome') {
       controls.style.display = 'none';
       const returning = !!(P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip);
       slot.innerHTML = `
-        <div class="easy-card easy-card-static">
-          <div class="easy-emoji">👋</div>
-          <div class="easy-title">${returning ? 'Let’s refine your CiViX manifesto' : 'Let’s build your CiViX manifesto'}</div>
-          <p class="easy-blurb">Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.</p>
-          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Let’s go &#8594;</button>
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">👋</div>
+          <div class="citizen-title">${returning ? 'Let’s refine your CiViX manifesto' : 'Let’s build your CiViX manifesto'}</div>
+          <p class="citizen-blurb">Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.</p>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Let’s go &#8594;</button>
         </div>`;
-      document.getElementById('easy-advance').addEventListener('click', () => advanceEasy());
+      document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
       return;
     }
 
     if (card.type === 'encourage') {
       controls.style.display = 'none';
       slot.innerHTML = `
-        <div class="easy-card easy-card-static">
-          <div class="easy-emoji">✨</div>
-          <div class="easy-title">You’re doing great</div>
-          <p class="easy-blurb">That’s the big picture sorted. Next up: the specifics, so CiViX knows exactly what to watch for you.</p>
-          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Keep going &#8594;</button>
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">✨</div>
+          <div class="citizen-title">You’re doing great</div>
+          <p class="citizen-blurb">That’s the big picture sorted. Next up: the specifics, so CiViX knows exactly what to watch for you.</p>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Keep going &#8594;</button>
         </div>`;
-      document.getElementById('easy-advance').addEventListener('click', () => advanceEasy());
+      document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
       return;
     }
 
     if (card.type === 'zip') {
       controls.style.display = 'none';
       slot.innerHTML = `
-        <div class="easy-card easy-card-static">
-          <div class="easy-emoji">📍</div>
-          <div class="easy-title">Last thing — your ZIP?</div>
-          <p class="easy-blurb">So we can match your council, legislature, and delegation. CiViX never asks for your name or address.</p>
-          <input class="field mono easy-zip-field" id="easy-zip" type="text" inputmode="numeric" maxlength="5" placeholder="ZIP code" value="${esc(P.place.zip || '')}">
-          <button type="button" class="btn btn-primary easy-cta" id="easy-advance">Continue &#8594;</button>
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">📍</div>
+          <div class="citizen-title">Last thing — your ZIP?</div>
+          <p class="citizen-blurb">So we can match your council, legislature, and delegation. CiViX never asks for your name or address.</p>
+          <input class="field mono citizen-zip-field" id="citizen-zip" type="text" inputmode="numeric" maxlength="5" placeholder="ZIP code" value="${esc(P.place.zip || '')}">
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Continue &#8594;</button>
         </div>`;
-      document.getElementById('easy-advance').addEventListener('click', () => {
-        const v = document.getElementById('easy-zip').value.replace(/\D/g, '').slice(0, 5);
+      document.getElementById('citizen-advance').addEventListener('click', () => {
+        const v = document.getElementById('citizen-zip').value.replace(/\D/g, '').slice(0, 5);
         P.place.zip = v;
         document.getElementById('place-zip').value = v;
         save();
-        advanceEasy();
+        advanceCitizen();
       });
       return;
     }
 
     if (card.type === 'done') {
       controls.style.display = 'none';
-      slot.innerHTML = renderEasyDone();
-      document.getElementById('easy-to-pro').addEventListener('click', () => setMode('pro'));
-      document.getElementById('easy-restart').addEventListener('click', () => startEasyMode());
+      slot.innerHTML = renderCitizenDone();
+      document.getElementById('citizen-to-pro').addEventListener('click', () => setMode('pro'));
+      document.getElementById('citizen-restart').addEventListener('click', () => startCitizenMode());
       renderAll();
       return;
     }
 
     controls.style.display = 'flex';
     slot.innerHTML = `
-      <div class="easy-card" id="easy-active-card">
-        <div class="easy-emoji">${card.emoji}</div>
-        <div class="easy-title">${esc(card.title)}</div>
-        <p class="easy-blurb">${esc(card.blurb)}</p>
+      <div class="citizen-card" id="citizen-active-card">
+        <div class="citizen-emoji">${card.emoji}</div>
+        <div class="citizen-title">${esc(card.title)}</div>
+        <p class="citizen-blurb">${esc(card.blurb)}</p>
       </div>`;
-    wireSwipeGestures(document.getElementById('easy-active-card'));
+    wireSwipeGestures(document.getElementById('citizen-active-card'));
   }
 
   // ---- Theme ----------------------------------------------------------

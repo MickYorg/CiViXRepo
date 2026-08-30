@@ -585,13 +585,13 @@
         </div>
         <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
           <div class="mode-thumb" id="mode-thumb"></div>
-          <button type="button" class="mode-stop" data-mode="easy" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+          <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
             <span class="mode-emoji" aria-hidden="true">&#127881;</span>
-            <span class="mode-label">Easy</span>
+            <span class="mode-label">Citizen</span>
           </button>
-          <button type="button" class="mode-stop" data-mode="smart" role="radio" title="The same form, one friendly step at a time.">
+          <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
             <span class="mode-emoji" aria-hidden="true">&#129504;</span>
-            <span class="mode-label">Smarty Pants</span>
+            <span class="mode-label">Activist</span>
           </button>
           <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
             <span class="mode-emoji" aria-hidden="true">&#127891;</span>
@@ -613,6 +613,7 @@
   <button class="cta" id="cta-sticky">Build your manifesto</button>
 </div>
 
+<script src="civics.js"></script>
 <script>
 (function () {
   const root = document.documentElement;
@@ -757,12 +758,12 @@
   // ---- Mode picker ------------------------------------------------------
   // A returning citizen with an existing manifesto keeps whatever mode
   // they last used there (defaulting to Pro, same as the builder itself);
-  // anyone new starts on Easy. Whatever's picked here is handed straight
+  // anyone new starts on Citizen. Whatever's picked here is handed straight
   // to the builder via the same 'civix-mode' key it reads on load.
-  const MODE_ORDER = ['easy', 'smart', 'pro'];
+  const MODE_ORDER = ['citizen', 'activist', 'pro'];
   let hasManifesto = false;
   try { hasManifesto = !!localStorage.getItem('civix-profile'); } catch (e) {}
-  let splashMode = 'easy';
+  let splashMode = 'citizen';
   if (hasManifesto) {
     try {
       const saved = localStorage.getItem('civix-mode');
@@ -785,7 +786,11 @@
     });
   }
   document.querySelectorAll('.mode-stop').forEach(btn => {
-    btn.addEventListener('click', () => { splashMode = btn.dataset.mode; applySplashMode(); });
+    btn.addEventListener('click', () => {
+      splashMode = btn.dataset.mode;
+      applySplashMode();
+      if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+    });
   });
   applySplashMode();
 

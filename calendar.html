@@ -462,6 +462,7 @@
   <div class="action-card" id="action-card"></div>
 </div>
 
+<script src="civics.js"></script>
 <script>
 (function () {
   var root = document.documentElement;
@@ -725,6 +726,7 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
   async function generateDrafts() {
@@ -793,6 +795,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
 
     renderActionCard();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
   function renderActionCard() {
