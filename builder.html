@@ -136,7 +136,15 @@
     border: 1px solid var(--line);
     border-radius: 999px;
     padding: 5px;
+    /* The splash makes this choice the centerpiece; here the build is
+       already under way, so it sits quieter — same 20% dim the splash
+       settles to once its own sequence resolves. Hover/focus restores
+       full opacity so it never reads as disabled. */
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
   }
+  .mode-track:hover,
+  .mode-track:focus-within { opacity: 1; }
   .mode-thumb {
     position: absolute;
     top: 5px; bottom: 5px; left: 5px;

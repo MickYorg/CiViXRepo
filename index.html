@@ -123,19 +123,15 @@
     text-transform: uppercase;
     color: var(--paper-dim);
   }
-  .topbar-link {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: clamp(10px, 1.15vw, 12px);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--amber-ink);
-    text-decoration: none;
-    border: 1px solid var(--amber);
-    border-radius: 20px;
-    padding: 5px 12px;
-    white-space: nowrap;
-  }
-  .topbar-link:hover { background: var(--amber-wash); }
+  /* Settles 20% dimmer once the amendment sequence resolves — full
+     brightness while it's the thing being decided, quieter once the
+     splash has made its case and the choice is just sitting there.
+     Hover/focus always restores full opacity so it never reads as
+     disabled. */
+  #mode-track { transition: opacity 0.4s ease; flex-shrink: 0; }
+  :root.is-resolved #mode-track { opacity: 0.8; }
+  :root.is-resolved #mode-track:hover,
+  :root.is-resolved #mode-track:focus-within { opacity: 1; }
 
   .theme-toggle {
     appearance: none;
@@ -325,17 +321,16 @@
     position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    max-width: 360px;
+    max-width: 280px;
     background: var(--ink-raised);
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 5px;
-    margin-top: 18px;
+    padding: 4px;
   }
   .mode-thumb {
     position: absolute;
-    top: 5px; bottom: 5px; left: 5px;
-    width: calc((100% - 10px) / 3);
+    top: 4px; bottom: 4px; left: 4px;
+    width: calc((100% - 8px) / 3);
     background: var(--amber-wash);
     border: 1px solid var(--amber);
     border-radius: 999px;
@@ -351,21 +346,22 @@
     background: none;
     border: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 3px;
-    padding: 9px 6px;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 6px;
     cursor: pointer;
     border-radius: 999px;
     color: var(--paper-dim);
     transition: color 0.15s ease;
   }
   .mode-stop.is-on { color: var(--amber-ink); }
-  .mode-emoji { font-size: 19px; line-height: 1; }
+  .mode-emoji { font-size: 14px; line-height: 1; }
   .mode-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: 9.5px;
-    letter-spacing: 0.07em;
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
@@ -526,7 +522,21 @@
   <div class="mark">C<em>i</em>V<em>i</em>X</div>
   <div class="topbar-right">
     <span class="mark-sub">A platform for civic engagement</span>
-    <a class="topbar-link" href="civix101.html">CiViX 101</a>
+    <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
+      <div class="mode-thumb" id="mode-thumb"></div>
+      <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
+        <span class="mode-emoji" aria-hidden="true">&#x1F64B;</span>
+        <span class="mode-label">Citizen</span>
+      </button>
+      <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
+        <span class="mode-emoji" aria-hidden="true">&#x270A;</span>
+        <span class="mode-label">Activist</span>
+      </button>
+      <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
+        <span class="mode-emoji" aria-hidden="true">&#x1F3DB;&#xFE0F;</span>
+        <span class="mode-label">Pro</span>
+      </button>
+    </div>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
@@ -550,6 +560,7 @@
           <div class="agent-links">
             <a class="agent-link" href="dig/" target="_blank" rel="noopener">Open DIG &#8599;</a>
             <a class="agent-link" href="https://poltrapro.com" target="_blank" rel="noopener">PolTraPro &#8599;</a>
+            <a class="agent-link" href="civix101.html">CiViX 101</a>
           </div>
         </div>
       </li>
@@ -596,21 +607,6 @@
         <p class="pitch">Build a private manifesto of what you actually care about. CiViX matches it against the municipal, state, and federal calendar, then turns it into action you control.</p>
         <div class="principles">
           <span>Trustless</span><span>Distributed</span><span>Private</span><span>Truth</span>
-        </div>
-        <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
-          <div class="mode-thumb" id="mode-thumb"></div>
-          <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
-            <span class="mode-emoji" aria-hidden="true">&#x1F64B;</span>
-            <span class="mode-label">Citizen</span>
-          </button>
-          <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
-            <span class="mode-emoji" aria-hidden="true">&#x270A;</span>
-            <span class="mode-label">Activist</span>
-          </button>
-          <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
-            <span class="mode-emoji" aria-hidden="true">&#x1F3DB;&#xFE0F;</span>
-            <span class="mode-label">Pro</span>
-          </button>
         </div>
       </div>
       <button class="cta" id="cta">Build your manifesto</button>
@@ -734,6 +730,7 @@
   function reset() {
     clearTimers();
     stage.classList.remove('is-resolved');
+    root.classList.remove('is-resolved');
     amends.forEach(a => a.classList.remove('is-visible', 'is-struck', 'is-amended'));
   }
 
@@ -741,6 +738,7 @@
     clearTimers();
     amends.forEach(a => a.classList.add('is-visible', 'is-struck', 'is-amended'));
     stage.classList.add('is-resolved');
+    root.classList.add('is-resolved');
     skipBtn.hidden = true;
     replayBtn.hidden = false;
   }
@@ -765,6 +763,7 @@
 
     at(amends.length * STEP + 260, () => {
       stage.classList.add('is-resolved');
+      root.classList.add('is-resolved');
       skipBtn.hidden = true;
       replayBtn.hidden = false;
     });
