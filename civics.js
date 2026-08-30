@@ -104,6 +104,9 @@
       '.cx-btn:hover{filter:brightness(1.1);}',
       '.cx-btn-primary{background:var(--ca);border-color:var(--ca);color:#0A0F1C;font-weight:600;}',
       '.cx-btn[disabled]{opacity:.4;cursor:default;}',
+      '.cx-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}',
+      '.cx-more{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--cpd);text-decoration:none;white-space:nowrap;}',
+      '.cx-more:hover{color:var(--cai);}',
       '.cx-quotes,.cx-names{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}',
       '.cx-chip{appearance:none;text-align:left;border:1px solid var(--caw);background:none;color:var(--cp);',
       'font-family:Newsreader,Georgia,serif;font-size:14px;line-height:1.4;padding:10px 12px;border-radius:10px;cursor:pointer;}',
@@ -128,6 +131,13 @@
     document.head.appendChild(tag);
   }
 
+  // civics.js is included from different depths (root pages vs. dig/,
+  // which is one folder down) — resolve the link relative to wherever the
+  // page actually is, not relative to this script's own location.
+  function civix101Href() {
+    return location.pathname.indexOf('/dig/') !== -1 ? '../civix101.html' : 'civix101.html';
+  }
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -149,7 +159,10 @@
         '<div class="cx-kicker">CIVICS MOMENT</div>' +
         '<h3 class="cx-title">' + esc(item.title) + '</h3>' +
         '<p class="cx-body">' + esc(item.body) + '</p>' +
-        '<button type="button" class="cx-btn cx-btn-primary" data-act="ok">Got it</button>' +
+        '<div class="cx-row">' +
+          '<button type="button" class="cx-btn cx-btn-primary" data-act="ok">Got it</button>' +
+          '<a class="cx-more" href="' + civix101Href() + '">More at CiViX 101 &#8594;</a>' +
+        '</div>' +
       '</div>';
     document.body.appendChild(overlay);
     overlay.querySelector('[data-act="ok"]').addEventListener('click', function () { dismiss(overlay); });
@@ -240,7 +253,10 @@
       namesEl.innerHTML = '';
       actionsEl.innerHTML =
         '<div class="cx-score">' + correctCount + ' / ' + quotes.length + ' matched</div>' +
-        '<button type="button" class="cx-btn cx-btn-primary" data-act="done">Continue</button>';
+        '<div class="cx-row">' +
+          '<a class="cx-more" href="' + civix101Href() + '">More at CiViX 101 &#8594;</a>' +
+          '<button type="button" class="cx-btn cx-btn-primary" data-act="done">Continue</button>' +
+        '</div>';
 
       overlay.querySelectorAll('.cx-react').forEach(function (row) {
         row.addEventListener('click', function (e) {
@@ -290,5 +306,42 @@
     showNow();
   }
 
-  window.CivicsEngine = { maybeShow: maybeShow, showNow: showNow };
+  // ---- Direct access (CiViX 101) -----------------------------------------
+  // Opens a specific fact or deck on demand, bypassing the cooldown/chance
+  // gate that governs the sprinkled pop-ups — a citizen who came here on
+  // purpose shouldn't be rate-limited. Still marks it seen, so the random
+  // sprinkle elsewhere doesn't immediately repeat what they just reviewed.
+  function playFact(id) {
+    if (showing) return;
+    var f = null;
+    for (var i = 0; i < FACTS.length; i++) if (FACTS[i].id === id) f = FACTS[i];
+    if (!f) return;
+    showing = true;
+    var state = loadState();
+    if (state.seenFacts.indexOf(id) === -1) state.seenFacts.push(id);
+    state.lastShownAt = Date.now();
+    saveState(state);
+    renderFact(f);
+  }
+  function playDeck(id) {
+    if (showing) return;
+    var d = null;
+    for (var i = 0; i < DECKS.length; i++) if (DECKS[i].id === id) d = DECKS[i];
+    if (!d) return;
+    showing = true;
+    var state = loadState();
+    if (state.seenDecks.indexOf(id) === -1) state.seenDecks.push(id);
+    state.lastShownAt = Date.now();
+    saveState(state);
+    renderQuiz(d, state);
+  }
+
+  window.CivicsEngine = {
+    maybeShow: maybeShow,
+    showNow: showNow,
+    playFact: playFact,
+    playDeck: playDeck,
+    facts: FACTS.map(function (f) { return { id: f.id, title: f.title, body: f.body }; }),
+    decks: DECKS.map(function (d) { return { id: d.id, count: d.quotes.length }; })
+  };
 })();
