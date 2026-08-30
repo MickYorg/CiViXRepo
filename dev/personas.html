@@ -81,7 +81,7 @@
 
   <div class="card">
     <h2>🗑️ Reset</h2>
-    <p>Wipes civix-profile, civix-mode, and the inbox-topic cache from this browser entirely — the same as never having visited.</p>
+    <p>Wipes civix-profile, civix-mode, the inbox-topic cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited.</p>
     <div class="row">
       <button data-persona="clear" data-go="index.html">Clear</button>
     </div>
@@ -188,6 +188,14 @@
       var persona = btn.dataset.persona;
       var go = btn.dataset.go;
       try {
+        // Every persona switch also resets the splash's own memory of you
+        // (return-visit wording, daily animation-replay gate) — otherwise
+        // an accumulated visit count from earlier testing would keep
+        // showing the "take action" splash variant no matter which
+        // persona you just loaded, which isn't what "brand new citizen"
+        // or "policy wonk" are supposed to demonstrate.
+        localStorage.removeItem('civix-splash-visits');
+        localStorage.removeItem('civix-splash-seen');
         if (persona === 'clear') {
           localStorage.removeItem('civix-profile');
           localStorage.removeItem('civix-mode');
