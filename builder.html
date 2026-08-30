@@ -128,10 +128,16 @@
      same P object, so switching between them never loses or converts
      data. ---- */
   .mode-bar { max-width: 1400px; margin: 0 auto; padding: 16px clamp(16px, 2.5vw, 30px) 0; }
+  /* Flex + space-between, not equal grid thirds — see index.html's
+     matching comment. Each pill sizes to its own content and the bar's
+     width becomes gap between them, with the thumb's left/width set
+     directly in JS (applyMode, in the script below) since it can't rely
+     on translateX(100%)/(200%) across equal columns anymore. */
   .mode-track {
     position: relative;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: var(--ink-raised);
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -147,19 +153,17 @@
   .mode-track:focus-within { opacity: 1; }
   .mode-thumb {
     position: absolute;
-    top: 5px; bottom: 5px; left: 5px;
-    width: calc((100% - 10px) / 3);
+    top: 5px; bottom: 5px;
     background: var(--amber-wash);
     border: 1px solid var(--amber);
     border-radius: 999px;
-    transition: transform 0.28s cubic-bezier(.2, .8, .2, 1);
+    transition: left 0.28s cubic-bezier(.2, .8, .2, 1), width 0.28s cubic-bezier(.2, .8, .2, 1);
     pointer-events: none;
   }
-  .mode-track[data-on="1"] .mode-thumb { transform: translateX(100%); }
-  .mode-track[data-on="2"] .mode-thumb { transform: translateX(200%); }
   .mode-stop {
     position: relative;
     z-index: 1;
+    flex: 0 0 auto;
     appearance: none;
     background: none;
     border: 0;
@@ -167,7 +171,7 @@
     flex-direction: column;
     align-items: center;
     gap: 3px;
-    padding: 10px 8px;
+    padding: 10px 18px;
     cursor: pointer;
     border-radius: 999px;
     color: var(--paper-dim);
@@ -2174,12 +2178,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
 
   function applyMode() {
-    const idx = MODE_ORDER.indexOf(MODE);
-    document.getElementById('mode-track').setAttribute('data-on', String(idx));
+    const modeThumb = document.getElementById('mode-thumb');
     document.querySelectorAll('.mode-stop').forEach(btn => {
       const on = btn.dataset.mode === MODE;
       btn.classList.toggle('is-on', on);
       btn.setAttribute('aria-checked', String(on));
+      if (on) {
+        modeThumb.style.left = btn.offsetLeft + 'px';
+        modeThumb.style.width = btn.offsetWidth + 'px';
+      }
     });
 
     document.getElementById('citizen-shell').hidden = MODE !== 'citizen';
@@ -2530,6 +2537,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
   renderAll();
   applyMode();
+  // applyMode's thumb positioning depends on the mode pills' real
+  // rendered width, which can be off against fallback-font metrics on
+  // first call, or stale after a resize/rotation — re-run in both cases.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(applyMode);
+  let modeResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(modeResizeTimer);
+    modeResizeTimer = setTimeout(applyMode, 150);
+  });
   // Fetched asynchronously and re-renders § 03 once it lands — same
   // matched-activity data calendar.html itself fetches, just consumed
   // here to link each priority straight to its filtered view there.
