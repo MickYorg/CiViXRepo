@@ -2017,6 +2017,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     if (t.closest('#wipe')) {
       if (confirm('Delete your manifesto from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
         try { localStorage.removeItem(KEY); } catch (e) {}
+        // Also clear the splash's own memory of you, so returning to the
+        // home page after a wipe genuinely looks like a first-ever visit —
+        // original wording, Citizen mode, "Build your manifesto" — rather
+        // than just an empty manifesto with a returning citizen's splash.
+        try {
+          localStorage.removeItem('civix-mode');
+          localStorage.removeItem('civix-splash-visits');
+          localStorage.removeItem('civix-splash-seen');
+        } catch (e) {}
         P = Object.assign({}, BLANK);
         save(); renderAll(); ensureDrop(true);
       }

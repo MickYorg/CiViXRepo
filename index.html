@@ -681,7 +681,9 @@
 
   if (visits - 1 >= RETURN_THRESHOLD) {
     const sec3 = amends[2].querySelector('.line');
-    if (sec3) sec3.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">a back seat</span><span class="ins">action</span>';
+    // .keep, not .ins — §01/§03 never get the red underline (only §02/§04
+    // do, via .ins), and that split is the point, not an oversight.
+    if (sec3) sec3.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">a back seat</span><span class="keep">action</span>';
     const sec4 = amends[3].querySelector('.line');
     if (sec4) sec4.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">orders</span><span class="ins">control</span>';
   }
@@ -806,8 +808,23 @@
   // anyone new starts on Citizen. Whatever's picked here is handed straight
   // to the builder via the same 'civix-mode' key it reads on load.
   const MODE_ORDER = ['citizen', 'activist', 'pro'];
+  // Presence of the civix-profile key isn't enough — builder.html's wipe
+  // flow resets P to BLANK and immediately re-saves it (to also persist a
+  // freshly-issued docket token/address), so the key still exists right
+  // after a wipe. Check for actual content instead, same heuristic
+  // builder.html itself uses to decide "returning" vs. "new."
   let hasManifesto = false;
-  try { hasManifesto = !!localStorage.getItem('civix-profile'); } catch (e) {}
+  try {
+    const raw = localStorage.getItem('civix-profile');
+    if (raw) {
+      const p = JSON.parse(raw);
+      hasManifesto = !!(p && (
+        (p.issues && p.issues.length) || (p.sources && p.sources.length) ||
+        (p.actions && p.actions.length) || (p.traits && p.traits.length) ||
+        (p.place && p.place.zip)
+      ));
+    }
+  } catch (e) {}
   let splashMode = 'citizen';
   if (hasManifesto) {
     try {
