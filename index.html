@@ -600,15 +600,15 @@
         <div class="mode-track" id="mode-track" role="radiogroup" aria-label="Manifesto builder mode">
           <div class="mode-thumb" id="mode-thumb"></div>
           <button type="button" class="mode-stop" data-mode="citizen" role="radio" title="Swipe through a few cards. Fast, fun, free.">
-            <span class="mode-emoji" aria-hidden="true">&#127881;</span>
+            <span class="mode-emoji" aria-hidden="true">&#x1F64B;</span>
             <span class="mode-label">Citizen</span>
           </button>
           <button type="button" class="mode-stop" data-mode="activist" role="radio" title="The same form, one friendly step at a time.">
-            <span class="mode-emoji" aria-hidden="true">&#129504;</span>
+            <span class="mode-emoji" aria-hidden="true">&#x270A;</span>
             <span class="mode-label">Activist</span>
           </button>
           <button type="button" class="mode-stop" data-mode="pro" role="radio" title="Every section, open, all at once. For citizens who want full control.">
-            <span class="mode-emoji" aria-hidden="true">&#127891;</span>
+            <span class="mode-emoji" aria-hidden="true">&#x1F3DB;&#xFE0F;</span>
             <span class="mode-label">Pro</span>
           </button>
         </div>
@@ -653,6 +653,28 @@
   try { seenToday = localStorage.getItem(SEEN_KEY) === today; } catch (e) {}
   function markSeenToday() {
     try { localStorage.setItem(SEEN_KEY, today); } catch (e) {}
+  }
+
+  // ---- Text variant ----
+  // First-time and early-return visitors see the original §03/§04 wording
+  // ("get engaged" / "get results"); after a handful of return visits it
+  // switches permanently to "take action" / "take control" — same
+  // strike-through amendment device, just a fresher pair of lines for
+  // anyone who's been back enough times to have earned a change of pace.
+  // Counts every splash load, independent of the daily replay gate above.
+  const VISITS_KEY = 'civix-splash-visits';
+  const RETURN_THRESHOLD = 4; // wording switches once this many RETURN visits have happened
+  let visits = 0;
+  try {
+    visits = (parseInt(localStorage.getItem(VISITS_KEY), 10) || 0) + 1;
+    localStorage.setItem(VISITS_KEY, String(visits));
+  } catch (e) { visits = 1; }
+
+  if (visits - 1 >= RETURN_THRESHOLD) {
+    const sec3 = amends[2].querySelector('.line');
+    if (sec3) sec3.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">a back seat</span><span class="ins">action</span>';
+    const sec4 = amends[3].querySelector('.line');
+    if (sec4) sec4.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">orders</span><span class="ins">control</span>';
   }
 
   // ---- Theme ----
