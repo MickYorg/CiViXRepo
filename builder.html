@@ -273,6 +273,17 @@
      is declared later in this stylesheet, so a same-specificity .citizen-
      quiz-opt rule loses to it on source order alone. */
   .citizen-quiz-options .citizen-quiz-opt { text-decoration: none; display: block; white-space: normal; text-align: left; line-height: 1.35; width: 100%; }
+  /* The "done" card's top-3 digest — real matched activity, not just a
+     link out to go find it yourself. Left-aligned since .citizen-card's
+     base text-align: center reads badly for multi-line card content. */
+  .citizen-digest { width: 100%; text-align: left; margin: 4px 0 14px; }
+  .citizen-digest-status { font-size: 13px; color: var(--paper-dim); margin-bottom: 10px; }
+  .citizen-digest-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; background: var(--ink); }
+  .citizen-digest-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .citizen-digest-title { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .citizen-digest-tag { flex-shrink: 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-ink); }
+  .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 8px; }
+  .citizen-digest-card .btn { font-size: 10.5px; padding: 6px 10px; text-decoration: none; }
   .citizen-controls {
     display: flex; justify-content: center; gap: 26px; margin-top: 22px;
   }
@@ -1035,6 +1046,7 @@
 </div>
 
 <script src="civics.js"></script>
+<script src="digest.js"></script>
 <script>
 (function () {
   'use strict';
@@ -2646,12 +2658,58 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         <div class="citizen-emoji">🎉</div>
         <div class="citizen-title">Nice — your manifesto’s coming together</div>
         <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
+        <div class="citizen-digest" id="citizen-digest">
+          <p class="citizen-digest-status">Finding your top picks right now&hellip;</p>
+        </div>
         <div class="citizen-done-row">
-          <a class="btn btn-primary citizen-cta" href="calendar.html">See what’s happening now &#8594;</a>
+          <a class="btn btn-primary citizen-cta" href="calendar.html">See everything &#8594;</a>
           <button type="button" class="btn citizen-cta" id="citizen-to-pro">Fine-tune it (Pro mode) &#8594;</button>
           <button type="button" class="btn btn-quiet citizen-cta" id="citizen-restart">Swipe through more</button>
         </div>
       </div>`;
+  }
+
+  function digestEntryHtml(e) {
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : 'Your docket';
+    const ctaLabel = e.kind === 'docket' ? 'Open in your docket' : 'Take a look';
+    return `
+      <div class="citizen-digest-card">
+        <div class="citizen-digest-top">
+          <span class="citizen-digest-title">${esc(e.title)}</span>
+          <span class="citizen-digest-tag">${kindLabel}</span>
+        </div>
+        <p class="citizen-digest-body">${esc(e.summary || 'No summary available yet.')}</p>
+        <a class="btn btn-primary" href="${esc(e.actionHref)}">${ctaLabel} &#8594;</a>
+      </div>`;
+  }
+
+  // Fetches and shows real matched activity right on the done card —
+  // federal, state, and anything filed via Send to CiViX all feed the
+  // same ranked pool (digest.js), instead of just linking out to go find
+  // it yourself. Best-effort: any failure here just quietly falls back to
+  // the plain "See everything" link already on the card.
+  async function loadCitizenDigest() {
+    const el = document.getElementById('citizen-digest');
+    if (!el || !window.CivixDigest) return;
+    if (!P.issues.length) {
+      el.innerHTML = '';
+      return;
+    }
+    try {
+      const top = await window.CivixDigest.buildTopDigest(P, { limit: 3 });
+      const current = document.getElementById('citizen-digest');
+      if (!current) return; // moved on to another card while this was in flight
+      if (!top.length) {
+        current.innerHTML = `<p class="citizen-digest-status">Nothing matched yet — check back once more legislative activity comes in.</p>`;
+        return;
+      }
+      current.innerHTML =
+        `<p class="citizen-digest-status">Your top pick${top.length === 1 ? '' : 's'} right now:</p>` +
+        top.map(digestEntryHtml).join('');
+    } catch (e) {
+      const current = document.getElementById('citizen-digest');
+      if (current) current.innerHTML = '';
+    }
   }
 
   function renderCitizenCard() {
@@ -2773,6 +2831,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       document.getElementById('citizen-to-pro').addEventListener('click', () => setMode('pro'));
       document.getElementById('citizen-restart').addEventListener('click', () => startCitizenMode());
       renderAll();
+      loadCitizenDigest();
       return;
     }
 

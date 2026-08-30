@@ -469,6 +469,7 @@
 
 <script src="mode.js"></script>
 <script src="civics.js"></script>
+<script src="digest.js"></script>
 <script>
 (function () {
   var root = document.documentElement;
@@ -491,60 +492,13 @@
 (function () {
   'use strict';
 
-  // Hand-authored synonym map, keyed by the same slug() the builder uses
-  // for its fixed issue catalog. Bill titles rarely use the catalog's own
-  // phrasing ("Wages and labor" vs. "minimum wage"), so a literal substring
-  // match against the issue name alone misses almost everything.
-  const SYNONYMS = {
-    'wages-and-labor': ['minimum wage', 'wage', 'labor', 'union', 'worker', 'overtime'],
-    'taxes': ['tax', 'taxes', 'irs', 'tax credit', 'tax cut'],
-    'cost-of-living': ['inflation', 'cost of living', 'affordability'],
-    'small-business': ['small business', 'entrepreneur'],
-    'trade-and-tariffs': ['tariff', 'trade', 'import', 'export'],
-    'healthcare-access': ['healthcare', 'health care', 'medicaid', 'medicare', 'insurance'],
-    'drug-pricing': ['drug price', 'prescription drug', 'pharmaceutical', 'insulin'],
-    'public-health': ['public health', 'cdc', 'disease', 'vaccine'],
-    'reproductive-health': ['abortion', 'reproductive', 'contraception'],
-    'mental-health': ['mental health', 'suicide', 'substance abuse', 'opioid'],
-    'housing-affordability': ['housing', 'affordable housing', 'rent'],
-    'zoning-and-development': ['zoning', 'land use', 'development'],
-    'homelessness': ['homeless', 'homelessness', 'shelter'],
-    'tenant-rights': ['tenant', 'landlord', 'eviction'],
-    'public-schools': ['school', 'k-12', 'education funding', 'teacher'],
-    'higher-education-cost': ['student loan', 'college', 'university', 'tuition'],
-    'curriculum-and-books': ['curriculum', 'book ban', 'textbook'],
-    'childcare': ['childcare', 'child care', 'daycare'],
-    'climate-policy': ['climate', 'emissions', 'carbon', 'greenhouse gas'],
-    'energy-costs': ['energy', 'electricity', 'utility', 'fuel'],
-    'water-and-air-quality': ['water quality', 'air quality', 'pollution', 'clean water', 'clean air'],
-    'public-lands': ['public lands', 'national park', 'forest service', 'wilderness'],
-    'policing': ['police', 'policing', 'law enforcement'],
-    'criminal-justice-reform': ['criminal justice', 'sentencing', 'incarceration', 'prison'],
-    'gun-policy': ['gun', 'firearm', 'second amendment'],
-    'courts': ['court', 'judiciary', 'judge'],
-    'voting-access': ['voting', 'voter', 'ballot', 'election'],
-    'redistricting': ['redistricting', 'gerrymander'],
-    'campaign-finance': ['campaign finance', 'super pac', 'election spending'],
-    'government-transparency': ['transparency', 'foia', 'open government'],
-    'data-privacy': ['data privacy', 'privacy'],
-    'ai-regulation': ['artificial intelligence', ' ai '],
-    'platform-accountability': ['social media', 'platform', 'section 230'],
-    'broadband-access': ['broadband', 'internet access', 'rural broadband'],
-    'transit': ['transit', 'bus', 'rail', 'public transportation'],
-    'roads-and-bridges': ['infrastructure', 'road', 'bridge', 'highway'],
-    'immigration': ['immigration', 'immigrant', 'border', 'visa', 'asylum'],
-    'rural-access': ['rural']
-  };
-
-  function slug(s) {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  }
-
-  function keywordsFor(issue) {
-    const extra = SYNONYMS[issue.id] || [];
-    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    return [issue.name.toLowerCase()].concat(extra, nameWords);
-  }
+  // Matching (SYNONYMS, slug, keywordsFor, matchBills) now lives in
+  // digest.js, shared with builder.html's Citizen-mode digest — this used
+  // to be its own copy here, which is exactly the kind of drift risk that
+  // bit mode.js's hasManifesto check earlier. Thin local aliases so the
+  // rest of this file doesn't need every call site rewritten.
+  const slug = window.CivixDigest.slug;
+  const matchBills = window.CivixDigest.matchBills;
 
   // ?focus=<issue-id> arrives from builder.html's § 03 "N matched" links,
   // so a specific declared priority can point straight at its own
@@ -592,27 +546,14 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  function matchBills(bills, issues) {
-    const scored = bills.map(bill => {
-      const hay = (bill.title + ' ' + (bill.latestAction ? bill.latestAction.text : '')).toLowerCase();
-      const hits = [];
-      let score = 0;
-      issues.forEach(issue => {
-        const kws = keywordsFor(issue);
-        if (kws.some(k => hay.indexOf(k) !== -1)) {
-          score += issue.weight || 1;
-          hits.push(issue.name);
-        }
-      });
-      return { bill, score, hits };
-    });
-    return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
-  }
-
   // Citizen mode trims the raw legislative metadata (congress number, ISO
   // date) and condenses the match-tag chip list to a count — Activist
   // renders exactly what this card always has; Pro is identical to
   // Activist here but sees more cards (see CAPS below).
+  function billSummaryId(bill) {
+    return bill.congress + '-' + bill.type + bill.number;
+  }
+
   function renderCard(bill, hits, idx, mode) {
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
@@ -629,7 +570,7 @@
       <div class="card">
         <div class="card-top"><span class="card-title">${title}</span><span class="tag">Federal</span></div>
         <div class="card-meta">${meta}</div>
-        <div class="card-body">${action}</div>
+        <div class="card-body" id="body-${esc(slug(billSummaryId(bill)))}">${action}</div>
         ${tags}
         <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
       </div>`;
@@ -990,9 +931,30 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       <div class="card">
         <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">State</span></div>
         ${metaHtml}
-        <div class="card-body">${action}</div>
+        <div class="card-body" id="body-${esc(slug(bill.identifier || ''))}">${action}</div>
         ${tags}
       </div>`;
+  }
+
+  // Progressive enhancement: cards render immediately with the raw
+  // legislative text (as before), then each visible one's plain-language
+  // rewrite fills in once it resolves — cached (and shared with builder.
+  // html's Citizen-mode digest via digest.js), so a bill only ever costs
+  // one AI call per browser, not one per view.
+  function enhancePlainSummaries(bills, isState) {
+    if (!window.CivixDigest || !bills || !bills.length) return;
+    bills.forEach(bill => {
+      const rawId = isState ? (bill.identifier || '') : billSummaryId(bill);
+      if (!rawId) return;
+      const domId = 'body-' + slug(rawId);
+      if (!document.getElementById(domId)) return;
+      window.CivixDigest.plainSummarize(rawId, bill.title, bill.latestAction ? bill.latestAction.text : '')
+        .then(plain => {
+          if (!plain) return;
+          const el = document.getElementById(domId);
+          if (el) el.textContent = plain;
+        });
+    });
   }
 
   // STATE_STATE holds the fetch result branch so renderStateResults() can
@@ -1007,6 +969,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const mode = currentMode();
     const caps = CAPS[mode] || CAPS.activist;
     const s = STATE_STATE;
+    let shown = [];
 
     if (s.kind === 'no-zip') {
       statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
@@ -1017,11 +980,13 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       statusEl.textContent = `No recent activity came back for ${s.stateName || 'your state'}'s legislature — try again later.`;
     } else if (s.kind === 'no-issues') {
       statusEl.innerHTML = `Showing the most recently updated bills in ${esc(s.stateName)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
-      listEl.innerHTML = s.bills.slice(0, caps.fallback).map(b => renderStateCard(b, [], mode)).join('');
+      shown = s.bills.slice(0, caps.fallback);
+      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode)).join('');
     } else if (s.kind === 'focused') {
       const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
       if (focused.length) {
         statusEl.textContent = `Showing ${focused.length} ${s.stateName} bill${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
+        shown = focused.map(m => m.bill);
         listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
       } else {
         statusEl.textContent = `No ${s.stateName} bills matched to "${s.focusIssue.name}" yet.`;
@@ -1029,11 +994,15 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       }
     } else if (s.kind === 'no-match') {
       statusEl.textContent = `Checked ${s.bills.length} recently updated ${s.stateName} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
-      listEl.innerHTML = s.bills.slice(0, caps.fallback).map(b => renderStateCard(b, [], mode)).join('');
+      shown = s.bills.slice(0, caps.fallback);
+      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode)).join('');
     } else if (s.kind === 'matched') {
       statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated ${s.stateName} bills against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
-      listEl.innerHTML = s.matched.slice(0, caps.matched).map(m => renderStateCard(m.bill, m.hits, mode)).join('');
+      const matchedSlice = s.matched.slice(0, caps.matched);
+      shown = matchedSlice.map(m => m.bill);
+      listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
     }
+    enhancePlainSummaries(shown, true);
   }
 
   async function bootState() {
@@ -1122,6 +1091,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
         listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
       } else {
         statusEl.textContent = `No federal bills matched to "${s.focusIssue.name}" yet.`;
+        CURRENT = [];
         listEl.innerHTML = '';
       }
     } else if (s.kind === 'no-match') {
@@ -1133,6 +1103,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       CURRENT = s.matched.slice(0, caps.matched).map(m => ({ bill: m.bill, hits: m.hits }));
       listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
     }
+    enhancePlainSummaries(CURRENT.map(c => c.bill));
   }
 
   async function boot() {

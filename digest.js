@@ -1,0 +1,271 @@
+// digest.js — shared "what should this citizen actually do right now"
+// engine. Single source of truth for matching manifesto issues against
+// federal/state bills (previously duplicated only in calendar.html — moved
+// here so builder.html's Citizen-mode digest and calendar.html's own lists
+// can't drift the way index.html/builder.html's hasManifesto check once
+// did) plus two additions:
+//   - Docket items filed via Send to CiViX feed into the same ranked pool
+//     as calendar matches, via the same AI topic-classification already
+//     used for Inbox triage (civix-inbox-topics), not a separate mechanism.
+//   - A cached, AI-backed plain-language one-liner for any bill/item, so
+//     raw legislative text ("Referred to the Subcommittee on...") doesn't
+//     have to be the thing a citizen reads first.
+(function () {
+  'use strict';
+  if (window.CivixDigest) return;
+
+  const CAPTURE_API = 'https://civix-capture.mycivix.workers.dev';
+  const INBOX_TOPICS_KEY = 'civix-inbox-topics'; // shared with builder.html's Inbox
+  const SUMMARY_KEY = 'civix-plain-summaries';
+
+  // ---- Matching (moved from calendar.html) -----------------------------
+  const SYNONYMS = {
+    'wages-and-labor': ['minimum wage', 'wage', 'labor', 'union', 'worker', 'overtime'],
+    'taxes': ['tax', 'taxes', 'irs', 'tax credit', 'tax cut'],
+    'cost-of-living': ['inflation', 'cost of living', 'affordability'],
+    'small-business': ['small business', 'entrepreneur'],
+    'trade-and-tariffs': ['tariff', 'trade', 'import', 'export'],
+    'healthcare-access': ['healthcare', 'health care', 'medicaid', 'medicare', 'insurance'],
+    'drug-pricing': ['drug price', 'prescription drug', 'pharmaceutical', 'insulin'],
+    'public-health': ['public health', 'cdc', 'disease', 'vaccine'],
+    'reproductive-health': ['abortion', 'reproductive', 'contraception'],
+    'mental-health': ['mental health', 'suicide', 'substance abuse', 'opioid'],
+    'housing-affordability': ['housing', 'affordable housing', 'rent'],
+    'zoning-and-development': ['zoning', 'land use', 'development'],
+    'homelessness': ['homeless', 'homelessness', 'shelter'],
+    'tenant-rights': ['tenant', 'landlord', 'eviction'],
+    'public-schools': ['school', 'k-12', 'education funding', 'teacher'],
+    'higher-education-cost': ['student loan', 'college', 'university', 'tuition'],
+    'curriculum-and-books': ['curriculum', 'book ban', 'textbook'],
+    'childcare': ['childcare', 'child care', 'daycare'],
+    'climate-policy': ['climate', 'emissions', 'carbon', 'greenhouse gas'],
+    'energy-costs': ['energy', 'electricity', 'utility', 'fuel'],
+    'water-and-air-quality': ['water quality', 'air quality', 'pollution', 'clean water', 'clean air'],
+    'public-lands': ['public lands', 'national park', 'forest service', 'wilderness'],
+    'policing': ['police', 'policing', 'law enforcement'],
+    'criminal-justice-reform': ['criminal justice', 'sentencing', 'incarceration', 'prison'],
+    'gun-policy': ['gun', 'firearm', 'second amendment'],
+    'courts': ['court', 'judiciary', 'judge'],
+    'voting-access': ['voting', 'voter', 'ballot', 'election'],
+    'redistricting': ['redistricting', 'gerrymander'],
+    'campaign-finance': ['campaign finance', 'super pac', 'election spending'],
+    'government-transparency': ['transparency', 'foia', 'open government'],
+    'data-privacy': ['data privacy', 'privacy'],
+    'ai-regulation': ['artificial intelligence', ' ai '],
+    'platform-accountability': ['social media', 'platform', 'section 230'],
+    'broadband-access': ['broadband', 'internet access', 'rural broadband'],
+    'transit': ['transit', 'bus', 'rail', 'public transportation'],
+    'roads-and-bridges': ['infrastructure', 'road', 'bridge', 'highway'],
+    'immigration': ['immigration', 'immigrant', 'border', 'visa', 'asylum'],
+    'rural-access': ['rural']
+  };
+
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function keywordsFor(issue) {
+    const extra = SYNONYMS[issue.id] || [];
+    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return [issue.name.toLowerCase()].concat(extra, nameWords);
+  }
+
+  // Scores one haystack of text against a citizen's issues — the per-item
+  // core that both matchBills() and docket matching share.
+  function scoreAgainstIssues(hay, issues) {
+    const h = hay.toLowerCase();
+    const hits = [];
+    let score = 0;
+    issues.forEach(issue => {
+      const kws = keywordsFor(issue);
+      if (kws.some(k => h.indexOf(k) !== -1)) {
+        score += issue.weight || 1;
+        hits.push(issue.name);
+      }
+    });
+    return { score, hits };
+  }
+
+  function matchBills(bills, issues) {
+    const scored = bills.map(bill => {
+      const hay = bill.title + ' ' + (bill.latestAction ? bill.latestAction.text : '');
+      const { score, hits } = scoreAgainstIssues(hay, issues);
+      return { bill, score, hits };
+    });
+    return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+  }
+
+  // ---- Fetching ----------------------------------------------------------
+  async function fetchFederalBills() {
+    const r = await fetch('/api/calendar');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message || 'error');
+    return data.bills || [];
+  }
+
+  async function fetchStateBills(zip) {
+    if (!zip) return { bills: [], state: '' };
+    const r = await fetch('/api/state-bills?zip=' + encodeURIComponent(zip));
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+    return { bills: data.bills || [], state: data.state || '' };
+  }
+
+  async function fetchDocketItems(token) {
+    if (!token) return [];
+    const r = await fetch(CAPTURE_API + '/api/filings?token=' + encodeURIComponent(token));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    return (d.items || []).filter(i => i.state === 'docket');
+  }
+
+  // ---- AI helpers (both hit /api/dig-check, both cached) -----------------
+  async function digCheckCall(prompt) {
+    const r = await fetch('/api/dig-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (!r.ok) {
+      let msg = 'HTTP ' + r.status;
+      try { const b = await r.json(); if (b.error && b.error.message) msg = b.error.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    const data = await r.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) throw new Error('empty response');
+    return text;
+  }
+
+  function loadJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function saveJSON(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  // Same prompt shape and cache (civix-inbox-topics) builder.html's Inbox
+  // already uses — a docket item classified once, from either surface,
+  // never costs a second AI call.
+  async function classifyDocketItem(item) {
+    const topics = loadJSON(INBOX_TOPICS_KEY, {});
+    const cached = topics[item.id];
+    if (cached && cached.topic) return cached.topic;
+    try {
+      const prompt = `Someone captured this item into a civic-engagement inbox and it needs to be placed under a general, ongoing policy topic — not the specific headline itself.
+
+Captured item: "${item.title}"${item.note ? `\nTheir note: "${item.note}"` : ''}${item.host ? `\nSource: ${item.host}` : ''}
+
+Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy area this falls under (e.g. "Housing affordability", "Immigration and border policy", "Criminal justice reform") — general enough that it would still make sense as a topic next month, not tied to this one event. No markdown, no explanation, no surrounding quotes.`;
+      const topic = (await digCheckCall(prompt)).replace(/^["']|["']$/g, '').trim();
+      topics[item.id] = { topic, at: Date.now() };
+      saveJSON(INBOX_TOPICS_KEY, topics);
+      return topic;
+    } catch (e) {
+      return item.title; // fall back to the raw title — still usable for matching
+    }
+  }
+
+  // Rewrites a bill's title + raw legislative action text into one plain
+  // sentence. Cached indefinitely per bill id — a bill's own text doesn't
+  // change retroactively, so this costs one AI call per bill, ever, across
+  // every citizen's browser that happens to see it (each browser caches
+  // its own copy; there's no shared server cache, so the real-world cost
+  // is per-bill-per-visitor, not per-bill-globally).
+  async function plainSummarize(id, title, actionText) {
+    const cache = loadJSON(SUMMARY_KEY, {});
+    if (cache[id]) return cache[id].text;
+    try {
+      const prompt = `Rewrite this piece of legislative activity as ONE plain-language sentence a busy person with no policy background could understand in five seconds — what it actually does or what just happened, not legal procedure. No markdown, no quotes, under 25 words.
+
+Bill: ${title}
+Latest action: ${actionText || 'No recorded action yet.'}`;
+      const text = (await digCheckCall(prompt)).replace(/^["']|["']$/g, '').trim();
+      cache[id] = { text, at: Date.now() };
+      saveJSON(SUMMARY_KEY, cache);
+      return text;
+    } catch (e) {
+      return null; // caller falls back to the raw text
+    }
+  }
+
+  // ---- The digest itself ---------------------------------------------
+  // Normalizes federal bills, state bills, and docket items into one
+  // shape, scores all of them against the citizen's declared issues (a
+  // docket item goes through the exact same scoreAgainstIssues() call a
+  // bill does, once classified — "as if it was a match," not a separate
+  // always-included lane), and returns the top `limit`.
+  function billEntry(kind, bill, hits, score) {
+    const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || bill.identifier || '');
+    return {
+      kind, hits, score,
+      title: bill.title,
+      label: label.trim(),
+      rawSummary: bill.latestAction ? bill.latestAction.text : '',
+      summaryId: bill.identifier || (bill.congress + '-' + bill.type + bill.number),
+      url: bill.url || '',
+      actionHref: 'calendar.html' + (hits.length ? '?focus=' + encodeURIComponent(slug(hits[0])) : '')
+    };
+  }
+
+  async function buildTopDigest(profile, opts) {
+    opts = opts || {};
+    const limit = opts.limit || 3;
+    const issues = (profile && profile.issues) || [];
+    const zip = profile && profile.place && profile.place.zip;
+    const results = [];
+
+    const [fed, state, docket] = await Promise.allSettled([
+      fetchFederalBills(),
+      fetchStateBills(zip),
+      fetchDocketItems(profile && profile.token)
+    ]);
+
+    if (fed.status === 'fulfilled' && issues.length) {
+      matchBills(fed.value, issues).forEach(m => results.push(billEntry('federal', m.bill, m.hits, m.score)));
+    }
+    if (state.status === 'fulfilled' && issues.length) {
+      matchBills(state.value.bills, issues).forEach(m => results.push(billEntry('state', m.bill, m.hits, m.score)));
+    }
+    if (docket.status === 'fulfilled' && docket.value.length && issues.length) {
+      for (const item of docket.value) {
+        const topic = await classifyDocketItem(item);
+        const { score, hits } = scoreAgainstIssues(topic, issues);
+        if (score > 0) {
+          results.push({
+            kind: 'docket', hits, score,
+            title: item.title,
+            label: topic,
+            rawSummary: item.note || '',
+            summaryId: null, // already plain — no AI summary needed
+            url: item.url || '',
+            actionHref: (profile.token ? 'send-to-civix.html#' + profile.token : 'send-to-civix.html')
+          });
+        }
+      }
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    const top = results.slice(0, limit);
+
+    // Plain-language pass, only for the handful actually being shown —
+    // never summarize the whole matched pool, just what's rendered.
+    await Promise.all(top.map(async entry => {
+      if (!entry.summaryId) { entry.summary = entry.rawSummary; return; }
+      const plain = await plainSummarize(entry.summaryId, entry.title, entry.rawSummary);
+      entry.summary = plain || entry.rawSummary || 'No recorded action yet.';
+    }));
+
+    return top;
+  }
+
+  window.CivixDigest = {
+    slug, keywordsFor, scoreAgainstIssues, matchBills,
+    fetchFederalBills, fetchStateBills, fetchDocketItems,
+    classifyDocketItem, plainSummarize, buildTopDigest
+  };
+})();
