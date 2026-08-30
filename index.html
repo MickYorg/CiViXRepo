@@ -324,10 +324,18 @@
   /* ---- Mode picker — same three stops as the builder's, so the choice
      made here just carries straight through when "Build your manifesto"
      is clicked. ---- */
+  /* Flex + space-between, not equal grid thirds: each pill sizes to its
+     own content (tight) and the track's stretch becomes gap between them
+     instead of dead air padding out an oversized pill. The thumb can no
+     longer just translateX(100%)/(200%) across equal columns, so its
+     left/width are set directly in JS (applySplashMode, in the script
+     below) to match whichever pill is actually active — re-run on
+     resize, same as the amendment spans' own measure-then-animate. */
   .mode-track {
     position: relative;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: var(--ink-raised);
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -335,19 +343,17 @@
   }
   .mode-thumb {
     position: absolute;
-    top: 4px; bottom: 4px; left: 4px;
-    width: calc((100% - 8px) / 3);
+    top: 4px; bottom: 4px;
     background: var(--amber-wash);
     border: 1px solid var(--amber);
     border-radius: 999px;
-    transition: transform 0.28s cubic-bezier(.2, .8, .2, 1);
+    transition: left 0.28s cubic-bezier(.2, .8, .2, 1), width 0.28s cubic-bezier(.2, .8, .2, 1);
     pointer-events: none;
   }
-  .mode-track[data-on="1"] .mode-thumb { transform: translateX(100%); }
-  .mode-track[data-on="2"] .mode-thumb { transform: translateX(200%); }
   .mode-stop {
     position: relative;
     z-index: 1;
+    flex: 0 0 auto;
     appearance: none;
     background: none;
     border: 0;
@@ -356,19 +362,13 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    padding: 6px 6px;
+    padding: 7px 12px;
     cursor: pointer;
     border-radius: 999px;
     color: var(--paper-dim);
     transition: color 0.15s ease;
   }
   .mode-stop.is-on { color: var(--amber-ink); }
-  /* Now that the track stretches wide, centering all three in their own
-     equal third left a lot of dead space at the outer edges — pinning
-     the endpoints outward reads more like an actual Citizen-to-Pro
-     continuum, with Activist staying centered as the midpoint. */
-  .mode-stop:first-of-type { justify-content: flex-start; padding-left: 12px; }
-  .mode-stop:last-of-type { justify-content: flex-end; padding-right: 12px; }
   .mode-emoji { font-size: 14px; line-height: 1; }
   .mode-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -800,19 +800,23 @@
     }
   }
 
+  // applySplashMode's first call (below) runs before web fonts land, so
+  // the thumb it positions is sized against fallback-font metrics —
+  // re-run once real fonts are in, same reasoning as measure().
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(() => requestAnimationFrame(start));
+    document.fonts.ready.then(() => requestAnimationFrame(() => { start(); applySplashMode(); }));
   } else {
-    requestAnimationFrame(start);
+    requestAnimationFrame(() => { start(); applySplashMode(); });
   }
 
   // Re-measure on resize/rotate so type reflowed at a new clamp() size
-  // doesn't leave spans pinned to stale widths. measure() is
-  // state-independent, so this is safe at any point in the sequence.
+  // doesn't leave spans (or the mode thumb) pinned to stale widths.
+  // measure() and applySplashMode() are both state-independent, so this
+  // is safe at any point in the sequence.
   let resizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(measure, 150);
+    resizeTimer = setTimeout(() => { measure(); applySplashMode(); }, 150);
   });
 
   skipBtn.addEventListener('click', finish);
@@ -853,14 +857,16 @@
   cta.textContent = ctaLabel;
   document.getElementById('cta-sticky').textContent = ctaLabel;
 
-  const modeTrack = document.getElementById('mode-track');
+  const modeThumb = document.getElementById('mode-thumb');
   function applySplashMode() {
-    const idx = MODE_ORDER.indexOf(splashMode);
-    modeTrack.setAttribute('data-on', String(idx));
     document.querySelectorAll('.mode-stop').forEach(btn => {
       const on = btn.dataset.mode === splashMode;
       btn.classList.toggle('is-on', on);
       btn.setAttribute('aria-checked', String(on));
+      if (on) {
+        modeThumb.style.left = btn.offsetLeft + 'px';
+        modeThumb.style.width = btn.offsetWidth + 'px';
+      }
     });
   }
   document.querySelectorAll('.mode-stop').forEach(btn => {
