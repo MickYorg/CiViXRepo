@@ -630,6 +630,15 @@
 <script src="civics.js"></script>
 <script>
 (function () {
+  // Mode/CTA/wording below are all decided once, from localStorage, at
+  // script run time. Landing here via the browser's Back button can
+  // restore this page from bfcache instead of re-running this script —
+  // e.g. after wiping the manifesto in builder.html and hitting Back, the
+  // splash would otherwise still show the pre-wipe mode and CTA, since
+  // nothing re-executed. Forcing a real reload on a bfcache restore keeps
+  // it honest.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
+
   const root = document.documentElement;
   const stage = document.getElementById('stage');
   const amends = Array.from(document.querySelectorAll('.amend'));
