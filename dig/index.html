@@ -593,6 +593,12 @@
     padding: 0;
   }
   .wd-skip-link:hover { color: var(--paper); }
+  /* Citizen mode's nudge toward the fast-exit onboarding path — same
+     link, just given the amber treatment so it reads as the suggested
+     way through rather than a same-weight alternative to picking
+     manually. Activist/Pro get the plain, unweighted styling above. */
+  .wd-skip-link.wd-nudge { color: var(--amber); text-decoration: none; font-weight: 600; }
+  .wd-skip-link.wd-nudge:hover { color: var(--rust); }
   .wd-rebuild-btn {
     background: none;
     border: 1px solid var(--line);
@@ -1409,6 +1415,10 @@
       <div class="wd-info-detail" id="wd-profile-intro-detail" style="display:none;">Everything below lives only on this device — nobody else sees it. Keep it, tidy it up, or clear it whenever you like.</div>
       <div class="wd-profile-summary" id="wd-profile-summary"></div>
       <div class="wd-profile-section">
+        <div class="wd-profile-section-title">Manifesto builder mode</div>
+        <div id="mode-picker" style="margin-top:6px;"></div>
+      </div>
+      <div class="wd-profile-section">
         <div class="wd-profile-section-title">Recently checked topics</div>
         <div id="wd-topic-history-list"></div>
         <button class="wd-find-btn" id="wd-clear-history-btn" type="button" style="margin-top:8px;">Clear topic history</button>
@@ -1479,6 +1489,7 @@
   </div>
 </div>
 
+<script src="../mode.js"></script>
 <script src="../civics.js"></script>
 <script>
 (function() {
@@ -1799,6 +1810,17 @@
   const focusPrev = document.getElementById('wd-focus-prev');
   const focusNext = document.getElementById('wd-focus-next');
   const focusClose = document.getElementById('wd-focus-close');
+  const modePickerEl = document.getElementById('mode-picker');
+
+  // Mode sets DEFAULTS here rather than gating new features — DIG already
+  // has both ends of this spectrum built (Focus Mode + fast onboarding
+  // exits vs. Table view + manual editing), so this just decides which
+  // end a citizen lands on. Read once at boot; the picker (in the PROFILE
+  // panel) still writes civix-mode immediately so it's correct on their
+  // next visit, but nothing here needs to react live mid-session.
+  function digMode() {
+    return (window.CivixMode && window.CivixMode.get()) || 'activist';
+  }
 
   let sources = [];
   let activeCategory = ONBOARD_CATEGORIES[0].key;
@@ -1947,6 +1969,12 @@
     renderOnboardTabs();
     renderChipGrid();
     updateOnboardFooter();
+    // Citizen mode nudges toward the fast-exit path (skip/surprise-me)
+    // instead of manual category picking — Activist/Pro get the plain,
+    // unweighted links, full manual onboarding either way.
+    const nudge = digMode() === 'citizen';
+    randomizeBtn.classList.toggle('wd-nudge', nudge);
+    skipBtn.classList.toggle('wd-nudge', nudge);
   }
 
   // ---- Header panel toggles (SOURCES / STATS / PROFILE) ----
@@ -2779,6 +2807,11 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
 
     runBtn.disabled = false;
     runBtn.textContent = 'CHECK STANCE ACROSS SOURCES';
+
+    // Citizen mode's guided default: walk the results one source at a
+    // time instead of landing on the grid. Activist/Pro keep whatever
+    // view (cards/table) they were already on.
+    if (digMode() === 'citizen') openFocus(0);
   }
 
   runBtn.addEventListener('click', runCheck);
@@ -2912,6 +2945,10 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
   }
 
   function renderProfilePanel() {
+    // The picker's own boot-time render happened while this panel was
+    // display:none, so its thumb was measured against a zero-width
+    // container — refresh now that the panel is actually visible.
+    if (modePickerHandle) modePickerHandle.refresh();
     const cachedCount = Object.values(resultsCache).reduce((n, bucket) => n + Object.keys(bucket).length, 0);
     profileSummaryEl.textContent =
       `${sources.length} source${sources.length === 1 ? '' : 's'} saved · ${topicHistory.length} topic${topicHistory.length === 1 ? '' : 's'} checked · ${cachedCount} result${cachedCount === 1 ? '' : 's'} cached`;
@@ -3276,6 +3313,12 @@ POINT: <talking point in a single sentence>
       } catch (e) { /* nothing under the old name either — first-time visitor */ }
     }
   }
+
+  // Pro lands on Table view by default (today's original default);
+  // Citizen/Activist keep the plain 'cards' declared above.
+  if (digMode() === 'pro') viewMode = 'table';
+  let modePickerHandle = null;
+  if (window.CivixMode && modePickerEl) modePickerHandle = window.CivixMode.renderPicker(modePickerEl);
 
   (async () => {
     await migrateLegacyStorage();

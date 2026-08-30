@@ -80,6 +80,10 @@
     align-items: center;
     gap: clamp(10px, 2vw, 18px);
   }
+  /* Mode picker sits between the wordmark and topbar-right, stretching
+     into whatever room the topbar has to spare — same treatment as the
+     splash/builder (mode.js renders its own self-contained pill widget). */
+  #mode-picker { flex: 1 1 260px; max-width: 460px; }
   .mark-sub {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: clamp(9.5px, 1.05vw, 11px);
@@ -410,6 +414,7 @@
 
 <header class="topbar">
   <a class="mark" href="index.html">C<em>i</em>V<em>i</em>X</a>
+  <div id="mode-picker"></div>
   <div class="topbar-right">
     <span class="mark-sub">A platform for civic engagement</span>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
@@ -462,6 +467,7 @@
   <div class="action-card" id="action-card"></div>
 </div>
 
+<script src="mode.js"></script>
 <script src="civics.js"></script>
 <script>
 (function () {
@@ -603,19 +609,26 @@
     return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
   }
 
-  function renderCard(bill, hits, idx) {
+  // Citizen mode trims the raw legislative metadata (congress number, ISO
+  // date) and condenses the match-tag chip list to a count — Activist
+  // renders exactly what this card always has; Pro is identical to
+  // Activist here but sees more cards (see CAPS below).
+  function renderCard(bill, hits, idx, mode) {
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
     const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
     const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    const tags = hits && hits.length
-      ? `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
-      : '';
+    const meta = mode === 'citizen'
+      ? esc(label)
+      : `${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}`;
+    const tags = !hits || !hits.length ? '' : mode === 'citizen'
+      ? `<div class="match-tags"><span class="match-tag">Matches ${hits.length} of your priorities</span></div>`
+      : `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`;
     return `
       <div class="card">
         <div class="card-top"><span class="card-title">${title}</span><span class="tag">Federal</span></div>
-        <div class="card-meta">${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}</div>
+        <div class="card-meta">${meta}</div>
         <div class="card-body">${action}</div>
         ${tags}
         <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
@@ -626,6 +639,19 @@
   let CURRENT = [];   // rendered {bill, hits} list, indexed for data-take-action
   let ACTIVE = null;  // the bill currently open in the action modal
   let REPS_CACHE = {};
+
+  // How many bills each mode sees. Activist matches today's pre-existing
+  // caps exactly (6 fallback / 8 matched) — treated as "no change" on
+  // purpose, to keep the lowest-risk tier identical to what shipped
+  // before mode-gating existed here. Citizen trims down, Pro expands.
+  const CAPS = {
+    citizen:  { fallback: 3, matched: 3 },
+    activist: { fallback: 6, matched: 8 },
+    pro:      { fallback: 10, matched: 12 }
+  };
+  function currentMode() {
+    return (window.CivixMode && window.CivixMode.get()) || 'activist';
+  }
 
   function loadRawProfile() {
     try {
@@ -949,31 +975,74 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   // button in here would show a state bill's reader their federal rep,
   // which is simply wrong. State-legislator lookup + drafting is future
   // scope, not shipped alongside this data slice.
-  function renderStateCard(bill, hits) {
+  function renderStateCard(bill, hits, mode) {
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
     const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    const tags = hits && hits.length
-      ? `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
-      : '';
+    // The identifier's already in card-top, so citizen mode just drops
+    // the meta line entirely rather than showing a redundant fragment.
+    const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
+    const tags = !hits || !hits.length ? '' : mode === 'citizen'
+      ? `<div class="match-tags"><span class="match-tag">Matches ${hits.length} of your priorities</span></div>`
+      : `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`;
     return `
       <div class="card">
         <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">State</span></div>
-        <div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>
+        ${metaHtml}
         <div class="card-body">${action}</div>
         ${tags}
       </div>`;
   }
 
-  async function bootState() {
+  // STATE_STATE holds the fetch result branch so renderStateResults() can
+  // re-slice/re-render at a new mode's cap without a refetch — mirrors
+  // FED_STATE/renderFedResults() below.
+  let STATE_STATE = null;
+
+  function renderStateResults() {
     const statusEl = document.getElementById('state-status');
     const listEl = document.getElementById('state-list');
+    if (!STATE_STATE) return;
+    const mode = currentMode();
+    const caps = CAPS[mode] || CAPS.activist;
+    const s = STATE_STATE;
+
+    if (s.kind === 'no-zip') {
+      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
+    } else if (s.kind === 'fetch-error') {
+      statusEl.textContent = "Couldn't reach the state calendar. Try reloading in a bit.";
+      statusEl.classList.add('is-error');
+    } else if (s.kind === 'no-bills') {
+      statusEl.textContent = `No recent activity came back for ${s.stateName || 'your state'}'s legislature — try again later.`;
+    } else if (s.kind === 'no-issues') {
+      statusEl.innerHTML = `Showing the most recently updated bills in ${esc(s.stateName)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
+      listEl.innerHTML = s.bills.slice(0, caps.fallback).map(b => renderStateCard(b, [], mode)).join('');
+    } else if (s.kind === 'focused') {
+      const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
+      if (focused.length) {
+        statusEl.textContent = `Showing ${focused.length} ${s.stateName} bill${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
+        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
+      } else {
+        statusEl.textContent = `No ${s.stateName} bills matched to "${s.focusIssue.name}" yet.`;
+        listEl.innerHTML = '';
+      }
+    } else if (s.kind === 'no-match') {
+      statusEl.textContent = `Checked ${s.bills.length} recently updated ${s.stateName} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
+      listEl.innerHTML = s.bills.slice(0, caps.fallback).map(b => renderStateCard(b, [], mode)).join('');
+    } else if (s.kind === 'matched') {
+      statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated ${s.stateName} bills against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
+      listEl.innerHTML = s.matched.slice(0, caps.matched).map(m => renderStateCard(m.bill, m.hits, mode)).join('');
+    }
+  }
+
+  async function bootState() {
     const profile = loadRawProfile();
     const zip = profile && profile.place && profile.place.zip;
 
     if (!zip) {
-      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
+      STATE_STATE = { kind: 'no-zip' };
+      renderStateResults();
       return;
     }
 
@@ -983,14 +1052,15 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       data = await r.json();
       if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
     } catch (e) {
-      statusEl.textContent = "Couldn't reach the state calendar. Try reloading in a bit.";
-      statusEl.classList.add('is-error');
+      STATE_STATE = { kind: 'fetch-error' };
+      renderStateResults();
       return;
     }
 
     const bills = data.bills || [];
     if (!bills.length) {
-      statusEl.textContent = `No recent activity came back for ${data.state || 'your state'}'s legislature — try again later.`;
+      STATE_STATE = { kind: 'no-bills', stateName: data.state };
+      renderStateResults();
       return;
     }
 
@@ -999,38 +1069,73 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     if (FOCUS_SLUG) initFocusBanner(focusIssue ? focusIssue.name : null);
 
     if (!issues.length) {
-      statusEl.innerHTML = `Showing the most recently updated bills in ${esc(data.state)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
-      listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
+      STATE_STATE = { kind: 'no-issues', bills, stateName: data.state };
+      renderStateResults();
       return;
     }
 
     const matched = matchBills(bills, issues);
 
     if (focusIssue) {
-      const focused = matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
-      if (focused.length) {
-        statusEl.textContent = `Showing ${focused.length} ${data.state} bill${focused.length === 1 ? '' : 's'} matched to "${focusIssue.name}".`;
-        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits)).join('');
-      } else {
-        statusEl.textContent = `No ${data.state} bills matched to "${focusIssue.name}" yet.`;
-        listEl.innerHTML = '';
-      }
+      STATE_STATE = { kind: 'focused', bills, matched, focusIssue, stateName: data.state };
+      renderStateResults();
       return;
     }
 
     if (!matched.length) {
-      statusEl.textContent = `Checked ${bills.length} recently updated ${data.state} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
-      listEl.innerHTML = bills.slice(0, 6).map(b => renderStateCard(b, [])).join('');
+      STATE_STATE = { kind: 'no-match', bills, stateName: data.state };
+      renderStateResults();
       return;
     }
 
-    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated ${data.state} bills against your manifesto, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
-    listEl.innerHTML = matched.slice(0, 8).map(m => renderStateCard(m.bill, m.hits)).join('');
+    STATE_STATE = { kind: 'matched', bills, matched, stateName: data.state, fetchedAt: data.fetchedAt };
+    renderStateResults();
+  }
+
+  // FED_STATE holds the fetch result branch so renderFedResults() can
+  // re-slice/re-render CURRENT at a new mode's cap without a refetch —
+  // it's what makes the mode picker's onChange feel instant.
+  let FED_STATE = null;
+
+  function renderFedResults() {
+    const statusEl = document.getElementById('fed-status');
+    const listEl = document.getElementById('fed-list');
+    if (!FED_STATE) return;
+    const mode = currentMode();
+    const caps = CAPS[mode] || CAPS.activist;
+    const s = FED_STATE;
+
+    if (s.kind === 'fetch-error') {
+      statusEl.textContent = "Couldn't reach the federal calendar. Try reloading in a bit.";
+      statusEl.classList.add('is-error');
+    } else if (s.kind === 'no-bills') {
+      statusEl.textContent = 'No recent federal activity came back — try again later.';
+    } else if (s.kind === 'no-profile') {
+      statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your manifesto</a> to see this narrowed to what you actually care about.`;
+      CURRENT = s.bills.slice(0, caps.fallback).map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
+    } else if (s.kind === 'focused') {
+      const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
+      if (focused.length) {
+        statusEl.textContent = `Showing ${focused.length} federal bill${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
+        CURRENT = focused.map(m => ({ bill: m.bill, hits: m.hits }));
+        listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
+      } else {
+        statusEl.textContent = `No federal bills matched to "${s.focusIssue.name}" yet.`;
+        listEl.innerHTML = '';
+      }
+    } else if (s.kind === 'no-match') {
+      statusEl.innerHTML = `Checked ${s.bills.length} recently updated bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
+      CURRENT = s.bills.slice(0, caps.fallback).map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
+    } else if (s.kind === 'matched') {
+      statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated bills against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
+      CURRENT = s.matched.slice(0, caps.matched).map(m => ({ bill: m.bill, hits: m.hits }));
+      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
+    }
   }
 
   async function boot() {
-    const statusEl = document.getElementById('fed-status');
-    const listEl = document.getElementById('fed-list');
     const profile = loadProfile();
 
     let data;
@@ -1040,21 +1145,21 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       data = await r.json();
       if (data.error) throw new Error(data.error.message || 'error');
     } catch (e) {
-      statusEl.textContent = "Couldn't reach the federal calendar. Try reloading in a bit.";
-      statusEl.classList.add('is-error');
+      FED_STATE = { kind: 'fetch-error' };
+      renderFedResults();
       return;
     }
 
     const bills = data.bills || [];
     if (!bills.length) {
-      statusEl.textContent = 'No recent federal activity came back — try again later.';
+      FED_STATE = { kind: 'no-bills' };
+      renderFedResults();
       return;
     }
 
     if (!profile) {
-      statusEl.innerHTML = `Showing the most recently updated bills in Congress. <a href="builder.html">Build your manifesto</a> to see this narrowed to what you actually care about.`;
-      CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));
-      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
+      FED_STATE = { kind: 'no-profile', bills };
+      renderFedResults();
       return;
     }
 
@@ -1064,28 +1169,25 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const matched = matchBills(bills, profile.issues);
 
     if (focusIssue) {
-      const focused = matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
-      if (focused.length) {
-        statusEl.textContent = `Showing ${focused.length} federal bill${focused.length === 1 ? '' : 's'} matched to "${focusIssue.name}".`;
-        CURRENT = focused.map(m => ({ bill: m.bill, hits: m.hits }));
-        listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
-      } else {
-        statusEl.textContent = `No federal bills matched to "${focusIssue.name}" yet.`;
-        listEl.innerHTML = '';
-      }
+      FED_STATE = { kind: 'focused', bills, matched, focusIssue };
+      renderFedResults();
       return;
     }
 
     if (!matched.length) {
-      statusEl.innerHTML = `Checked ${bills.length} recently updated bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
-      CURRENT = bills.slice(0, 6).map(b => ({ bill: b, hits: [] }));
-      listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
+      FED_STATE = { kind: 'no-match', bills };
+      renderFedResults();
       return;
     }
 
-    statusEl.textContent = `Matched ${matched.length} of ${bills.length} recently updated bills against your manifesto, as of ${fmtDate(new Date(data.fetchedAt).toISOString())}.`;
-    CURRENT = matched.slice(0, 8).map(m => ({ bill: m.bill, hits: m.hits }));
-    listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i)).join('');
+    FED_STATE = { kind: 'matched', bills, matched, fetchedAt: data.fetchedAt };
+    renderFedResults();
+  }
+
+  if (window.CivixMode) {
+    window.CivixMode.renderPicker(document.getElementById('mode-picker'), {
+      onChange: () => { renderFedResults(); renderStateResults(); }
+    });
   }
 
   boot();

@@ -2165,7 +2165,10 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     } catch (e) {}
     // A manifesto with anything already in it came from Pro (or an import) —
     // land it back there. A brand-new manifesto gets the fast, fun default.
-    return (P.issues.length || P.sources.length || P.actions.length) ? 'pro' : 'citizen';
+    // Same 5-field check as index.html's hasManifesto (issues/sources/
+    // actions/traits/place.zip) — this used to check only 3 of the 5,
+    // which had already drifted from index.html's version.
+    return (P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip) ? 'pro' : 'citizen';
   }
   let MODE = loadMode();
   function saveMode(m) { try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }

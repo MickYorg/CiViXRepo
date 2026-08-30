@@ -235,13 +235,16 @@
     text-transform: uppercase; color: var(--ink-dim);
     border-bottom: 1px solid transparent;
   }
-    background: none; border: 0; padding: 0; cursor: pointer;
-    font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--ink-dim);
-    border-bottom: 1px solid transparent;
-  }
   .link-btn:hover { color: var(--ink); border-bottom-color: var(--rule); }
   .link-btn.danger:hover { color: var(--strike); border-bottom-color: var(--strike); }
+  /* Pro mode surfaces docket-management tools more prominently — Citizen/
+     Activist keep today's quiet footer-link treatment unchanged. */
+  [data-mode="pro"] #exportBtn,
+  [data-mode="pro"] #clearBtn {
+    border: 1px solid var(--rule); border-radius: 2px; padding: 6px 12px;
+    background: var(--panel);
+  }
+  [data-mode="pro"] #clearBtn { border-color: var(--strike); color: var(--strike); }
   .privacy {
     width: 100%; margin: 0; font-family: var(--mono); font-size: 10px;
     letter-spacing: .06em; color: var(--ink-dim); line-height: 1.7;
@@ -389,9 +392,19 @@
 
 <div id="toast" role="status"></div>
 
+<script src="mode.js"></script>
 <script>
 (function () {
   'use strict';
+
+  // Passive read only — no picker widget here on purpose. This page is a
+  // share-target/inbox-triage flow meant to be hit in a hurry from an OS
+  // share sheet; a 3-way mode picker would add friction to exactly the
+  // moment this page's whole design tries to avoid it. Mode just adjusts
+  // density (see the [data-mode="pro"] rules above) — set wherever the
+  // citizen actually chose it, on the splash/builder/calendar.
+  var mode = (window.CivixMode && window.CivixMode.get()) || 'citizen';
+  document.documentElement.setAttribute('data-mode', mode);
 
   var API = 'https://civix-capture.mycivix.workers.dev';
   var TOKEN_KEY = 'civix.token';
