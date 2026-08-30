@@ -110,6 +110,21 @@ build, which does pick it up.
   Serif 4). Worth extracting into one shared stylesheet all pages `<link>` to.
 - `package.json` is still named `dig-selfhosted` — a leftover from before the
   folder held more than one tool.
+- **`civix-profile.token` vs. `civix.token` desync** — found 30 Aug 2026
+  while verifying the new digest's Send-to-CiViX integration against the
+  live site. `builder.html`/`digest.js` mint and read a docket token off
+  `civix-profile.token`; `send-to-civix.html` mints and reads its own,
+  completely separate `civix.token` (`builder.html` never references
+  `civix.token` at all). The two are independently generated, so they can
+  diverge — confirmed live in the user's own browser, where they already
+  had. Net effect: a citizen's real Send-to-CiViX filings won't surface in
+  the "top 3" digest (`digest.js`'s `fetchDocketItems(profile.token)`)
+  unless the two tokens happen to match. The classification/matching
+  mechanism itself is verified working end-to-end against a real filed
+  item once the right token is used — this is purely a "two independent
+  token namespaces" bug, not a broken feature. Fix is likely to unify on
+  one token namespace (have one page adopt the other's) rather than add a
+  sync step.
 
 ## Deliberately not yet done
 
