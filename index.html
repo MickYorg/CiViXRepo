@@ -115,20 +115,24 @@
     display: flex;
     align-items: center;
     gap: clamp(10px, 2vw, 18px);
+    flex: 1 1 auto;
   }
   .mark-sub {
+    flex-shrink: 0;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: clamp(9.5px, 1.05vw, 11px);
     letter-spacing: 0.17em;
     text-transform: uppercase;
     color: var(--paper-dim);
   }
-  /* Settles 20% dimmer once the amendment sequence resolves — full
-     brightness while it's the thing being decided, quieter once the
-     splash has made its case and the choice is just sitting there.
-     Hover/focus always restores full opacity so it never reads as
+  /* Grows into whatever room the topbar has to spare — same spacious,
+     widely-spaced feel the builder's full-width version has, tightening
+     back up on narrow viewports instead of overflowing. Also settles 20%
+     dimmer once the amendment sequence resolves — full brightness while
+     it's the thing being decided, quieter once the splash has made its
+     case. Hover/focus always restores full opacity so it never reads as
      disabled. */
-  #mode-track { transition: opacity 0.4s ease; flex-shrink: 0; }
+  #mode-track { transition: opacity 0.4s ease; flex: 1 1 260px; max-width: 460px; }
   :root.is-resolved #mode-track { opacity: 0.8; }
   :root.is-resolved #mode-track:hover,
   :root.is-resolved #mode-track:focus-within { opacity: 1; }
@@ -247,9 +251,13 @@
   .amend.is-struck .del::after { transform: scaleX(1); }
   .amend.is-amended .del { max-width: 0; opacity: 0; }
 
-  /* Inserted language: expands in, then takes the underline that marks
-     text added by amendment. */
-  .ins {
+  /* Inserted language: hidden until the deleted phrase has collapsed away
+     (never visible at the same time — that overlap is what reads as two
+     phrases jammed together), then expands in. .ins additionally takes
+     the underline that marks text added by amendment; .ins-plain is the
+     same timing with no underline, for §01/§03-style lines whose new
+     text isn't a §02/§04-style full replacement that should get one. */
+  .ins, .ins-plain {
     position: relative;
     max-width: 0;
     overflow: hidden;
@@ -270,7 +278,8 @@
     transform-origin: left center;
     transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) 0.34s;
   }
-  .amend.is-amended .ins { max-width: var(--w, 20ch); opacity: 1; }
+  .amend.is-amended .ins,
+  .amend.is-amended .ins-plain { max-width: var(--w, 20ch); opacity: 1; }
   .amend.is-amended .ins::after { transform: scaleX(1); }
 
   /* ---- Resolve: what the amended document adds up to ---- */
@@ -321,7 +330,6 @@
     position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    max-width: 280px;
     background: var(--ink-raised);
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -457,7 +465,7 @@
   /* Reduced motion: land on the finished document immediately. Nothing
      is withheld — the amended state IS the content. */
   @media (prefers-reduced-motion: reduce) {
-    .amend, .resolve, .stage, .del, .ins, .agent-link,
+    .amend, .resolve, .stage, .del, .ins, .ins-plain, .agent-link,
     .del::after, .ins::after, html, body { transition: none; }
   }
 
@@ -677,9 +685,14 @@
 
   if (visits - 1 >= RETURN_THRESHOLD) {
     const sec3 = amends[2].querySelector('.line');
-    // .keep, not .ins — §01/§03 never get the red underline (only §02/§04
-    // do, via .ins), and that split is the point, not an oversight.
-    if (sec3) sec3.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">a back seat</span><span class="keep">action</span>';
+    // .ins-plain, not .keep — .keep is only right when the deleted prefix
+    // and the kept text form one real word together ("dis"+"engaged"),
+    // since .keep is visible the whole time, overlapping the still-struck
+    // .del. "a back seat" + "action" don't concatenate into anything, so
+    // that overlap read as "a back seat action" mid-animation. .ins-plain
+    // stays hidden until .del has collapsed away (like .ins), just
+    // without the red underline .ins carries.
+    if (sec3) sec3.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">a back seat</span><span class="ins-plain">action</span>';
     const sec4 = amends[3].querySelector('.line');
     if (sec4) sec4.innerHTML = '<span class="lead">take&nbsp;</span><span class="del">orders</span><span class="ins">control</span>';
   }
@@ -708,7 +721,7 @@
   // collapsed span measures 0, so measuring mid-sequence (or on resize
   // after the run) would pin --w to 0 and it would never expand again.
   // Each span is briefly released to natural width, read, then restored.
-  const spans = Array.from(document.querySelectorAll('.del, .ins'));
+  const spans = Array.from(document.querySelectorAll('.del, .ins, .ins-plain'));
 
   function measure() {
     root.classList.add('is-measuring');
