@@ -784,6 +784,16 @@
       skipBtn.hidden = true;
       replayBtn.hidden = false;
     });
+
+    // Once the amendment sequence has actually played out (not on Skip,
+    // not on a same-day return visit that jumps straight to the resolved
+    // state via finish() — only after watching it happen), a few seconds
+    // to sit with the resolved state, then straight into building/
+    // refining. Scheduled through the same at()/timers mechanism as the
+    // rest of the sequence, so Replay's reset() cancels it automatically
+    // — a replay shouldn't have last run's auto-advance fire mid-way
+    // through the new one.
+    at(amends.length * STEP + 260 + 4500, () => { goToBuilder(); });
   }
 
   // Fonts change metrics, so measure after they land — otherwise widths

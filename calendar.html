@@ -366,6 +366,29 @@
   }
   .rep-chip:hover { border-color: var(--paper-dim); }
   .rep-chip.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
+  /* For/against toggle — deliberately the same visual weight as the rep
+     picker (equal-width chips, same is-on treatment), since this is just
+     as consequential to what gets drafted as which rep gets addressed. */
+  .lean-toggle { display: flex; gap: 8px; margin-bottom: 8px; }
+  .lean-chip {
+    appearance: none;
+    flex: 1;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .lean-chip:hover { border-color: var(--paper-dim); }
+  .lean-chip.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
+  .lean-note { font-size: 12px; color: var(--paper-dim); line-height: 1.5; margin: 0 0 4px; }
+  .lean-note strong { color: var(--paper); }
+  .deeper-link { display: block; text-align: center; margin-top: 4px; }
   .action-draft {
     font-size: 14px;
     line-height: 1.6;
@@ -747,20 +770,29 @@
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
-  async function generateDrafts() {
+  // Drafts are generated per-lean and cached in ACTIVE.drafts[lean], so
+  // toggling For/Against swaps instantly once both sides have been seen
+  // once instead of re-drafting every tap. The position itself is now an
+  // explicit, authoritative line in the prompt — this used to only ever
+  // pass along free-text stance if one happened to already exist, which
+  // meant an early-manifesto citizen with no stance set yet could easily
+  // get handed a script arguing a side they don't actually hold.
+  async function generateDraftsFor(lean) {
     const rep = ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
     if (!rep) return;
-    ACTIVE.call = { status: 'loading' };
-    ACTIVE.email = { status: 'loading' };
-    renderActionCard();
+    const bill = ACTIVE.bill;
+    ACTIVE.drafts[lean].call = { status: 'loading' };
+    ACTIVE.drafts[lean].email = { status: 'loading' };
+    if (ACTIVE.lean === lean) renderActionCard();
 
     const profile = loadRawProfile();
     const matchedIssues = (profile && profile.issues || []).filter(i => (ACTIVE.hits || []).includes(i.name));
     const stanceText = matchedIssues.length
       ? matchedIssues.map(i => i.stance ? `${i.name}: "${i.stance}"` : i.name).join('; ')
       : '';
-    const noStanceNote = "The constituent hasn't written a specific position on this yet — keep the ask general but still concrete (e.g. 'please support/oppose this bill').";
-    const bill = ACTIVE.bill;
+    const positionLine = lean === 'for'
+      ? 'The constituent SUPPORTS this bill and wants it to pass.'
+      : 'The constituent OPPOSES this bill and wants it stopped or changed.';
     const billLine = `${(bill.type || '').toUpperCase()} ${bill.number} \u2014 "${bill.title}"`;
     const actionLine = bill.latestAction ? bill.latestAction.text : 'No recorded action yet.';
     const chamberWord = rep.area === 'US Senate' ? 'Senator' : 'Representative';
@@ -771,19 +803,21 @@
 ${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
 Bill: ${billLine}
 Latest action: ${actionLine}
-${stanceText ? `Constituent's stated position: ${stanceText}` : noStanceNote}
+${positionLine}
+${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : ''}
 
-Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.`;
+Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask matching their position above, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.`;
 
     const emailPrompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office about a bill in Congress, for a civic-engagement tool.
 
 ${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
 Bill: ${billLine}
 Latest action: ${actionLine}
-${stanceText ? `Constituent's stated position: ${stanceText}` : noStanceNote}
+${positionLine}
+${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : ''}
 Constituent's ZIP: ${zip}
 
-Write a concise constituent email, under 180 words total. Respond in exactly this plain-text format, no markdown:
+Write a concise constituent email, under 180 words total, matching their position above. Respond in exactly this plain-text format, no markdown:
 
 SUBJECT: <subject line>
 BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chamberWord} [last name]," and signed "A constituent in ${zip || '[ZIP]'}">`;
@@ -793,9 +827,9 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       digCheckCall(emailPrompt)
     ]);
 
-    if (!ACTIVE || ACTIVE.bill !== bill) return; // closed or switched while in flight
+    if (!ACTIVE || ACTIVE.bill !== bill) return; // closed or switched bills while in flight
 
-    ACTIVE.call = callResult.status === 'fulfilled'
+    ACTIVE.drafts[lean].call = callResult.status === 'fulfilled'
       ? { status: 'done', text: callResult.value }
       : { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
 
@@ -803,17 +837,53 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       const text = emailResult.value;
       const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
       const bodyMatch = text.match(/BODY:\s*([\s\S]+)/i);
-      ACTIVE.email = {
+      ACTIVE.drafts[lean].email = {
         status: 'done',
         subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${billLine}`,
         body: bodyMatch ? bodyMatch[1].trim() : text
       };
     } else {
-      ACTIVE.email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
+      ACTIVE.drafts[lean].email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
     }
 
-    renderActionCard();
+    if (ACTIVE.lean === lean) renderActionCard();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+  }
+
+  // Persists the citizen's declared position back onto every manifesto
+  // issue this bill matched \u2014 "update the manifesto" is the whole point
+  // of surfacing the toggle here: this is often the first time an
+  // early-manifesto citizen has stated a real direction on a priority
+  // they only named in passing while swiping.
+  function updateManifestoLean(lean) {
+    if (!ACTIVE) return;
+    const profile = loadRawProfile();
+    if (!profile || !Array.isArray(profile.issues)) return;
+    let changed = false;
+    profile.issues.forEach(i => {
+      if ((ACTIVE.hits || []).includes(i.name)) { i.lean = lean; changed = true; }
+    });
+    if (changed) {
+      try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+    }
+  }
+
+  function initialLeanFor(hits) {
+    const profile = loadRawProfile();
+    const issues = (profile && profile.issues) || [];
+    const known = issues.find(i => (hits || []).includes(i.name) && (i.lean === 'for' || i.lean === 'against'));
+    return known ? known.lean : 'for';
+  }
+
+  function setLean(lean) {
+    if (!ACTIVE || ACTIVE.lean === lean) return;
+    ACTIVE.lean = lean;
+    updateManifestoLean(lean);
+    renderActionCard();
+    const slot = ACTIVE.drafts[lean];
+    if (ACTIVE.reps && ACTIVE.reps.length && slot.call.status !== 'done' && slot.call.status !== 'loading') {
+      generateDraftsFor(lean);
+    }
   }
 
   function renderActionCard() {
@@ -821,6 +891,20 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     if (!ACTIVE) return;
     const bill = ACTIVE.bill;
     const label = (bill.type || '').toUpperCase() + ' ' + bill.number;
+
+    // Lean toggle is shown whenever there's a real ZIP/rep flow to draft
+    // against \u2014 it's meaningless on the no-ZIP empty state, but otherwise
+    // stays visible through loading/error too, since switching sides is
+    // exactly how a citizen recovers from an error or a stale draft.
+    const leanSection = ACTIVE.noZip ? '' : `
+      <div class="action-section">
+        <div class="action-section-title">Your position on this bill</div>
+        <div class="lean-toggle">
+          <button type="button" class="lean-chip ${ACTIVE.lean === 'for' ? 'is-on' : ''}" data-lean="for">&#128077; For</button>
+          <button type="button" class="lean-chip ${ACTIVE.lean === 'against' ? 'is-on' : ''}" data-lean="against">&#128078; Against</button>
+        </div>
+        <p class="lean-note">Scripts below are drafted assuming you're <strong>${ACTIVE.lean === 'for' ? 'FOR' : 'AGAINST'}</strong> this bill \u2014 tap the other side any time to swap instantly, and it updates your manifesto too.</p>
+      </div>`;
 
     let repsSection;
     if (ACTIVE.noZip) {
@@ -837,27 +921,28 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       ).join('')}</div>`;
 
       const rep = ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
-      const callBody = ACTIVE.call.status === 'loading'
+      const draft = ACTIVE.drafts[ACTIVE.lean];
+      const callBody = draft.call.status === 'loading'
         ? `<div class="action-draft is-loading">Drafting a call script&hellip;</div>`
-        : ACTIVE.call.status === 'error'
-          ? `<div class="action-draft">Couldn't draft this: ${esc(ACTIVE.call.error)}</div>`
-          : `<div class="action-draft">${esc(ACTIVE.call.text || '')}</div>`;
-      const callActions = ACTIVE.call.status === 'done'
+        : draft.call.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(draft.call.error)}</div>`
+          : `<div class="action-draft">${esc(draft.call.text || '')}</div>`;
+      const callActions = draft.call.status === 'done'
         ? `<div class="action-row">
             ${rep && rep.phone ? `<a class="btn btn-primary" href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}">Call ${esc(rep.phone)}</a>` : ''}
             <button type="button" class="btn" data-copy-call>Copy script</button>
           </div>`
         : '';
 
-      const emailBody = ACTIVE.email.status === 'loading'
+      const emailBody = draft.email.status === 'loading'
         ? `<div class="action-draft is-loading">Drafting an email&hellip;</div>`
-        : ACTIVE.email.status === 'error'
-          ? `<div class="action-draft">Couldn't draft this: ${esc(ACTIVE.email.error)}</div>`
-          : `<div class="action-draft"><strong>${esc(ACTIVE.email.subject || '')}</strong>\n\n${esc(ACTIVE.email.body || '')}</div>`;
-      const mailto = ACTIVE.email.status === 'done'
-        ? `mailto:?subject=${encodeURIComponent(ACTIVE.email.subject || '')}&body=${encodeURIComponent(ACTIVE.email.body || '')}`
+        : draft.email.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(draft.email.error)}</div>`
+          : `<div class="action-draft"><strong>${esc(draft.email.subject || '')}</strong>\n\n${esc(draft.email.body || '')}</div>`;
+      const mailto = draft.email.status === 'done'
+        ? `mailto:?subject=${encodeURIComponent(draft.email.subject || '')}&body=${encodeURIComponent(draft.email.body || '')}`
         : null;
-      const emailActions = ACTIVE.email.status === 'done'
+      const emailActions = draft.email.status === 'done'
         ? `<div class="action-row">
             ${mailto ? `<a class="btn btn-primary" href="${mailto}">Open in email app</a>` : ''}
             <button type="button" class="btn" data-copy-email>Copy email</button>
@@ -890,14 +975,34 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       </div>
     `;
 
+    // Hands off to builder.html's Citizen-mode drilldown deck (the same
+    // "it's complicated" mechanic) seeded with this bill and the position
+    // just declared, instead of duplicating swipe-card UI here \u2014 a
+    // second, focused way to understand this citizen's actual view
+    // beyond a single yes/no on one bill.
+    const deeperHref = 'builder.html?drilldown=' + encodeURIComponent(bill.title) + '&stance=' + encodeURIComponent(ACTIVE.lean);
+    const deeperSection = ACTIVE.noZip ? '' : `
+      <div class="action-section">
+        <a class="btn deeper-link" href="${esc(deeperHref)}">Want to go deeper on this? Explore related facets &#8594;</a>
+      </div>`;
+
     el.innerHTML = `
       <button class="action-close" type="button" id="action-close">&#10005; CLOSE</button>
       <div class="action-bill-title">${esc(bill.title)}</div>
       <div class="action-bill-meta">${esc(label)} \u00b7 Congress ${esc(bill.congress)} \u00b7 ${esc(bill.latestAction ? bill.latestAction.text : '')}</div>
+      ${leanSection}
       ${repsSection}
       ${calSection}
+      ${deeperSection}
     `;
     document.getElementById('action-close').addEventListener('click', closeActionModal);
+  }
+
+  function freshDrafts() {
+    return {
+      for: { call: { status: 'idle' }, email: { status: 'idle' } },
+      against: { call: { status: 'idle' }, email: { status: 'idle' } }
+    };
   }
 
   function openActionModal(idx) {
@@ -906,7 +1011,8 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     ACTIVE = {
       bill: entry.bill, hits: entry.hits,
       reps: null, repsError: null, noZip: false, selectedRepId: null,
-      call: { status: 'idle' }, email: { status: 'idle' }
+      lean: initialLeanFor(entry.hits),
+      drafts: freshDrafts()
     };
     document.getElementById('action-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -936,7 +1042,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       active.reps = data.reps || [];
       if (active.reps.length) active.selectedRepId = pickDefaultRep(active.reps, active.bill).id;
       renderActionCard();
-      if (active.reps.length) generateDrafts();
+      if (active.reps.length) generateDraftsFor(active.lean);
     } catch (e) {
       if (ACTIVE !== active) return;
       active.repsError = e.message || 'request failed';
@@ -952,12 +1058,23 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 
     if (t.id === 'action-overlay') { closeActionModal(); return; }
 
-    const repChip = t.closest('[data-rep]');
-    if (repChip && ACTIVE) { ACTIVE.selectedRepId = repChip.dataset.rep; generateDrafts(); return; }
+    const leanChip = t.closest('[data-lean]');
+    if (leanChip && ACTIVE) { setLean(leanChip.dataset.lean); return; }
 
-    if (t.closest('[data-copy-call]') && ACTIVE) { copy(ACTIVE.call.text || '', t.closest('[data-copy-call]')); return; }
+    const repChip = t.closest('[data-rep]');
+    if (repChip && ACTIVE) {
+      ACTIVE.selectedRepId = repChip.dataset.rep;
+      // A different rep invalidates both cached drafts — they were
+      // addressed to whoever was previously selected.
+      ACTIVE.drafts = freshDrafts();
+      generateDraftsFor(ACTIVE.lean);
+      return;
+    }
+
+    if (t.closest('[data-copy-call]') && ACTIVE) { copy(ACTIVE.drafts[ACTIVE.lean].call.text || '', t.closest('[data-copy-call]')); return; }
     if (t.closest('[data-copy-email]') && ACTIVE) {
-      copy((ACTIVE.email.subject || '') + '\n\n' + (ACTIVE.email.body || ''), t.closest('[data-copy-email]'));
+      const draft = ACTIVE.drafts[ACTIVE.lean];
+      copy((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), t.closest('[data-copy-email]'));
       return;
     }
     if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }

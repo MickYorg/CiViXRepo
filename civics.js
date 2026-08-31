@@ -86,7 +86,7 @@
     tag.textContent = [
       '.cx-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;',
       'padding:20px;background:rgba(8,11,20,0.6);backdrop-filter:blur(2px);animation:cx-fade-in .3s ease both;}',
-      '.cx-overlay.cx-out{animation:cx-fade-out .35s ease both;}',
+      '.cx-overlay.cx-out{animation:cx-fade-out 1s ease both;}',
       '@keyframes cx-fade-in{from{opacity:0}to{opacity:1}}',
       '@keyframes cx-fade-out{from{opacity:1}to{opacity:0}}',
       '.cx-card{--ci:#0A0F1C;--cr:#121A2C;--cp:#ECEAE2;--cpd:#8792A8;--ca:#E0A93F;--cai:#E0A93F;--caw:rgba(224,169,63,.14);',
@@ -148,13 +148,16 @@
   // Idempotent on purpose — a fact card's auto-dismiss timer and its
   // manual "Got it"/backdrop-click can both fire; the second call should
   // just no-op rather than double-animate or clear an already-cleared
-  // timer.
+  // timer. The fade-out is a full second (not a snap-cut) so it visibly
+  // dissolves and eases the citizen's eye back into whatever they were
+  // doing underneath, rather than the card just vanishing.
+  var DISMISS_ANIM_MS = 1000;
   function dismiss(overlay) {
     if (overlay.dataset.dismissed) return;
     overlay.dataset.dismissed = '1';
     if (overlay._autoTimer) window.clearTimeout(overlay._autoTimer);
     overlay.classList.add('cx-out');
-    window.setTimeout(function () { overlay.remove(); showing = false; }, 350);
+    window.setTimeout(function () { overlay.remove(); showing = false; }, DISMISS_ANIM_MS);
   }
 
   // Purely informational — no interaction required — so it auto-dissolves

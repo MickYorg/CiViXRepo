@@ -13,7 +13,15 @@ see "Deliberately not yet done" below for why.
 
 **Real, working — the core loop is wired end-to-end:**
 - `index.html` — animated splash/landing page. Mobile-tuned as of 27 Aug
-  (narrow-viewport overflow fixed, always-visible sticky CTA).
+  (narrow-viewport overflow fixed, always-visible sticky CTA). As of 31
+  Aug 2026, once the amendment sequence actually plays out (not on Skip,
+  not on a same-day return visit that jumps straight to the resolved
+  state) it auto-advances into `builder.html` ~4.5s after resolving,
+  scheduled through the same `at()`/`timers` mechanism the sequence
+  itself uses so Replay's `reset()` cancels a pending auto-advance for
+  free. Also pings `/api/headlines-batch` fire-and-forget on every load
+  purely to keep builder.html's headline-swipe deck pre-warmed (see
+  below) — never reads the response.
 - `builder.html` — the "build your profile" flow (ZIP, issues/weights,
   positions, trusted sources, action authority). Its Inbox (§ 01) now has
   DIG's full focus-mode treatment: open a filed item, it's auto-placed
@@ -21,10 +29,12 @@ see "Deliberately not yet done" below for why.
   sources with DIG's own stance-check prompt (sharing DIG's
   `dig-results-cache` localStorage key), expandable summaries, 3-star
   rating that sets the adopted issue's priority weight. Citizen mode's
-  welcome card (31 Aug 2026) now also offers a second, "for fun" path
-  alongside the 30-second archetype quiz: swipe through 5 real news
-  headlines (`/api/headlines`, a pluggable source-adapter registry, GNews
-  wired up today) instead of trait/category cards. Each headline is
+  welcome card leads with swiping through 5 real news headlines
+  (`/api/headlines`, a pluggable source-adapter registry, GNews wired up
+  today) instead of trait/category cards — the original 30-second
+  archetype quiz is still there, demoted to a quiet second option below
+  (headlines shipped 31 Aug 2026 as the secondary path and was promoted
+  to primary the same day once it proved out). Each headline is
   boiled down via `/api/dig-check` into a topic on CiViX's own fixed issue
   taxonomy (so it matches cleanly against `digest.js`'s existing
   SYNONYMS), a one-sentence talking point, and a search query for a real
@@ -51,7 +61,14 @@ see "Deliberately not yet done" below for why.
   meant to be a frequent tap) to react to individually; swiping right on
   any of them adopts its topic as a priority the same way a headline card
   does, so agreeing with more facets is a citizen's own way of signaling
-  how much a topic matters without a slider. As of 31 Aug 2026 the whole
+  how much a topic matters without a slider. This same drilldown mechanic
+  now also has a cold-start entry point (`startSeededDrilldown()`,
+  triggered by `?drilldown=<topic>&stance=<for|against>` on boot): calendar.html's
+  action modal links here once a citizen declares a For/Against position
+  on a bill, so "go deeper on this" doesn't need its own swipe-card UI
+  duplicated in calendar.html — it hands off to the exact same deck,
+  seeded with the bill and stance so the 3 facets build on the position
+  already stated instead of re-litigating it. As of 31 Aug 2026 the whole
   headline pipeline (fetch -> boildown -> photo) is also pre-warmed:
   `functions/api/headlines-batch.js` builds a ready 5-card batch server-
   side (reusing `/api/dig-check` and `/api/headline-image` via internal
@@ -86,11 +103,27 @@ see "Deliberately not yet done" below for why.
   profile's declared issues (weighted, hand-authored synonym map). Each
   matched bill has a **Take action** button opening a modal that looks up
   the user's reps by ZIP (`functions/api/reps.js`, via the 5calls API),
-  drafts a call script and email (`/api/dig-check` again, using the
-  user's stated stance when they have one), offers a click-to-call `tel:`
-  link and a `mailto:` draft, and an "add to calendar" `.ics` download
-  using the bill's own latest legislative-action date (explicitly labeled
-  as that, not a confirmed rally/event — no event-data source exists yet).
+  drafts a call script and email (`/api/dig-check` again), offers a
+  click-to-call `tel:` link and a `mailto:` draft, and an "add to
+  calendar" `.ics` download using the bill's own latest legislative-action
+  date (explicitly labeled as that, not a confirmed rally/event — no
+  event-data source exists yet). As of 31 Aug 2026 the modal leads with an
+  explicit **For/Against toggle** instead of silently inferring a
+  direction from free-text stance (which, especially early on, a citizen
+  often hasn't set — the old behavior could hand over a script arguing a
+  side they don't hold, at exactly the moment they're least equipped to
+  notice). Both directions' call+email drafts are generated per-lean and
+  cached in `ACTIVE.drafts.for`/`ACTIVE.drafts.against`, so switching
+  sides once both have been seen is instant, not a re-draft; the first
+  generation still costs one AI call pair, same as before. Toggling also
+  writes `lean: 'for'|'against'` onto every matching `P.issues` entry
+  (`updateManifestoLean()`) — separate from the free-text `stance` field,
+  which stays whatever nuance the citizen wrote there — so this is often
+  the first time an early-manifesto citizen has stated a real direction
+  on a priority they only named in passing while swiping. The modal's
+  initial lean prefers an issue's already-known `lean` if one exists,
+  else defaults to "for". A "Want to go deeper on this?" link hands off
+  to builder.html's seeded-drilldown deck (see above), stance-aware.
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title
@@ -125,7 +158,11 @@ see "Deliberately not yet done" below for why.
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
   (manual "Got it"/backdrop-click still skip it immediately) — it's pure
   information, no interaction needed, so it shouldn't require a click to
-  go away. The interactive quiz card deliberately does NOT auto-dismiss.
+  go away. The fade-out itself is a full 1s (`DISMISS_ANIM_MS`, same
+  path for manual and auto dismiss) rather than the original 0.35s snap —
+  it needs to visibly dissolve, not just vanish, so the citizen's eye
+  eases back into whatever was underneath instead of the card just
+  disappearing. The interactive quiz card deliberately does NOT auto-dismiss.
   New `CivicsEngine.showDuringWait()` entry point shows a fact (never the
   quiz) specifically to fill a real network/AI wait elsewhere in the app —
   still respects the existing cooldown (so it won't stack a second popup

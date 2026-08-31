@@ -2972,6 +2972,39 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     }
   }
 
+  // Cold-start version of the same drilldown mechanic, entered from
+  // outside the swipe deck entirely — calendar.html's action modal links
+  // here (?drilldown=<bill title>&stance=<for|against>) once a citizen
+  // has declared a position on a bill, offering to go deeper on that
+  // specific topic right away instead of only surfacing it if they
+  // happen to swipe into it later. Stance-aware: the seed context tells
+  // Claude which side the citizen already told CiViX they're on, so the
+  // 3 facets build on that instead of re-litigating it.
+  async function startSeededDrilldown(title, stance) {
+    firstPass = false;
+    deck = [{ type: 'drilldown-loading', parentTitle: title }];
+    deckIndex = 0;
+    renderCitizenCard();
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+
+    const context = stance === 'for' || stance === 'against'
+      ? `The citizen has already said they are ${stance === 'for' ? 'FOR' : 'AGAINST'} this.`
+      : '';
+    const subs = await buildDrilldownCards({ title, context });
+
+    if (!subs.length) {
+      // The dedicated 'headline-error' card's "Try again" button re-runs
+      // the headline pipeline, not this seeded one — wrong retry for this
+      // failure, so just fall back to the normal citizen flow instead of
+      // showing a misleading retry.
+      startCitizenMode();
+      return;
+    }
+    deck = [...subs, ...(P.place.zip ? [] : [{ type: 'zip' }]), { type: 'done' }];
+    deckIndex = 0;
+    renderCitizenCard();
+  }
+
   document.getElementById('citizen-yes').addEventListener('click', () => commitSwipe('right'));
   document.getElementById('citizen-no').addEventListener('click', () => commitSwipe('left'));
   document.getElementById('citizen-complicated').addEventListener('click', () => commitComplicated());
@@ -3087,16 +3120,19 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
 
     if (card.type === 'welcome') {
       controls.style.display = 'none';
+      // Headlines leads now — real news to react to is a livelier front
+      // door than trait/category cards, which move to a quieter second
+      // option instead of being the only path in.
       const blurb = firstPass
-        ? 'A few quick questions — about 30 seconds — then we’ll tell you what we think you’re about. Private and secure the whole way — it all stays on this device, never shared or sold.'
-        : 'Swipe right for “yes, that’s me” — left to skip. A couple of minutes, private and secure the whole way — it all stays on this device, never shared or sold.';
+        ? 'Swipe through 5 real headlines and tell us what matters — about a minute. Private and secure the whole way — it all stays on this device, never shared or sold.'
+        : 'Swipe through today’s headlines to sharpen what’s already here — a couple of minutes, private and secure the whole way.';
       slot.innerHTML = `
         <div class="citizen-card citizen-card-static">
           <div class="citizen-emoji">👋</div>
           <div class="citizen-title">${firstPass ? 'Let’s build your CiViX manifesto' : 'Let’s refine your CiViX manifesto'}</div>
           <p class="citizen-blurb">${blurb}</p>
-          <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Let’s go &#8594;</button>
-          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines">Or swipe today's headlines instead &#8594;</button>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines">Swipe today's headlines &#8594;</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-advance">${firstPass ? 'Or take the 30-second quiz instead' : 'Or use trait &amp; issue cards instead'} &#8594;</button>
         </div>`;
       document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
       document.getElementById('citizen-headlines').addEventListener('click', () => startHeadlineMode());
@@ -3331,6 +3367,24 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       window.setTimeout(() => row.classList.add('is-fading'), 1200);
       window.setTimeout(() => row.classList.remove('is-focused', 'is-fading'), 3200);
     }, 60);
+  })();
+
+  // ?drilldown=<topic>&stance=<for|against> arrives from calendar.html's
+  // action-modal "go deeper" link, once a citizen has declared a For/
+  // Against position on a specific bill — jump straight into a stance-
+  // aware drilldown deck on that topic instead of the normal welcome
+  // flow. Takes priority over ?focus= if somehow both are present (the
+  // two links are never generated together in practice).
+  (function handleDrilldownParam() {
+    let topic = '', stance = '';
+    try {
+      const params = new URLSearchParams(window.location.search);
+      topic = params.get('drilldown') || '';
+      stance = params.get('stance') || '';
+    } catch (e) {}
+    if (!topic) return;
+    if (MODE !== 'citizen') setMode('citizen');
+    startSeededDrilldown(topic, stance);
   })();
 
   // Thumb positioning depends on the mode pills' real rendered width,
