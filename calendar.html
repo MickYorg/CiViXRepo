@@ -489,6 +489,7 @@
   .btn-primary { background: var(--amber); border-color: var(--amber); color: var(--btn-ink); font-weight: 500; }
   .btn-primary:hover { filter: brightness(1.06); border-color: var(--amber); }
   .ics-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
+  .action-email-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
 
   .stat-grid {
     display: grid;
@@ -1016,14 +1017,19 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
         : draft.email.status === 'error'
           ? `<div class="action-draft">Couldn't draft this: ${esc(draft.email.error)}</div>`
           : `<div class="action-draft"><strong>${esc(draft.email.subject || '')}</strong>\n\n${esc(draft.email.body || '')}</div>`;
-      const mailto = draft.email.status === 'done'
-        ? `mailto:?subject=${encodeURIComponent(draft.email.subject || '')}&body=${encodeURIComponent(draft.email.body || '')}`
-        : null;
+      // Congress doesn't publish direct staff email addresses for
+      // constituent mail — 5calls' rep data (functions/api/reps.js) never
+      // had one to begin with, so the old "Open in email app" mailto:
+      // link had no recipient and was a dead end, worse on mobile browser
+      // webmail with no registered mail-app handler at all. Offices
+      // actually receive constituent email through their own official
+      // contact form instead — Copy, then paste into that.
       const emailActions = draft.email.status === 'done'
         ? `<div class="action-row">
-            ${mailto ? `<a class="btn btn-primary" href="${mailto}">Open in email app</a>` : ''}
-            <button type="button" class="btn" data-copy-email>Copy email</button>
-          </div>`
+            <button type="button" class="btn btn-primary" data-copy-email>Copy email</button>
+            ${rep && rep.url ? `<a class="btn" href="${esc(rep.url)}" target="_blank" rel="noopener">Open contact form &#8599;</a>` : ''}
+          </div>
+          <p class="action-email-note">Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form. Copy the draft above, then paste it in.</p>`
         : '';
 
       repsSection = `

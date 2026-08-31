@@ -84,7 +84,21 @@ export async function onRequestGet({ env }) {
     return json({ error: { message: 'congress.gov returned an unparseable response' } }, 502);
   }
 
-  const bills = (data.bills || []).map(slim);
+  // congress.gov's own sort=updateDate+desc (the request above) sorts by
+  // the bill's overall metadata-update timestamp, which gets bumped by
+  // things that aren't a real legislative action at all — a cosponsor
+  // added, a text version republished. Net effect: a bill can lead this
+  // list looking "recent" while the latestAction it actually shows is
+  // months stale. Re-sorting here by latestAction's own date fixes what
+  // "recent" means for a page whose whole point is legislative activity.
+  const bills = (data.bills || []).map(slim).sort((a, b) => {
+    const ad = a.latestAction && a.latestAction.date;
+    const bd = b.latestAction && b.latestAction.date;
+    if (!ad && !bd) return 0;
+    if (!ad) return 1;
+    if (!bd) return -1;
+    return bd.localeCompare(ad);
+  });
   const payload = { bills, fetchedAt: Date.now() };
 
   if (kv) {

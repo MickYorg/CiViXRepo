@@ -1186,7 +1186,14 @@
     ['veteran', 'Veteran', '🎖️', 'You served in the military.'],
     ['retired', 'Retired', '🌤️', 'You’re retired.'],
     ['caregiver', 'Caregiver', '🤝', 'You care for a family member.'],
-    ['newcomer', 'New to the area', '📦', 'You moved here recently.']
+    ['newcomer', 'New to the area', '📦', 'You moved here recently.'],
+    // Posture traits — a different axis entirely from the circumstance
+    // traits above (what you ARE vs. how you think change happens).
+    // TRAIT_HINTS doesn't cover these on purpose: theory of change isn't
+    // correlated with any particular issue category, it's orthogonal —
+    // TRAIT_ACTION_HINTS below is where they actually do something.
+    ['direct-action', 'Direct action', '🪧', '“We’re never going to vote our way out of this” — you want to be in the streets, not just the ballot box.'],
+    ['incrementalist', 'Incrementalist', '🪜', '“Don’t let the perfect be the enemy of the good” — you’d rather bank a real win than hold out for the ideal one.']
   ];
   const TRAIT_HINTS = {
     renter: ['Tenant rights', 'Housing affordability'],
@@ -1199,6 +1206,14 @@
     retired: ['Healthcare access', 'Drug pricing'],
     caregiver: ['Mental health', 'Healthcare access'],
     newcomer: ['Transit', 'Rural access']
+  };
+  // Which ACTIONS a posture trait hints at, mirroring TRAIT_HINTS' role
+  // for issue categories — swiping right on "Direct action" moves
+  // attend/testify/share to the front of the action deck; "Incrementalist"
+  // moves call/email/comment instead. See actionBoost()/buildActionCards().
+  const TRAIT_ACTION_HINTS = {
+    'direct-action': ['attend', 'testify', 'share'],
+    incrementalist: ['call', 'email', 'comment']
   };
   const CATEGORY_META = {
     'Economy & work': ['💼', 'Jobs, wages, prices, and small business.'],
@@ -2585,8 +2600,20 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   function buildTraitCards(pool) {
     return pool.map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb }));
   }
+  // Same idea as categoryBoost() below, for TRAIT_ACTION_HINTS instead of
+  // TRAIT_HINTS — a swiped-in posture trait moves the action types it
+  // implies to the front of the action deck.
+  function actionBoost(actionId) {
+    let score = 0;
+    P.traits.forEach(t => {
+      if ((TRAIT_ACTION_HINTS[t] || []).indexOf(actionId) !== -1) score++;
+    });
+    return score;
+  }
   function buildActionCards(pool) {
-    return pool.map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb }));
+    return pool
+      .map(([id, title, blurb]) => ({ type: 'action', id, title, emoji: ACTION_EMOJI[id] || '📣', blurb }))
+      .sort((a, b) => actionBoost(b.id) - actionBoost(a.id));
   }
 
   function startCitizenMode() {

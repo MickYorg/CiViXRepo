@@ -68,7 +68,17 @@ see "Deliberately not yet done" below for why.
   on a bill, so "go deeper on this" doesn't need its own swipe-card UI
   duplicated in calendar.html — it hands off to the exact same deck,
   seeded with the bill and stance so the 3 facets build on the position
-  already stated instead of re-litigating it. As of 31 Aug 2026 the whole
+  already stated instead of re-litigating it. The trait deck (`TRAITS`)
+  also gained two "posture" cards (31 Aug 2026) — "Direct action" ("We're
+  never going to vote our way out of this") and "Incrementalist" ("Don't
+  let the perfect be the enemy of the good") — a different axis from the
+  existing circumstance traits (renter/parent/veteran/etc.): not what a
+  citizen IS, but how they think change happens. `TRAIT_HINTS` deliberately
+  skips them (theory of change isn't correlated with any issue category);
+  instead `TRAIT_ACTION_HINTS` + `actionBoost()` (mirroring
+  `categoryBoost()`) move the ACTION cards they imply to the front of the
+  action deck — Direct action promotes attend/testify/share, Incrementalist
+  promotes call/email/comment. As of 31 Aug 2026 the whole
   headline pipeline (fetch -> boildown -> photo) is also pre-warmed:
   `functions/api/headlines-batch.js` builds a ready 5-card batch server-
   side (reusing `/api/dig-check` and `/api/headline-image` via internal
@@ -104,10 +114,23 @@ see "Deliberately not yet done" below for why.
   matched bill has a **Take action** button opening a modal that looks up
   the user's reps by ZIP (`functions/api/reps.js`, via the 5calls API),
   drafts a call script and email (`/api/dig-check` again), offers a
-  click-to-call `tel:` link and a `mailto:` draft, and an "add to
-  calendar" `.ics` download using the bill's own latest legislative-action
-  date (explicitly labeled as that, not a confirmed rally/event — no
-  event-data source exists yet). As of 31 Aug 2026 the modal leads with an
+  click-to-call `tel:` link, and an "add to calendar" `.ics` download
+  using the bill's own latest legislative-action date (explicitly labeled
+  as that, not a confirmed rally/event — no event-data source exists
+  yet). The email side dropped its `mailto:` link (31 Aug 2026) — 5calls'
+  rep data never included an email address to begin with (Congress
+  doesn't publish direct staff addresses for constituent mail), so the
+  link had no recipient and was a dead end, worse on mobile browser-based
+  webmail with no mail-app handler registered at all. Replaced with
+  "Copy email" as the primary action plus an "Open contact form ↗" link
+  to the rep's own official site (`rep.url`, from 5calls) — that's how
+  offices actually take constituent email. `functions/api/calendar.js`
+  also now re-sorts its results by `latestAction`'s own date (31 Aug
+  2026) rather than trusting congress.gov's `sort=updateDate+desc` as a
+  proxy for it — that field gets bumped by any metadata change (a
+  cosponsor added, a text version republished), not just real legislative
+  action, so a bill could lead the list looking recent while the action
+  actually shown was months stale. As of 31 Aug 2026 the modal leads with an
   explicit **For/Against toggle** instead of silently inferring a
   direction from free-text stance (which, especially early on, a citizen
   often hasn't set — the old behavior could hand over a script arguing a
