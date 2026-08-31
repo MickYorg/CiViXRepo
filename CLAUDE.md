@@ -196,7 +196,18 @@ see "Deliberately not yet done" below for why.
   "Send to CiViX", an installable PWA share-target backed by a real
   Cloudflare Worker (`civix-capture.mycivix.workers.dev`, not in this
   repo) for the docket/filings API that both pages and `builder.html`'s
-  Inbox read from.
+  Inbox read from. It also has a second, install-free path (the `.addr`
+  panel): a real per-docket email address a citizen can save as a
+  contact and then Share → Mail to from literally any app, no PWA
+  install required — this is the one actually worth promoting as "clear
+  and easy," since PWA share-target requires an install nothing in the
+  app currently prompts for. As of 31 Aug 2026 the page also leads with
+  a `.value-note` explaining *why* to do this (there was previously zero
+  explanatory copy anywhere on this page, just mechanism), and
+  builder.html's Citizen-mode "done" card gained its own matching
+  callout (`.citizen-send-note`) linking here — Citizen mode never
+  mentioned Send to CiViX at all before, since §01's own Inbox note lives
+  in the `.shell` that Citizen mode hides entirely.
 
 **Placeholders (styled to match, no real functionality):**
 - `connect.html`, `civil-dis.html`, `civix-track.html`, `analytics.html`
@@ -269,21 +280,25 @@ build, which does pick it up.
   Serif 4). Worth extracting into one shared stylesheet all pages `<link>` to.
 - `package.json` is still named `dig-selfhosted` — a leftover from before the
   folder held more than one tool.
-- **`civix-profile.token` vs. `civix.token` desync** — found 30 Aug 2026
-  while verifying the new digest's Send-to-CiViX integration against the
-  live site. `builder.html`/`digest.js` mint and read a docket token off
-  `civix-profile.token`; `send-to-civix.html` mints and reads its own,
-  completely separate `civix.token` (`builder.html` never references
-  `civix.token` at all). The two are independently generated, so they can
-  diverge — confirmed live in the user's own browser, where they already
-  had. Net effect: a citizen's real Send-to-CiViX filings won't surface in
-  the "top 3" digest (`digest.js`'s `fetchDocketItems(profile.token)`)
-  unless the two tokens happen to match. The classification/matching
-  mechanism itself is verified working end-to-end against a real filed
-  item once the right token is used — this is purely a "two independent
-  token namespaces" bug, not a broken feature. Fix is likely to unify on
-  one token namespace (have one page adopt the other's) rather than add a
-  sync step.
+- **`civix-profile.token` vs. `civix.token` desync — fixed going forward,
+  31 Aug 2026** (found 30 Aug 2026 while verifying the digest's Send-to-
+  CiViX integration against the live site). `builder.html`/`digest.js`
+  mint/read a docket token off `civix-profile.token`; `send-to-civix.html`
+  minted/read its own, completely separate `civix.token` — the two were
+  independently generated, so they could diverge (confirmed live in the
+  user's own browser). Net effect: a citizen's real Send-to-CiViX filings
+  wouldn't surface in the "top 3" digest unless the two tokens happened to
+  match. Fixed by having each page's token-read path check the other's
+  storage location first and adopt it if present (`ensureDrop()` in
+  builder.html; `readToken()` in send-to-civix.html), rather than always
+  minting independently — whichever page runs first mints the real token,
+  the other adopts it. **Forward-looking only**: a citizen who already has
+  two diverged tokens from before this fix isn't retroactively merged —
+  the two dockets may already hold different server-side items, and
+  there's no merge endpoint in the (out-of-repo) Worker to reconcile them.
+  If the user has already hit this on their own device, it needs manual
+  reconciliation (e.g. clearing one of the two stored tokens), not
+  something to do to their real data without asking first.
 
 ## Deliberately not yet done
 

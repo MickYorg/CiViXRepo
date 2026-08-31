@@ -303,6 +303,22 @@
   .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 6px; }
   .citizen-digest-eta { font-size: 11px; color: var(--paper-dim); margin: 0 0 8px; }
   .citizen-digest-card .btn { font-size: 10.5px; padding: 6px 10px; text-decoration: none; }
+  /* Send-to-CiViX callout on the done card — the value/"why" this is
+     worth doing, not just the mechanism (send-to-civix.html carries the
+     mechanism). Citizen mode never showed this at all before; it's
+     folded into §01's own Inbox note in Pro/Activist mode instead. */
+  .citizen-send-note {
+    width: 100%; text-align: left; margin: 4px 0 16px;
+    border: 1px dashed var(--amber); border-radius: 9px;
+    padding: 13px 14px; background: var(--ink-sunk);
+  }
+  .citizen-send-note-eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--amber-ink); margin: 0 0 6px;
+  }
+  .citizen-send-note p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--paper-dim); }
+  .citizen-send-note a { color: var(--amber-ink); }
   /* Headline-swipe cards lead with the generated image and the plain
      talking point — the opposite hierarchy of a trait/issue card, which
      is why this gets its own block instead of reusing .citizen-emoji. */
@@ -1482,14 +1498,38 @@
 
   // Called on load and after a rotate. Failure is survivable: the section
   // says so rather than showing a dash that looks like a bug.
+  // Fixes the civix-profile.token / civix.token desync (documented in
+  // CLAUDE.md, 30 Aug 2026): this page and send-to-civix.html used to
+  // mint completely independent docket tokens under separate localStorage
+  // keys, so a citizen's real Send to CiViX filings could silently never
+  // reach this page's Inbox or top-3 digest. Whichever page runs first
+  // now mints the real token; the other adopts it instead of minting a
+  // second, disconnected docket. Forward-looking only — a citizen who
+  // already has two diverged tokens from before this fix isn't
+  // retroactively merged (the two dockets may already hold different
+  // items server-side, and there's no merge endpoint to reconcile them).
   async function ensureDrop(force) {
     if (P.token && P.drop && !force) return;
     const el = document.getElementById('drop-addr');
     if (el) el.textContent = 'issuing…';
     try {
-      const d = await newDocket();
-      P.token = d.token;
-      P.drop = d.address;
+      let token = force ? '' : (localStorage.getItem('civix.token') || '');
+      let address = '';
+      if (token) {
+        try {
+          const r = await fetch(API + '/api/filings?token=' + encodeURIComponent(token));
+          if (r.ok) address = (await r.json()).address || '';
+        } catch (e) {}
+        if (!address) token = ''; // stale/invalid — fall through to minting fresh
+      }
+      if (!token) {
+        const d = await newDocket();
+        token = d.token;
+        address = d.address;
+      }
+      P.token = token;
+      P.drop = address;
+      try { localStorage.setItem('civix.token', token); } catch (e) {}
       save();
       renderAll();
       loadInbox();
@@ -3030,6 +3070,10 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
         <div class="citizen-digest" id="citizen-digest">
           <p class="citizen-digest-status">Checking federal, state, and your own docket for the fastest ways to act&hellip;</p>
+        </div>
+        <div class="citizen-send-note">
+          <p class="citizen-send-note-eyebrow">Keep CiViX sharp</p>
+          <p>Already told the world what you think — a post, a reply, a comment on a local issue? <a href="send-to-civix.html">Send it to CiViX &#8594;</a> We'll match it to your priorities and check it against real bills, the same way we just did with headlines. The more you share, the better CiViX can advocate for you.</p>
         </div>
         <div class="citizen-done-row">
           <a class="btn btn-primary citizen-cta" href="calendar.html">See everything &#8594;</a>

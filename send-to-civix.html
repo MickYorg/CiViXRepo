@@ -278,6 +278,19 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
   }
+  /* ---------- Value note: the "why", separate from the addr panel's
+     "how" — this page used to be pure mechanism with no explanation of
+     the payoff anywhere on it. ---------- */
+  .value-note {
+    margin-top: 18px; padding: 15px 16px;
+    border: 1px solid var(--rule); border-left: 3px solid var(--amber);
+  }
+  .value-note .eyebrow {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--amber); display: block; margin-bottom: 6px;
+  }
+  .value-note p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); }
+
   /* ---------- Send to CiViX address panel ---------- */
   .addr {
     margin-top: 22px; padding: 15px 16px;
@@ -343,6 +356,11 @@
   <div class="errbar" id="errBar">
     <p id="errText">Couldn't reach your docket.</p>
     <button type="button" id="retryBtn">Retry</button>
+  </div>
+
+  <div class="value-note">
+    <span class="eyebrow">Why send this</span>
+    <p>Already told the world what you think — a post, a reply, a comment on a local issue? Forward it here. CiViX reads it, matches it to your priorities, and checks it against real bills and decisions already in motion. The more you share, the sharper CiViX gets at speaking for you — never tied to your name.</p>
   </div>
 
   <div class="addr" id="addrPanel" hidden>
@@ -458,6 +476,16 @@
   /* ---------------------------------------------------------------
      Token — the docket's only credential. Fragment first so it can
      be moved between devices by copying one link.
+
+     Fixes the civix-profile.token / civix.token desync (documented in
+     CLAUDE.md, 30 Aug 2026): this page used to mint its own token
+     completely independent of builder.html's, so items filed here could
+     silently never reach a citizen's Inbox/top-3 digest over there. If
+     builder.html already minted a real docket (civix-profile.token),
+     adopt it instead of minting a second, disconnected one. Forward-
+     looking only — see ensureDrop() in builder.html for the mirror of
+     this fix and why an already-diverged citizen isn't retroactively
+     merged.
   ----------------------------------------------------------------*/
   function readToken() {
     var frag = (window.location.hash || '').replace(/^#/, '').trim();
@@ -465,7 +493,18 @@
       try { localStorage.setItem(TOKEN_KEY, frag); } catch (e) {}
       return frag;
     }
-    try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+    try {
+      var own = localStorage.getItem(TOKEN_KEY);
+      if (own) return own;
+    } catch (e) {}
+    try {
+      var profile = JSON.parse(localStorage.getItem('civix-profile') || 'null');
+      if (profile && profile.token) {
+        localStorage.setItem(TOKEN_KEY, profile.token);
+        return profile.token;
+      }
+    } catch (e) {}
+    return null;
   }
 
   function ensureToken() {
