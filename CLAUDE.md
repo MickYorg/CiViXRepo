@@ -113,7 +113,16 @@ see "Deliberately not yet done" below for why.
   and `/api/headlines-batch` share one implementation instead of two
   copies drifting apart — `issue-taxonomy.js` is a manually-kept-in-sync
   copy of builder.html's `CATALOG` (client JS and server Functions can't
-  share a module today), flagged in its own file comment. The "done" card's top-3
+  share a module today), flagged in its own file comment. A brand-new
+  citizen (no `P.issues` yet, so no search query) used to always pull
+  GNews's `category=nation` top-headlines — the same narrow slice every
+  time, refreshed hourly by the pre-warm batch but never actually
+  varied. `gnews.js`'s `fetchGNews()` now rotates through six
+  civically-relevant categories (nation, world, business, science,
+  health, environment) keyed off the current UTC hour (31 Aug 2026,
+  citizen asked for "new/refreshed headlines for the initial manifesto
+  build") — same one-request-per-fetch budget, real variety over time
+  instead of a frozen feed. The "done" card's top-3
   digest also got a "pop" pass (31 Aug 2026): each entry now shows a rank
   badge (#1 visibly stronger — amber border/background, not just a bigger
   number), a template-built "why this matches you" line naming the actual
@@ -313,7 +322,14 @@ see "Deliberately not yet done" below for why.
   the caller already knows a wait is genuinely happening. Wired into:
   builder.html's headline-swipe loading, its "it's complicated" drilldown
   loading, its top-3 digest loading, calendar.html's action-modal rep
-  lookup/drafting, and municipal's live fetch.
+  lookup/drafting, and municipal's live fetch. `FACTS` gained six new
+  entries (31 Aug 2026, citizen asked for "info cards on electoral
+  college and convention of states and a few of the more obscure
+  aspects" of the system): Electoral College, Article V convention
+  (worded around the actual constitutional mechanism — "Convention of
+  States" is one modern campaign's name for triggering it, noted as such
+  rather than treated as the official term, to keep the card neutral),
+  faithless elector, gerrymander, and cloture.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.
@@ -349,6 +365,48 @@ see "Deliberately not yet done" below for why.
   a `.citizen-digest-nudge` line ("Pick one above and go — most take
   under 5 minutes") added once real results load, actively pushing
   toward acting on one of the top 3 rather than just displaying them.
+
+  **Watchdog mockup: watchlist, one-tap send, "beyond calls & email," 31
+  Aug 2026** — the citizen asked for CiViX to prove out its "personal
+  advocate" pitch: "you say the word, I fire off this email and it
+  lands... I watch the topic and remind and alert... they will not slip
+  something through in the middle of the night without you knowing."
+  Explicitly asked to mock up the flow now and build it out fully later.
+  Shipped honestly rather than as a pure mock where it could be: a real
+  persisted **watchlist** (`P.watching`, `toggleWatch()`/`findWatch()`)
+  reachable via a "🐕 Watch this bill/topic" toggle in both the bill-
+  specific and general-advocacy action modals, surfaced in a new
+  "Watching" panel above the collapsed detail sections. There's no
+  accounts system, notification backend, or scheduled job in this
+  architecture, so real push alerts aren't buildable today — but
+  `checkWatchlistUpdates()` does a **real** comparison (not a mock)
+  against `/api/calendar`'s own recent-activity fetch, which the page
+  already runs on every load: if a watched bill's `latestAction` date
+  has moved since it was added to the watchlist, a "🔔 Updated since you
+  started watching" badge shows in the panel. Every piece of copy says
+  "flags changes when you visit," never "alerted" or "sent" — the gap
+  between what's real (persisted list + return-visit diffing) and what's
+  still aspirational (real-time push) is deliberate and stated plainly,
+  not glossed over. Similarly, **"Send it"** replaces the old two-step
+  "Copy email" + "Open contact form" pair with one button
+  (`fireOff()`) that does both — copies the draft and opens the rep's
+  contact form in one tap — but the button copy still says "Copied —
+  paste it in," not "Sent": 5calls never returns a real recipient email
+  address to send to, and auto-submitting a third-party government
+  contact form on a citizen's behalf isn't something to do invisibly.
+  Full one-tap *delivery* would need either a real recipient address
+  (offices don't publish one) or scripted form-submission (fragile,
+  and not something to build without the citizen watching it happen) —
+  flagged here as unsolved, not silently declared done. A new **"Beyond
+  calls & email"** section in both modals hands off to real external
+  tools instead of fabricating CiViX's own data for action types it
+  explicitly deferred before (see "Petition and rally/event actions" in
+  "The core loop" below): a Change.org search link and a Mobilize.us
+  search link, both prefilled with the bill title or topic, plus an
+  "Organize your own meeting" toggle that expands a short, genuinely
+  useful static checklist (space, notice period, RSVP, inviting the
+  rep's office, following up in writing) rather than pretending to have
+  event data CiViX doesn't have.
 
   **Fixed a real dead end, also 31 Aug 2026**: this page's own "Adopt"
   button used to just PATCH the filing's server-side `state` straight to
@@ -490,11 +548,27 @@ they'd pay off, are:
   its `area` field — `StateUpper`/`StateLower` — reps.js currently
   filters to federal only) before this is a small extension rather than
   new infrastructure.
-- **Petition and rally/event actions** — the two action types explicitly
-  deferred when call/email/calendar-add were built (27 Aug 2026); each
-  needs its own data source picked (no petition partner, no local-events
-  feed exists yet) before it's a "wire it up" job rather than new
-  infrastructure.
+- **Petition and rally/event actions — partially real as of 31 Aug
+  2026.** The action modals' new "Beyond calls & email" section (see
+  calendar.html's entry above) hands off to Change.org/Mobilize.us
+  search links today rather than CiViX's own data — real external
+  tools, not fake results, but still not a curated petition partner or
+  a local-events feed of CiViX's own. That remains the real gap here.
+- **Real-time watch alerts** — calendar.html's new watchlist (see
+  entry above) does honest return-visit change detection against the
+  federal calendar's own fetch, but there's no accounts system,
+  notification backend, or scheduled job to actually push an alert to a
+  citizen who isn't on the page. Building that is a real infrastructure
+  project (accounts, a job runner, an email/push channel), not a small
+  extension — the "mock it up now" scope stopped short of it on purpose.
+- **One-tap "Send it" still ends in a copy+paste, not a real send** —
+  calendar.html's `fireOff()` (see entry above) removed a manual step but
+  not the fundamental blocker: 5calls has no real recipient email address
+  to send to, and CiViX doesn't auto-submit third-party government
+  contact forms on a citizen's behalf. Solving this for real means either
+  a data source with real staff emails (doesn't appear to exist publicly)
+  or scripted form-filling, which needs its own trust/reliability
+  tradeoffs worked out before it's worth building.
 - **ZIP-only rep lookup is best-effort** — 5calls resolves a ZIP to a
   district, but ZIPs don't map 1:1 to congressional districts, so it can
   be wrong for a split ZIP. Precise lookup would mean asking for a full

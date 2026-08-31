@@ -523,6 +523,37 @@
   .ics-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
   .action-email-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
 
+  /* Watchlist — a real persisted list plus real "did this change since
+     you started watching" detection against calendar.js's own recent-
+     activity fetch, but honestly no live/push alerting yet (see
+     CLAUDE.md's "watchdog" note) — copy throughout says "flags changes
+     when you're here," never "alerted"/"sent." */
+  .watch-toggle {
+    appearance: none; background: none; border: 1px solid var(--line); color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    padding: 8px 13px; border-radius: 7px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .watch-toggle:hover { border-color: var(--paper-dim); }
+  .watch-toggle.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
+  .watch-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
+  .noise-hint { font-size: 12px; color: var(--paper-dim); line-height: 1.55; margin: 0 0 10px; }
+  .noise-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .organize-tips { margin-top: 10px; }
+  .organize-tips ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.6; }
+  .watching-zone { margin-bottom: 8px; }
+  .watching-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
+    background: var(--ink-raised); display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+  }
+  .watching-title { font-size: 13.5px; }
+  .watching-badge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--amber-ink); background: var(--amber-wash);
+    border: 1px solid var(--amber); border-radius: 20px; padding: 3px 9px; display: inline-block; margin-top: 4px;
+  }
+
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -593,6 +624,8 @@
   <div class="focus-zone" id="focus-zone">
     <p class="fed-status mono">Finding your top 3 actions&hellip;</p>
   </div>
+
+  <div class="watching-zone" id="watching-zone"></div>
 
   <details class="everything-details" id="everything-details">
     <summary>See everything — municipal, state &amp; federal, unfiltered &#8594;</summary>
@@ -841,6 +874,97 @@
     try { document.execCommand('copy'); done(); } catch (e) {}
     document.body.removeChild(ta);
   }
+  // Copy + open in one tap — the citizen said the hard part should be
+  // getting clear on a position and finding the matching bill, not the
+  // mechanics of sending; once the draft exists, one button should do
+  // both steps instead of two. This is honestly still "copy, then paste
+  // into the page that opened," not a real automated send — CiViX has no
+  // recipient email address to send to (5calls never returns one) and
+  // auto-submitting a third-party government contact form on a citizen's
+  // behalf isn't something to do without them watching it happen. Button
+  // copy says exactly that: "Copied — paste it in," never "Sent."
+  function fireOff(text, url, btn) {
+    const was = btn.textContent;
+    const done = () => {
+      btn.textContent = 'Copied — paste it in →';
+      setTimeout(() => { btn.textContent = was; }, 2600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    } else fallbackCopy(text, done);
+    window.open(url, '_blank', 'noopener');
+  }
+
+  // ---- Watchlist: "watch this" + return-visit change detection --------
+  // The citizen asked for CiViX to act like a watchdog — "I watch the
+  // topic and remind and alert... they will not slip something through
+  // in the middle of the night without you knowing." A real version of
+  // that needs push notifications and a server-side job checking bills
+  // on a schedule — no accounts, no notification backend, no cron today,
+  // so this ships the honest slice: a persisted watchlist plus a real
+  // check (not a mock) against calendar.js's own recent-activity fetch,
+  // which already runs every time this page loads. It flags "this
+  // changed since you started watching" when the citizen is actually
+  // here — it doesn't reach out to them. Full alerting is future work,
+  // tracked in CLAUDE.md, and every piece of copy here says "flags
+  // changes when you visit," never "alerted" or "sent."
+  let WATCH_UPDATES = {};
+  function watchKeyFor(bill) {
+    return 'federal:' + bill.congress + ':' + bill.type + bill.number;
+  }
+  function watchKeyForGeneral(topic) {
+    return 'general:' + topic;
+  }
+  function loadWatchlist() {
+    const profile = loadRawProfile();
+    return (profile && Array.isArray(profile.watching)) ? profile.watching : [];
+  }
+  function findWatch(key) {
+    return loadWatchlist().find(w => w.key === key);
+  }
+  // Returns true if the item is now watched (false if this call removed it).
+  function toggleWatch(item) {
+    const profile = loadRawProfile();
+    if (!profile) return false;
+    if (!Array.isArray(profile.watching)) profile.watching = [];
+    const idx = profile.watching.findIndex(w => w.key === item.key);
+    if (idx !== -1) { profile.watching.splice(idx, 1); delete WATCH_UPDATES[item.key]; }
+    else profile.watching.push(item);
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+    return idx === -1;
+  }
+  function checkWatchlistUpdates(bills) {
+    const list = loadWatchlist();
+    if (!list.length) return;
+    const byKey = {};
+    (bills || []).forEach(b => { byKey[watchKeyFor(b)] = b; });
+    list.forEach(w => {
+      if (w.kind !== 'federal') return;
+      const b = byKey[w.key];
+      if (!b) return;
+      const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
+      if (latest && w.lastSeenActionDate && latest !== w.lastSeenActionDate) WATCH_UPDATES[w.key] = true;
+    });
+  }
+  function renderWatchingZone() {
+    const zone = document.getElementById('watching-zone');
+    if (!zone) return;
+    const list = loadWatchlist();
+    if (!list.length) { zone.innerHTML = ''; return; }
+    zone.innerHTML = `<p class="focus-label">Watching (${list.length})</p>` +
+      list.map(w => `
+        <div class="watching-card">
+          <div>
+            <div class="watching-title">${esc(w.title)}</div>
+            ${WATCH_UPDATES[w.key] ? `<span class="watching-badge">Updated since you started watching</span>` : ''}
+          </div>
+          <div class="action-row">
+            ${w.url ? `<a class="btn" href="${esc(w.url)}" target="_blank" rel="noopener">View &#8599;</a>` : ''}
+            <button type="button" class="btn" data-unwatch="${esc(w.key)}">Stop watching</button>
+          </div>
+        </div>`).join('') +
+      `<p class="watch-note">CiViX checks these for updates when you visit this page — real-time alerts aren't built yet.</p>`;
+  }
 
   // ---- "Add to calendar" stub — CiViX has no rally/event data source
   // yet, so this adds the bill's own latest legislative-action date as a
@@ -1009,6 +1133,38 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const bill = ACTIVE.bill;
     const label = (bill.type || '').toUpperCase() + ' ' + bill.number;
 
+    // Watching and "beyond calls & email" only need the bill itself, not
+    // a resolved rep/ZIP — a citizen can watch a bill or go find a
+    // petition/rally before (or instead of) drafting anything.
+    const watching = !!findWatch(watchKeyFor(bill));
+    const watchSection = `
+      <div class="action-section">
+        <button type="button" class="watch-toggle ${watching ? 'is-on' : ''}" data-watch-bill>
+          ${watching ? '🐕 Watching — tap to stop' : '🐕 Watch this bill'}
+        </button>
+        <p class="watch-note">${watching ? "CiViX will flag it in your Watching list below if there's new activity next time you're on this page." : "No live alerts yet — watching adds it to a list below and flags it here on your next visit if it moves."}</p>
+      </div>`;
+    const noiseSection = `
+      <div class="action-section">
+        <div class="action-section-title">Beyond calls &amp; email</div>
+        <p class="noise-hint">CiViX doesn't have its own petition, rally, or meetup data yet — these hand off to real public tools instead of faking results.</p>
+        <div class="noise-links">
+          <a class="btn" href="https://www.change.org/search?q=${encodeURIComponent(bill.title || '')}" target="_blank" rel="noopener">Sign or start a petition &#8599;</a>
+          <a class="btn" href="https://www.mobilize.us/search/?q=${encodeURIComponent(bill.title || '')}" target="_blank" rel="noopener">Find a rally or event &#8599;</a>
+          <button type="button" class="btn" data-organize-tips>Organize your own meeting</button>
+        </div>
+        <div class="action-draft organize-tips" id="organize-tips" hidden>
+          <strong>Organizing something yourself?</strong>
+          <ul>
+            <li>Pick a concrete ask — one bill, one clear outcome.</li>
+            <li>Book a public, accessible space — a library meeting room or community center is usually free or low-cost.</li>
+            <li>Give people 2–3 weeks' notice and a way to RSVP so you know how many chairs to set up.</li>
+            <li>Invite your rep's office — a staffer showing up is itself a form of accountability.</li>
+            <li>Follow up in writing afterward, even with just a few attendees — a written record outlasts the room.</li>
+          </ul>
+        </div>
+      </div>`;
+
     // Lean toggle is shown whenever there's a real ZIP/rep flow to draft
     // against \u2014 it's meaningless on the no-ZIP empty state, but otherwise
     // stays visible through loading/error too, since switching sides is
@@ -1063,12 +1219,19 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       // webmail with no registered mail-app handler at all. Offices
       // actually receive constituent email through their own official
       // contact form instead — Copy, then paste into that.
+      // "Send it" is one tap doing both steps (copy, then open the
+      // contact form) instead of two — the citizen shouldn't have to
+      // think about the mechanics once the hard part (position, rep,
+      // draft) is done. Still honestly "copied, then paste it in," not a
+      // real automated send — see fireOff()'s comment for why.
       const emailActions = draft.email.status === 'done'
         ? `<div class="action-row">
-            <button type="button" class="btn btn-primary" data-copy-email>Copy email</button>
-            ${rep && rep.url ? `<a class="btn" href="${esc(rep.url)}" target="_blank" rel="noopener">Open contact form &#8599;</a>` : ''}
+            ${rep && rep.url
+              ? `<button type="button" class="btn btn-primary" data-send-it>Send it &#8594;</button>
+                 <button type="button" class="btn" data-copy-email>Copy only</button>`
+              : `<button type="button" class="btn btn-primary" data-copy-email>Copy email</button>`}
           </div>
-          <p class="action-email-note">Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form. Copy the draft above, then paste it in.</p>`
+          <p class="action-email-note">${rep && rep.url ? `“Send it” copies the draft and opens ${esc(rep.name)}’s contact form in a new tab — paste and hit send there.` : ''} Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form.</p>`
         : '';
 
       repsSection = `
@@ -1114,6 +1277,8 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       <div class="action-bill-meta">${esc(label)} \u00b7 Congress ${esc(bill.congress)} \u00b7 ${esc(bill.latestAction ? bill.latestAction.text : '')}</div>
       ${leanSection}
       ${repsSection}
+      ${watchSection}
+      ${noiseSection}
       ${calSection}
       ${deeperSection}
     `;
@@ -1300,6 +1465,36 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     const active = GENERAL_ACTIVE;
     if (!active) return;
 
+    const watchKey = watchKeyForGeneral(active.topic);
+    const watching = !!findWatch(watchKey);
+    const watchSection = `
+      <div class="action-section">
+        <button type="button" class="watch-toggle ${watching ? 'is-on' : ''}" data-watch-general>
+          ${watching ? '🐕 Watching — tap to stop' : '🐕 Watch this topic'}
+        </button>
+        <p class="watch-note">${watching ? "CiViX will flag it in your Watching list below if a bill later shows up matching this." : "No live alerts yet — watching adds it to a list below so you don't lose track of it."}</p>
+      </div>`;
+    const noiseSection = `
+      <div class="action-section">
+        <div class="action-section-title">Beyond calls &amp; email</div>
+        <p class="noise-hint">CiViX doesn't have its own petition, rally, or meetup data yet — these hand off to real public tools instead of faking results.</p>
+        <div class="noise-links">
+          <a class="btn" href="https://www.change.org/search?q=${encodeURIComponent(active.topic || '')}" target="_blank" rel="noopener">Sign or start a petition &#8599;</a>
+          <a class="btn" href="https://www.mobilize.us/search/?q=${encodeURIComponent(active.topic || '')}" target="_blank" rel="noopener">Find a rally or event &#8599;</a>
+          <button type="button" class="btn" data-organize-tips>Organize your own meeting</button>
+        </div>
+        <div class="action-draft organize-tips" id="organize-tips" hidden>
+          <strong>Organizing something yourself?</strong>
+          <ul>
+            <li>Pick a concrete ask — one clear outcome.</li>
+            <li>Book a public, accessible space — a library meeting room or community center is usually free or low-cost.</li>
+            <li>Give people 2–3 weeks' notice and a way to RSVP so you know how many chairs to set up.</li>
+            <li>Invite your rep's office — a staffer showing up is itself a form of accountability.</li>
+            <li>Follow up in writing afterward, even with just a few attendees — a written record outlasts the room.</li>
+          </ul>
+        </div>
+      </div>`;
+
     let repsSection;
     if (active.noZip) {
       repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your manifesto</a> to find your representatives and draft a call or email.</p>`;
@@ -1334,10 +1529,12 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
           : `<div class="action-draft"><strong>${esc(active.email.subject || '')}</strong>\n\n${esc(active.email.body || '')}</div>`;
       const emailActions = active.email.status === 'done'
         ? `<div class="action-row">
-            <button type="button" class="btn btn-primary" data-copy-general-email>Copy email</button>
-            ${rep && rep.url ? `<a class="btn" href="${esc(rep.url)}" target="_blank" rel="noopener">Open contact form &#8599;</a>` : ''}
+            ${rep && rep.url
+              ? `<button type="button" class="btn btn-primary" data-send-general>Send it &#8594;</button>
+                 <button type="button" class="btn" data-copy-general-email>Copy only</button>`
+              : `<button type="button" class="btn btn-primary" data-copy-general-email>Copy email</button>`}
           </div>
-          <p class="action-email-note">Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form. Copy the draft above, then paste it in.</p>`
+          <p class="action-email-note">${rep && rep.url ? `“Send it” copies the draft and opens ${esc(rep.name)}’s contact form in a new tab — paste and hit send there.` : ''} Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form.</p>`
         : '';
 
       repsSection = `
@@ -1360,6 +1557,8 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
       <div class="action-bill-title">${esc(active.topic)}</div>
       <div class="action-bill-meta">No specific bill matched yet — this raises your own stated concern directly.</div>
       ${repsSection}
+      ${watchSection}
+      ${noiseSection}
     `;
     document.getElementById('action-close').addEventListener('click', closeGeneralAdvocacyModal);
   }
@@ -1442,6 +1641,56 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
       return;
     }
     if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }
+
+    const sendIt = t.closest('[data-send-it]');
+    if (sendIt && ACTIVE) {
+      const rep = ACTIVE.reps && ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
+      const draft = ACTIVE.drafts[ACTIVE.lean];
+      if (rep && rep.url) fireOff((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), rep.url, sendIt);
+      return;
+    }
+    const sendGeneral = t.closest('[data-send-general]');
+    if (sendGeneral && GENERAL_ACTIVE) {
+      const rep = GENERAL_ACTIVE.reps && GENERAL_ACTIVE.reps.find(r => r.id === GENERAL_ACTIVE.selectedRepId);
+      if (rep && rep.url) fireOff((GENERAL_ACTIVE.email.subject || '') + '\n\n' + (GENERAL_ACTIVE.email.body || ''), rep.url, sendGeneral);
+      return;
+    }
+
+    const watchBill = t.closest('[data-watch-bill]');
+    if (watchBill && ACTIVE) {
+      const bill = ACTIVE.bill;
+      toggleWatch({
+        key: watchKeyFor(bill), kind: 'federal',
+        title: (bill.type || '').toUpperCase() + ' ' + bill.number + ': ' + bill.title,
+        url: bill.url || null,
+        lastSeenActionDate: (bill.latestAction && bill.latestAction.date) || bill.updateDate || null,
+        addedAt: Date.now()
+      });
+      renderActionCard();
+      renderWatchingZone();
+      return;
+    }
+    const watchGeneral = t.closest('[data-watch-general]');
+    if (watchGeneral && GENERAL_ACTIVE) {
+      toggleWatch({ key: watchKeyForGeneral(GENERAL_ACTIVE.topic), kind: 'general', title: GENERAL_ACTIVE.topic, addedAt: Date.now() });
+      renderGeneralActionCard();
+      renderWatchingZone();
+      return;
+    }
+    const unwatch = t.closest('[data-unwatch]');
+    if (unwatch) {
+      toggleWatch({ key: unwatch.dataset.unwatch });
+      renderWatchingZone();
+      if (ACTIVE) renderActionCard();
+      if (GENERAL_ACTIVE) renderGeneralActionCard();
+      return;
+    }
+
+    if (t.closest('[data-organize-tips]')) {
+      const tips = document.getElementById('organize-tips');
+      if (tips) tips.hidden = !tips.hidden;
+      return;
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -1892,6 +2141,11 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     }
 
     const bills = data.bills || [];
+    // Real change-detection, not a mock: compares each watched bill's
+    // stored latestAction date against what congress.gov actually
+    // returned just now, on this same fetch the page always makes.
+    checkWatchlistUpdates(bills);
+    renderWatchingZone();
     if (!bills.length) {
       FED_STATE = { kind: 'no-bills' };
       renderFedResults();
@@ -1931,6 +2185,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     });
   }
 
+  renderWatchingZone();
   boot();
   bootState();
   bootMunicipal();

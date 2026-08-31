@@ -1462,7 +1462,8 @@
     updated: null,
     archetype: '',     // id of the matched Citizen-mode quiz archetype, once confirmed
     backlog: [],       // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
-    jurisdictionLean: null  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in calendar.html
+    jurisdictionLean: null,  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in calendar.html
+    watching: []       // { key, kind, title, ... } — calendar.html's watchlist, see toggleWatch()/checkWatchlistUpdates() there
   };
 
   let P = load();
