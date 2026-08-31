@@ -5,7 +5,7 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 27 Aug 2026)
+## Current state (as of 31 Aug 2026)
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -20,7 +20,24 @@ see "Deliberately not yet done" below for why.
   under a general policy topic via `/api/dig-check`, checked against § 04's
   sources with DIG's own stance-check prompt (sharing DIG's
   `dig-results-cache` localStorage key), expandable summaries, 3-star
-  rating that sets the adopted issue's priority weight.
+  rating that sets the adopted issue's priority weight. Citizen mode's
+  welcome card (31 Aug 2026) now also offers a second, "for fun" path
+  alongside the 30-second archetype quiz: swipe through 5 real news
+  headlines (`/api/headlines`, a pluggable source-adapter registry, GNews
+  wired up today) instead of trait/category cards. Each headline is
+  boiled down via `/api/dig-check` into a topic on CiViX's own fixed issue
+  taxonomy (so it matches cleanly against `digest.js`'s existing
+  SYNONYMS), a one-sentence talking point, and a prompt for a generated
+  illustration (`/api/headline-image`, OpenAI `gpt-image-1` — CiViX's
+  first non-Anthropic AI vendor, cost-capped and cached in KV the same
+  way DIG's own daily spend cap works). A swiped-right headline adopts
+  its topic as a priority exactly like a swiped issue card, so it flows
+  straight into the same zip → done → top-3 digest → calendar.html
+  take-action pipeline the quiz path already ends at — no separate
+  "propose actions" logic needed. The query sent to `/api/headlines`
+  already biases toward a citizen's existing top 2 priorities when they
+  have any (a first step toward "the manifesto should influence the
+  headlines"); a brand-new citizen just gets the general national feed.
 - `calendar.html` — Federal section is real: `functions/api/calendar.js`
   pulls recent bills from congress.gov, matched client-side against the
   profile's declared issues (weighted, hand-authored synonym map). Each
@@ -31,6 +48,13 @@ see "Deliberately not yet done" below for why.
   link and a `mailto:` draft, and an "add to calendar" `.ics` download
   using the bill's own latest legislative-action date (explicitly labeled
   as that, not a confirmed rally/event — no event-data source exists yet).
+  Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
+  synopsis (`digest.js`'s `plainSummarize`, already shared with
+  builder.html's digest) instead of the official bill title — the title
+  collapses into a small `<details>` disclosure — and matched priorities
+  render as named links back into `builder.html?focus=<issue-id>` (§03,
+  scrolled to and briefly highlighted) instead of a bare "matches N"
+  count. Activist/Pro cards are unchanged.
   State section is also real: `functions/api/state-bills.js` resolves the
   profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
   matched bills from OpenStates, the same "one API covers all 50
@@ -71,6 +95,14 @@ deployment (not just "Retry deployment") is required after adding one:
 - `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
 - `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
 - `OPENSTATES_API_KEY` — powers `/api/state-bills` (free, openstates.org/api/register).
+- `GNEWS_API_KEY` — powers `/api/headlines` for builder.html's headline-
+  swipe path (free tier, 100 req/day, allows production use — gnews.io).
+- `OPENAI_API_KEY` — powers `/api/headline-image`, generating each swiped
+  headline's illustration via `gpt-image-1` (platform.openai.com/api-keys).
+  Optional tuning env vars, same shape as DIG's own budget/rate vars:
+  `IMAGE_DAILY_BUDGET_USD` (default 5), `IMAGE_DAILY_LIMIT_PER_IP`
+  (default 20), `IMAGE_COST_USD` (default 0.02, a flat per-image estimate
+  — tune once real OpenAI billing is visible).
 
 ## Netlify → Cloudflare migration — done
 

@@ -284,6 +284,25 @@
   .citizen-digest-tag { flex-shrink: 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-ink); }
   .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 8px; }
   .citizen-digest-card .btn { font-size: 10.5px; padding: 6px 10px; text-decoration: none; }
+  /* Headline-swipe cards lead with the generated image and the plain
+     talking point — the opposite hierarchy of a trait/issue card, which
+     is why this gets its own block instead of reusing .citizen-emoji. */
+  .citizen-headline-card { padding-top: 22px; }
+  .citizen-headline-img {
+    width: 100%; max-width: 260px; aspect-ratio: 1 / 1; object-fit: cover;
+    border-radius: 12px; margin-bottom: 16px; background: var(--ink);
+  }
+  .citizen-headline-img-fallback {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; color: var(--paper-dim);
+  }
+  .citizen-headline-source { width: 100%; text-align: left; margin-top: 4px; }
+  .citizen-headline-source summary {
+    cursor: pointer; font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.04em; color: var(--paper-dim);
+  }
+  .citizen-headline-source p { font-size: 13px; color: var(--paper-dim); margin: 6px 0 0; line-height: 1.4; }
+  .citizen-headline-source a { color: var(--amber-ink); }
   .citizen-controls {
     display: flex; justify-content: center; gap: 26px; margin-top: 22px;
   }
@@ -470,6 +489,10 @@
   }
   .prow:last-child { border-bottom: none; }
   .prow-name { font-size: 16px; font-weight: 600; }
+  /* Transient landing highlight for a ?focus= deep link from calendar.html's
+     citizen-mode match chips — fades on its own, not tied to interaction. */
+  .prow.is-focused { background: var(--amber-wash); border-radius: 8px; padding-left: 10px; padding-right: 10px; margin: 0 -10px; transition: background 1.8s ease; }
+  .prow.is-focused.is-fading { background: transparent; }
   .prow-stance { grid-column: 1 / -1; }
   .prow-matched { grid-column: 1 / -1; margin-top: 2px; }
   .prow-matched a {
@@ -1068,6 +1091,12 @@
     ['Tech & privacy', ['Data privacy', 'AI regulation', 'Platform accountability', 'Broadband access']],
     ['Movement', ['Transit', 'Roads and bridges', 'Immigration', 'Rural access']]
   ];
+  // Flattened once for the headline-swipe path below, which asks Claude to
+  // classify a real news headline as the closest match from this exact
+  // list — keeping every issue a citizen ends up with on the same fixed
+  // taxonomy digest.js's SYNONYMS map already keys off of, rather than
+  // letting free-form AI phrasing quietly fragment matching quality.
+  const ALL_ISSUE_NAMES = CATALOG.reduce((acc, [, issues]) => acc.concat(issues), []);
 
   const ACTIONS = [
     ['email', 'Write to reps', 'Draft messages to your delegation'],
@@ -1594,7 +1623,7 @@
     el.innerHTML = P.issues.map(i => {
       const n = haveData ? matchedCountFor(i) : 0;
       return `
-      <div class="prow">
+      <div class="prow" id="prow-${esc(i.id)}">
         <div class="prow-name">${esc(i.name)}</div>
         <div class="weight">
           <span class="weight-label">Weight</span>
@@ -2503,6 +2532,162 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     renderCitizenCard();
   }
 
+  // ---- Citizen mode: headline swipe (alternate to the archetype quiz) --
+  // "Today's headlines" instead of trait/category cards: pull a handful of
+  // real news headlines, boil each down (via /api/dig-check) to a topic on
+  // CiViX's own issue taxonomy, a one-line plain-language talking point,
+  // and a prompt for a generated illustration (via /api/headline-image),
+  // then run the exact same swipe-right-to-adopt mechanics the rest of
+  // Citizen mode already uses. A swiped-in topic becomes a priority the
+  // same way an 'issue' card does, so it flows into the same zip/done ->
+  // buildTopDigest() -> calendar.html take-action pipeline for free.
+  const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
+
+  function hashStr(s) {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
+  function loadJSON(key, fallback) {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; }
+  }
+  function saveJSON(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  // Cached per article URL — a headline's boildown doesn't change once
+  // written, so this costs one AI call per headline per browser, ever.
+  async function boildownHeadline(article) {
+    const cache = loadJSON(HEADLINE_BOILDOWN_KEY, {});
+    const key = hashStr(article.url || article.title);
+    if (cache[key]) return cache[key];
+    const prompt = `A citizen is swiping through today's news headlines to build a civic-engagement manifesto. Reduce this one headline to something a busy person can react to in five seconds.
+
+Headline: "${article.title}"
+${article.description ? `Description: "${article.description}"` : ''}
+
+Reply with ONLY a JSON object, no markdown fences, no other text:
+{
+  "topic": one of these exact strings, whichever is the closest fit — ${JSON.stringify(ALL_ISSUE_NAMES)},
+  "talkingPoint": one plain sentence (under 22 words) capturing what's actually at stake for an ordinary person — not a restatement of the headline,
+  "imagePrompt": a short visual description (under 25 words) for a simple, abstract editorial illustration of that talking point — no text/words/logos in the image, no real people's likenesses
+}`;
+    try {
+      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(raw);
+      if (!parsed.topic || !parsed.talkingPoint) throw new Error('incomplete boildown');
+      if (ALL_ISSUE_NAMES.indexOf(parsed.topic) === -1) parsed.topic = ALL_ISSUE_NAMES[0];
+      cache[key] = parsed;
+      saveJSON(HEADLINE_BOILDOWN_KEY, cache);
+      return parsed;
+    } catch (e) {
+      return null; // this headline just gets skipped — better than a broken card
+    }
+  }
+
+  // Best-effort: an illustration is nice-to-have, never a blocker. A
+  // failure (budget cap, rate limit, network) just leaves the card with a
+  // topic-emoji placeholder instead of a generated image.
+  async function fetchHeadlineImage(prompt) {
+    try {
+      const r = await fetch('/api/headline-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await r.json();
+      if (!r.ok || data.error || !data.image) return null;
+      return data.image;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function renderHeadlineLoading(status) {
+    controlsHidden();
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">📰</div>
+        <div class="citizen-title">Getting today's headlines ready</div>
+        <p class="citizen-blurb">${esc(status || 'Fetching real headlines and boiling each one down…')}</p>
+      </div>`;
+  }
+  function controlsHidden() {
+    const controls = document.getElementById('citizen-controls');
+    if (controls) controls.style.display = 'none';
+  }
+
+  // Top 2 priorities (if any exist yet) bias the search — the "eventually
+  // the manifesto should influence the headlines" step, without waiting on
+  // a full personalization pass. A brand-new citizen with no issues yet
+  // just gets the general national feed.
+  function headlineQuery() {
+    const top = P.issues.slice().sort((a, b) => b.weight - a.weight).slice(0, 2);
+    if (!top.length) return '';
+    return top.map(i => `"${i.name}"`).join(' OR ');
+  }
+
+  async function startHeadlineMode() {
+    firstPass = false; // done card should reflect real accumulated state, not the 30-second-quiz framing
+    deck = [{ type: 'headline-loading' }];
+    deckIndex = 0;
+    renderHeadlineLoading();
+
+    let articles = [];
+    try {
+      const q = headlineQuery();
+      const r = await fetch('/api/headlines?limit=5' + (q ? '&q=' + encodeURIComponent(q) : ''));
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+      articles = data.articles || [];
+    } catch (e) {
+      deck = [{ type: 'headline-error', message: e.message }];
+      renderCitizenCard();
+      return;
+    }
+
+    if (!articles.length) {
+      deck = [{ type: 'headline-error', message: 'No headlines available right now.' }];
+      renderCitizenCard();
+      return;
+    }
+
+    renderHeadlineLoading('Boiling ' + articles.length + ' headlines down to what actually matters…');
+    const boiled = await Promise.all(articles.map(async article => {
+      const b = await boildownHeadline(article);
+      return b ? { article, boildown: b } : null;
+    }));
+    const survivors = boiled.filter(Boolean);
+
+    if (!survivors.length) {
+      deck = [{ type: 'headline-error', message: "Couldn't make sense of today's headlines — try again in a bit." }];
+      renderCitizenCard();
+      return;
+    }
+
+    renderHeadlineLoading('Sketching a picture for each one…');
+    await Promise.all(survivors.map(async s => {
+      s.image = await fetchHeadlineImage(s.boildown.imagePrompt);
+    }));
+
+    const headlineCards = survivors.map(s => ({
+      type: 'headline',
+      article: s.article,
+      topic: s.boildown.topic,
+      talkingPoint: s.boildown.talkingPoint,
+      image: s.image
+    }));
+
+    deck = [
+      ...headlineCards,
+      ...(P.place.zip ? [] : [{ type: 'zip' }]),
+      { type: 'done' }
+    ];
+    deckIndex = 0;
+    renderCitizenCard();
+  }
+
   // ---- Archetype quiz scoring / application ---------------------------
   function scoreArchetype(a, tally) {
     return (tally.values[a.valueCluster] || 0) + (tally.engagement[a.engagementStyle] || 0);
@@ -2583,6 +2768,8 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       }
     } else if (card.type === 'action') {
       if (P.actions.indexOf(card.id) === -1) P.actions.push(card.id);
+    } else if (card.type === 'headline') {
+      addIssue(card.topic);
     }
     save();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
@@ -2740,8 +2927,48 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
           <div class="citizen-title">${firstPass ? 'Let’s build your CiViX manifesto' : 'Let’s refine your CiViX manifesto'}</div>
           <p class="citizen-blurb">${blurb}</p>
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Let’s go &#8594;</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines">Or swipe today's headlines instead &#8594;</button>
         </div>`;
       document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
+      document.getElementById('citizen-headlines').addEventListener('click', () => startHeadlineMode());
+      return;
+    }
+
+    if (card.type === 'headline-loading') {
+      controls.style.display = 'none';
+      return; // renderHeadlineLoading() already painted this card directly
+    }
+
+    if (card.type === 'headline-error') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">😕</div>
+          <div class="citizen-title">Couldn't load today's headlines</div>
+          <p class="citizen-blurb">${esc(card.message || 'Something went wrong.')}</p>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines-retry">Try again &#8594;</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines-back">Back to the quiz instead</button>
+        </div>`;
+      document.getElementById('citizen-headlines-retry').addEventListener('click', () => startHeadlineMode());
+      document.getElementById('citizen-headlines-back').addEventListener('click', () => startCitizenMode());
+      return;
+    }
+
+    if (card.type === 'headline') {
+      controls.style.display = 'flex';
+      const a = card.article;
+      slot.innerHTML = `
+        <div class="citizen-card citizen-headline-card" id="citizen-active-card">
+          ${card.image
+            ? `<img class="citizen-headline-img" src="${esc(card.image)}" alt="">`
+            : `<div class="citizen-headline-img citizen-headline-img-fallback">📰</div>`}
+          <div class="citizen-title">${esc(card.talkingPoint)}</div>
+          <details class="citizen-headline-source">
+            <summary>${esc(a.source || 'Source')} &mdash; original headline</summary>
+            <p>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}</p>
+          </details>
+        </div>`;
+      wireSwipeGestures(document.getElementById('citizen-active-card'));
       return;
     }
 
@@ -2892,6 +3119,26 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
   renderAll();
   applyMode();
+
+  // ?focus=<issue-id> arrives from calendar.html's citizen-mode match
+  // chips (the mirror image of builder.html's own outbound ?focus= into
+  // calendar.html) — jump straight to that priority in Pro mode instead
+  // of leaving the visitor to go find it themselves.
+  (function handleFocusParam() {
+    let focusId = '';
+    try { focusId = new URLSearchParams(window.location.search).get('focus') || ''; } catch (e) {}
+    if (!focusId) return;
+    if (MODE !== 'pro') setMode('pro');
+    window.setTimeout(() => {
+      const row = document.getElementById('prow-' + focusId);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('is-focused');
+      window.setTimeout(() => row.classList.add('is-fading'), 1200);
+      window.setTimeout(() => row.classList.remove('is-focused', 'is-fading'), 3200);
+    }, 60);
+  })();
+
   // Thumb positioning depends on the mode pills' real rendered width,
   // which can be off against fallback-font metrics on first call, or
   // stale after a resize/rotation — re-run in both cases. Deliberately

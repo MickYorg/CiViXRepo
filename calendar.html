@@ -246,6 +246,38 @@
   }
   .card-title a { color: inherit; text-decoration: none; }
   .card-title a:hover { text-decoration: underline; }
+
+  /* Citizen mode inverts the card's usual hierarchy: the plain-language
+     synopsis leads (large, high-contrast) and the official bill name —
+     useless to skim, necessary to have — collapses behind a small
+     <details> disclosure instead of sitting up top in bold. */
+  .citizen-synopsis {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--paper);
+    margin-bottom: 8px;
+  }
+  .citizen-title-details {
+    margin-bottom: 8px;
+  }
+  .citizen-title-details summary {
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--paper-dim);
+    list-style: none;
+  }
+  .citizen-title-details summary::-webkit-details-marker { display: none; }
+  .citizen-title-details summary::before { content: '▸ '; }
+  .citizen-title-details[open] summary::before { content: '▾ '; }
+  .citizen-title-details .card-title { font-size: 13px; margin-top: 4px; }
+  .match-tag.is-link {
+    color: inherit;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .match-tag.is-link:hover { border-color: var(--amber); }
   .build-cta {
     border: 1px dashed var(--amber);
     border-radius: 9px;
@@ -554,24 +586,51 @@
     return bill.congress + '-' + bill.type + bill.number;
   }
 
+  // hits are matched priority names (from digest.js's scoreAgainstIssues) —
+  // in citizen mode each becomes its own link back into the Manifesto's
+  // §03 priorities instead of collapsing to a bare count, so "matches your
+  // priorities" is something you can actually follow, not just trust.
+  function matchTagsHtml(hits, mode) {
+    if (!hits || !hits.length) return '';
+    if (mode !== 'citizen') {
+      return `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`;
+    }
+    return `<div class="match-tags">${hits.map(h =>
+      `<a class="match-tag is-link" href="builder.html?focus=${encodeURIComponent(slug(h))}">${esc(h)}</a>`
+    ).join('')}</div>`;
+  }
+
   function renderCard(bill, hits, idx, mode) {
+    const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
+    const bodyId = 'body-' + esc(slug(billSummaryId(bill)));
+
+    if (mode === 'citizen') {
+      const officialTitle = bill.url
+        ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
+        : esc(bill.title);
+      return `
+        <div class="card">
+          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">Federal</span></div>
+          <details class="citizen-title-details">
+            <summary>${esc(label)} &mdash; official bill name</summary>
+            <div class="card-title">${officialTitle}</div>
+          </details>
+          ${matchTagsHtml(hits, mode)}
+          <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
+        </div>`;
+    }
+
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
-    const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
     const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    const meta = mode === 'citizen'
-      ? esc(label)
-      : `${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}`;
-    const tags = !hits || !hits.length ? '' : mode === 'citizen'
-      ? `<div class="match-tags"><span class="match-tag">Matches ${hits.length} of your priorities</span></div>`
-      : `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`;
+    const meta = `${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}`;
     return `
       <div class="card">
         <div class="card-top"><span class="card-title">${title}</span><span class="tag">Federal</span></div>
         <div class="card-meta">${meta}</div>
-        <div class="card-body" id="body-${esc(slug(billSummaryId(bill)))}">${action}</div>
-        ${tags}
+        <div class="card-body" id="${bodyId}">${action}</div>
+        ${matchTagsHtml(hits, mode)}
         <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
       </div>`;
   }
@@ -917,22 +976,34 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   // which is simply wrong. State-legislator lookup + drafting is future
   // scope, not shipped alongside this data slice.
   function renderStateCard(bill, hits, mode) {
+    const bodyId = 'body-' + esc(slug(bill.identifier || ''));
+
+    if (mode === 'citizen') {
+      const officialTitle = bill.url
+        ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
+        : esc(bill.title);
+      return `
+        <div class="card">
+          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">State</span></div>
+          <details class="citizen-title-details">
+            <summary>${esc(bill.identifier)} &mdash; official bill name</summary>
+            <div class="card-title">${officialTitle}</div>
+          </details>
+          ${matchTagsHtml(hits, mode)}
+        </div>`;
+    }
+
     const title = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
     const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    // The identifier's already in card-top, so citizen mode just drops
-    // the meta line entirely rather than showing a redundant fragment.
-    const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
-    const tags = !hits || !hits.length ? '' : mode === 'citizen'
-      ? `<div class="match-tags"><span class="match-tag">Matches ${hits.length} of your priorities</span></div>`
-      : `<div class="match-tags">${hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`;
+    const metaHtml = `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
     return `
       <div class="card">
         <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">State</span></div>
         ${metaHtml}
-        <div class="card-body" id="body-${esc(slug(bill.identifier || ''))}">${action}</div>
-        ${tags}
+        <div class="card-body" id="${bodyId}">${action}</div>
+        ${matchTagsHtml(hits, mode)}
       </div>`;
   }
 
@@ -950,9 +1021,16 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       if (!document.getElementById(domId)) return;
       window.CivixDigest.plainSummarize(rawId, bill.title, bill.latestAction ? bill.latestAction.text : '')
         .then(plain => {
-          if (!plain) return;
           const el = document.getElementById(domId);
-          if (el) el.textContent = plain;
+          if (!el) return;
+          // Citizen mode's placeholder ("Getting the plain-English
+          // version...") is never the raw legislative text, so a failed
+          // rewrite still needs a fallback — Activist/Pro already show the
+          // raw text up front and simply leave it untouched on failure.
+          if (plain) el.textContent = plain;
+          else if (el.classList.contains('citizen-synopsis')) {
+            el.textContent = bill.latestAction ? bill.latestAction.text : 'No recorded action yet.';
+          }
         });
     });
   }
