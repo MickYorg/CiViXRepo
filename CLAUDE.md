@@ -27,10 +27,13 @@ see "Deliberately not yet done" below for why.
   wired up today) instead of trait/category cards. Each headline is
   boiled down via `/api/dig-check` into a topic on CiViX's own fixed issue
   taxonomy (so it matches cleanly against `digest.js`'s existing
-  SYNONYMS), a one-sentence talking point, and a prompt for a generated
-  illustration (`/api/headline-image`, OpenAI `gpt-image-1` — CiViX's
-  first non-Anthropic AI vendor, cost-capped and cached in KV the same
-  way DIG's own daily spend cap works). A swiped-right headline adopts
+  SYNONYMS), a one-sentence talking point, and a search query for a real
+  stock photo (`/api/headline-image`, Unsplash's Search Photos API,
+  cached in KV, photographer credit shown under the image per Unsplash's
+  API guidelines). This replaced an earlier OpenAI `gpt-image-1`
+  generation attempt (31 Aug 2026) — the citizen explicitly wanted real
+  photos from a public source, not AI-generated illustrations, and search
+  is free where generation had a real per-image cost. A swiped-right headline adopts
   its topic as a priority exactly like a swiped issue card, so it flows
   straight into the same zip → done → top-3 digest → calendar.html
   take-action pipeline the quiz path already ends at — no separate
@@ -108,12 +111,13 @@ deployment (not just "Retry deployment") is required after adding one:
 - `OPENSTATES_API_KEY` — powers `/api/state-bills` (free, openstates.org/api/register).
 - `GNEWS_API_KEY` — powers `/api/headlines` for builder.html's headline-
   swipe path (free tier, 100 req/day, allows production use — gnews.io).
-- `OPENAI_API_KEY` — powers `/api/headline-image`, generating each swiped
-  headline's illustration via `gpt-image-1` (platform.openai.com/api-keys).
-  Optional tuning env vars, same shape as DIG's own budget/rate vars:
-  `IMAGE_DAILY_BUDGET_USD` (default 5), `IMAGE_DAILY_LIMIT_PER_IP`
-  (default 20), `IMAGE_COST_USD` (default 0.02, a flat per-image estimate
-  — tune once real OpenAI billing is visible).
+- `UNSPLASH_ACCESS_KEY` — powers `/api/headline-image`, finding a real
+  stock photo for each swiped headline via Unsplash's Search Photos API
+  (free — unsplash.com/oauth/applications, register an app to get an
+  Access Key). Free/demo tier caps at 50 requests/hour; apply for
+  Unsplash's Production tier once real traffic needs more. Optional
+  tuning var: `PHOTO_DAILY_LIMIT_PER_IP` (default 40, protects the shared
+  hourly quota from one visitor).
 
 ## Netlify → Cloudflare migration — done
 

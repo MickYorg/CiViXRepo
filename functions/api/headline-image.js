@@ -1,14 +1,23 @@
-// Cloudflare Pages Function — generates the illustration for one boiled-
-// down headline in builder.html's "swipe today's headlines" path. Holds
-// the OpenAI key server-side (CiViX's first non-Anthropic AI vendor) and
-// mirrors dig-check.js's daily-budget / per-IP-rate-limit shape, since
-// image generation is meaningfully more expensive per call than a text
-// check. The one addition dig-check.js doesn't need: a persistent cache
-// keyed by the prompt itself, in DIG_KV — every citizen who swipes through
-// the same cached headline batch (headlines.js caches for 30 minutes)
-// reuses the same generated image instead of re-paying for it.
+// Cloudflare Pages Function — fetches a real stock photo for one boiled-
+// down headline in builder.html's "swipe today's headlines" path, via
+// Unsplash's Search Photos API. Replaces an earlier OpenAI gpt-image-1
+// generation attempt: the citizen explicitly asked for real photos from a
+// public source instead of AI-generated illustrations, and search is free
+// where generation had a real per-image cost.
+//
+// Unsplash's API Guidelines require two things this function honors:
+// attribution (the response carries the photographer's name + profile
+// link and the photo's own page link, which the client displays under the
+// image) and a "download" tracking ping (`links.download_location`) fired
+// once per photo actually shown to a citizen, not per search query.
+//
+// NOTE: Unsplash's free/demo application tier caps at 50 requests/hour —
+// fine for development and modest traffic, but a live app with real usage
+// should apply for Unsplash's Production tier
+// (unsplash.com/oauth/applications) to lift that cap. Nothing here needs
+// to change when that upgrade happens — same Access Key either way.
 
-const IMAGE_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30; // a headline's image never needs to change
+const CACHE_TTL_SECONDS = 60 * 60 * 24 * 30; // a headline's photo never needs to change
 const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2;
 
 function todayKey() {
@@ -29,9 +38,9 @@ function hash(str) {
 }
 
 export async function onRequestPost({ request, env }) {
-  const apiKey = env.OPENAI_API_KEY;
+  const apiKey = env.UNSPLASH_ACCESS_KEY;
   if (!apiKey) {
-    return json({ error: { message: 'Server is missing OPENAI_API_KEY — set it in the Cloudflare Pages project env vars.' } }, 500);
+    return json({ error: { message: 'Server is missing UNSPLASH_ACCESS_KEY — set it in the Cloudflare Pages project env vars.' } }, 500);
   }
 
   let body;
@@ -41,46 +50,31 @@ export async function onRequestPost({ request, env }) {
     return json({ error: { message: 'Invalid JSON body' } }, 400);
   }
 
-  const prompt = body && body.prompt;
-  if (!prompt || typeof prompt !== 'string') {
-    return json({ error: { message: 'Missing "prompt" string in request body' } }, 400);
+  const query = body && body.query;
+  if (!query || typeof query !== 'string') {
+    return json({ error: { message: 'Missing "query" string in request body' } }, 400);
   }
 
   const kv = env.DIG_KV;
-  const cacheKey = `imgcache:${hash(prompt)}`;
+  const cacheKey = `photocache:${hash(query)}`;
 
   if (kv) {
     try {
       const cached = await kv.get(cacheKey, { type: 'json' });
-      if (cached) return json({ image: cached.image, cached: true });
+      if (cached) return json(Object.assign({}, cached, { cached: true }));
     } catch (e) {
-      // fall through to a live generation on a storage hiccup
+      // fall through to a live search on a storage hiccup
     }
   }
 
-  const dailyBudget = Number(env.IMAGE_DAILY_BUDGET_USD || 5);
-  const dailyLimitPerIp = Number(env.IMAGE_DAILY_LIMIT_PER_IP || 20);
-  const costPerImage = Number(env.IMAGE_COST_USD || 0.02); // flat estimate — tune once real billing is visible
+  // No cost to guard here (Unsplash search is free), but the shared Access
+  // Key's hourly quota is a real shared resource — a modest per-IP daily
+  // cap keeps one visitor from burning through it alone.
+  const dailyLimitPerIp = Number(env.PHOTO_DAILY_LIMIT_PER_IP || 40);
   const day = todayKey();
-
-  let record = { spent: 0 };
-  if (kv) {
-    try {
-      record = (await kv.get(`imgusage:${day}`, { type: 'json' })) || { spent: 0 };
-    } catch (e) {
-      record = { spent: 0 };
-    }
-  }
-
-  if (record.spent >= dailyBudget) {
-    return json(
-      { error: { message: `Daily image budget of $${dailyBudget} reached — resets at UTC midnight. Try again tomorrow.` } },
-      402
-    );
-  }
-
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const rateKey = `imgrate:${ip}:${day}`;
+  const rateKey = `photorate:${ip}:${day}`;
+
   let rateRecord = { count: 0 };
   if (kv) {
     try {
@@ -92,7 +86,7 @@ export async function onRequestPost({ request, env }) {
 
   if (rateRecord.count >= dailyLimitPerIp) {
     return json(
-      { error: { message: `Daily limit of ${dailyLimitPerIp} images reached for this visitor — resets at UTC midnight.` } },
+      { error: { message: `Daily limit of ${dailyLimitPerIp} photos reached for this visitor — resets at UTC midnight.` } },
       429,
       { 'retry-after': String(secondsUntilMidnightUTC()) }
     );
@@ -106,53 +100,46 @@ export async function onRequestPost({ request, env }) {
 
   let res;
   try {
-    res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt,
-        size: '1024x1024',
-        quality: 'low',
-        n: 1
-      })
-    });
+    res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish&content_filter=high`,
+      { headers: { Authorization: `Client-ID ${apiKey}` } }
+    );
   } catch (e) {
-    return json({ error: { message: 'Could not reach OpenAI API' } }, 502);
-  }
-
-  const text = await res.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    return json({ error: { message: 'OpenAI returned an unparseable response' } }, 502);
+    return json({ error: { message: 'Could not reach Unsplash API' } }, 502);
   }
 
   if (!res.ok) {
-    return json({ error: { message: (data.error && data.error.message) || `OpenAI returned HTTP ${res.status}` } }, res.status);
+    const text = await res.text();
+    return json({ error: { message: `Unsplash returned HTTP ${res.status}: ${text.slice(0, 200)}` } }, res.status);
   }
 
-  const b64 = data.data && data.data[0] && data.data[0].b64_json;
-  if (!b64) {
-    return json({ error: { message: 'OpenAI response had no image data' } }, 502);
+  const data = await res.json();
+  const photo = data.results && data.results[0];
+  if (!photo) {
+    return json({ error: { message: 'No photo found for this query' } }, 404);
   }
 
-  const image = `data:image/png;base64,${b64}`;
+  // Best-effort, never blocks the response — Unsplash's guideline is to
+  // ping this once a photo is actually shown to an end user, not per
+  // search, so this call is where "actually shown" happens.
+  if (photo.links && photo.links.download_location) {
+    fetch(`${photo.links.download_location}&client_id=${encodeURIComponent(apiKey)}`).catch(() => {});
+  }
+
+  const payload = {
+    image: photo.urls.small,
+    photographerName: photo.user.name,
+    photographerUrl: `${photo.user.links.html}?utm_source=civix&utm_medium=referral`,
+    photoUrl: `${photo.links.html}?utm_source=civix&utm_medium=referral`
+  };
 
   if (kv) {
     try {
-      await kv.put(`imgusage:${day}`, JSON.stringify({ spent: (record.spent || 0) + costPerImage }), { expirationTtl: COUNTER_TTL_SECONDS });
-    } catch (e) {}
-    try {
-      await kv.put(cacheKey, JSON.stringify({ image, at: Date.now() }), { expirationTtl: IMAGE_CACHE_TTL_SECONDS });
+      await kv.put(cacheKey, JSON.stringify(payload), { expirationTtl: CACHE_TTL_SECONDS });
     } catch (e) {}
   }
 
-  return json({ image, cached: false });
+  return json(Object.assign({}, payload, { cached: false }));
 }
 
 function json(body, status, extraHeaders) {

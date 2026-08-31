@@ -303,6 +303,14 @@
   }
   .citizen-headline-source p { font-size: 13px; color: var(--paper-dim); margin: 6px 0 0; line-height: 1.4; }
   .citizen-headline-source a { color: var(--amber-ink); }
+  /* Unsplash's API guidelines require photographer credit to travel with
+     the photo, not be buried — small, but never omitted. */
+  .citizen-photo-credit {
+    width: 100%; text-align: left; margin: -10px 0 12px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 9.5px; letter-spacing: 0.03em; color: var(--paper-dim);
+  }
+  .citizen-photo-credit a { color: inherit; }
   .citizen-controls {
     display: flex; justify-content: center; gap: 26px; margin-top: 22px;
   }
@@ -2549,9 +2557,9 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // "Today's headlines" instead of trait/category cards: pull a handful of
   // real news headlines, boil each down (via /api/dig-check) to a topic on
   // CiViX's own issue taxonomy, a one-line plain-language talking point,
-  // and a prompt for a generated illustration (via /api/headline-image),
-  // then run the exact same swipe-right-to-adopt mechanics the rest of
-  // Citizen mode already uses. A swiped-in topic becomes a priority the
+  // and a search query for a real stock photo (via /api/headline-image,
+  // Unsplash), then run the exact same swipe-right-to-adopt mechanics the
+  // rest of Citizen mode already uses. A swiped-in topic becomes a priority the
   // same way an 'issue' card does, so it flows into the same zip/done ->
   // buildTopDigest() -> calendar.html take-action pipeline for free.
   const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
@@ -2584,7 +2592,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 {
   "topic": one of these exact strings, whichever is the closest fit — ${JSON.stringify(ALL_ISSUE_NAMES)},
   "talkingPoint": one plain sentence (under 22 words) capturing what's actually at stake for an ordinary person — not a restatement of the headline,
-  "imagePrompt": a short visual description (under 25 words) for a simple, abstract editorial illustration of that talking point — no text/words/logos in the image, no real people's likenesses
+  "imageQuery": 2-4 concrete, photographable keywords for a stock-photo search that captures the scene (e.g. "apartment building renters", "hospital waiting room") — no proper nouns, no politician or public-figure names, nothing that would try to identify a real specific person
 }`;
     try {
       const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -2599,19 +2607,22 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     }
   }
 
-  // Best-effort: an illustration is nice-to-have, never a blocker. A
-  // failure (budget cap, rate limit, network) just leaves the card with a
-  // topic-emoji placeholder instead of a generated image.
-  async function fetchHeadlineImage(prompt) {
+  // Best-effort: a photo is nice-to-have, never a blocker. A failure
+  // (rate limit, no match, network) just leaves the card with a
+  // topic-emoji placeholder instead of a real photo. Returns the full
+  // { image, photographerName, photographerUrl, photoUrl } object (not
+  // just a URL) since Unsplash's API guidelines require the photographer
+  // credit to travel with the photo, not be an afterthought.
+  async function fetchHeadlinePhoto(query) {
     try {
       const r = await fetch('/api/headline-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ query })
       });
       const data = await r.json();
       if (!r.ok || data.error || !data.image) return null;
-      return data.image;
+      return data;
     } catch (e) {
       return null;
     }
@@ -2679,9 +2690,9 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       return;
     }
 
-    renderHeadlineLoading('Sketching a picture for each one…');
+    renderHeadlineLoading('Finding a picture for each one…');
     await Promise.all(survivors.map(async s => {
-      s.image = await fetchHeadlineImage(s.boildown.imagePrompt);
+      s.photo = await fetchHeadlinePhoto(s.boildown.imageQuery);
     }));
 
     const headlineCards = survivors.map(s => ({
@@ -2689,7 +2700,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       article: s.article,
       topic: s.boildown.topic,
       talkingPoint: s.boildown.talkingPoint,
-      image: s.image
+      photo: s.photo
     }));
 
     deck = [
@@ -3036,11 +3047,13 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     if (card.type === 'headline') {
       controls.style.display = 'flex';
       const a = card.article;
+      const p = card.photo;
       slot.innerHTML = `
         <div class="citizen-card citizen-headline-card" id="citizen-active-card">
-          ${card.image
-            ? `<img class="citizen-headline-img" src="${esc(card.image)}" alt="">`
+          ${p
+            ? `<img class="citizen-headline-img" src="${esc(p.image)}" alt="">`
             : `<div class="citizen-headline-img citizen-headline-img-fallback">📰</div>`}
+          ${p ? `<p class="citizen-photo-credit">Photo: <a href="${esc(p.photographerUrl)}" target="_blank" rel="noopener">${esc(p.photographerName)}</a> / <a href="${esc(p.photoUrl)}" target="_blank" rel="noopener">Unsplash</a></p>` : ''}
           <div class="citizen-title">${esc(card.talkingPoint)}</div>
           <details class="citizen-headline-source">
             <summary>${esc(a.source || 'Source')} &mdash; original headline</summary>
