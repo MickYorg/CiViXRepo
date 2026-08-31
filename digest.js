@@ -202,7 +202,9 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
   function billEntry(kind, bill, hits, score) {
     const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || bill.identifier || '');
     return {
-      kind, hits, score,
+      kind, hits, score, bill, // the full bill object travels with the entry —
+      // calendar.html's focus view uses it to open the Take Action modal
+      // directly on a federal entry, instead of only linking to a filtered list
       title: bill.title,
       label: label.trim(),
       rawSummary: bill.latestAction ? bill.latestAction.text : '',

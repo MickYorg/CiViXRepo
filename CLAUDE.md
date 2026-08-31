@@ -124,6 +124,24 @@ see "Deliberately not yet done" below for why.
   initial lean prefers an issue's already-known `lean` if one exists,
   else defaults to "for". A "Want to go deeper on this?" link hands off
   to builder.html's seeded-drilldown deck (see above), stance-aware.
+  As of 31 Aug 2026 the page also leads with a **focus zone** — the top-3
+  digest (same `buildTopDigest()` engine as builder.html's) rendered at
+  the very top of the page, before any municipal/state/federal detail.
+  This replaced the previous layout where the top-3 concept didn't exist
+  on this page at all and a citizen had to scroll past all three
+  sections' full lists to find anything actionable ("if I didn't know to
+  scroll down you'd have lost me right there" — the exact complaint this
+  fixes). The federal entry's card gets a **Take action now** button that
+  opens the take-action modal directly (`openActionModalFor(bill, hits)`,
+  split out of `openActionModal(idx)` so it doesn't need the entry to
+  already be present in the detailed Federal list's own `CURRENT` array —
+  `digest.js`'s `billEntry()` now carries the full bill object precisely
+  so this works). State/docket entries fall back to their normal
+  `actionHref` link, same limitation as the detailed lists (state has no
+  take-action flow yet). The municipal/state/federal detail itself is now
+  a collapsed `<details>` ("See everything"), open by default only when
+  arriving via `?focus=<issue-id>` (a different intent — "show me this
+  one issue's filtered detail" — than the focus zone's general top-3).
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title

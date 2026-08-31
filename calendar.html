@@ -176,6 +176,75 @@
   }
   .section-label:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 
+  /* ---- Focus zone: the top-3 actions, front and center — this is the
+     first thing on the page now, not something buried below the
+     municipal/state/federal lists. .card-title/.tag/.match-tag are
+     reused inside for visual consistency with the detailed lists below. */
+  .focus-zone { margin-bottom: 8px; }
+  .focus-label {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber-ink);
+    margin: 0 0 14px;
+  }
+  .focus-card {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    background: var(--ink-raised);
+  }
+  .focus-card[data-rank="0"] { border-color: var(--amber); background: var(--amber-wash); }
+  .focus-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+  .focus-rank {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--amber);
+    color: var(--btn-ink);
+    font-weight: 700;
+    font-size: 13px;
+    display: grid;
+    place-items: center;
+    margin-top: 2px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  .focus-card[data-rank="0"] .focus-rank { width: 28px; height: 28px; font-size: 14px; }
+  .focus-headtext { flex: 1; min-width: 0; }
+  .focus-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .focus-summary { font-size: 14.5px; line-height: 1.6; color: var(--paper-dim); margin: 6px 0 10px; }
+  .focus-empty {
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-size: 14px;
+    color: var(--paper-dim);
+    line-height: 1.55;
+  }
+  .focus-empty strong { color: var(--paper); }
+  .focus-empty a { color: var(--amber-ink); }
+
+  /* ---- Everything else, collapsed by default: the whole point of the
+     focus zone above is that this noisier full-list view is opt-in, not
+     the first thing on the page — "if I didn't know to scroll down
+     you'd have lost me right there" was the exact complaint this fixes. */
+  .everything-details { margin-top: 30px; }
+  .everything-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--paper-dim);
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  .everything-details summary::-webkit-details-marker { display: none; }
+  .everything-details summary:hover { color: var(--paper); }
+  .everything-details[open] summary { color: var(--amber-ink); border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+
   .card {
     border: 1px solid var(--line);
     border-radius: 9px;
@@ -488,24 +557,32 @@
   <h1>Calendar</h1>
   <p class="dek">The municipal, state, and federal legislative calendar, matched against what's actually in your manifesto.</p>
 
-  <div class="wip">
-    <span>&#9888;</span>
-    <span><strong>Municipal covers a growing list of cities —</strong> there's no unified public data source for city/county government, so CiViX verifies one city at a time (via Legistar) instead of guessing at nationwide coverage. If your city isn't covered yet, you'll see an honest note below instead of fake data. State and Federal, below that, are both fully live everywhere.</span>
+  <div class="focus-zone" id="focus-zone">
+    <p class="fed-status mono">Finding your top 3 actions&hellip;</p>
   </div>
 
-  <div class="build-cta" id="focus-banner" style="display:none;">
-    <span id="focus-banner-text"></span> <a href="calendar.html">Show everything</a>
-  </div>
+  <details class="everything-details" id="everything-details">
+    <summary>See everything — municipal, state &amp; federal, unfiltered &#8594;</summary>
 
-<p class="section-label">Municipal</p>
-  <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
-  <div id="municipal-list"></div>
-<p class="section-label">State</p>
-  <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
-  <div id="state-list"></div>
-<p class="section-label">Federal</p>
-  <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
-  <div id="fed-list"></div>
+    <div class="wip">
+      <span>&#9888;</span>
+      <span><strong>Municipal covers a growing list of cities —</strong> there's no unified public data source for city/county government, so CiViX verifies one city at a time (via Legistar) instead of guessing at nationwide coverage. If your city isn't covered yet, you'll see an honest note below instead of fake data. State and Federal, below that, are both fully live everywhere.</span>
+    </div>
+
+    <div class="build-cta" id="focus-banner" style="display:none;">
+      <span id="focus-banner-text"></span> <a href="calendar.html">Show everything</a>
+    </div>
+
+    <p class="section-label">Municipal</p>
+    <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
+    <div id="municipal-list"></div>
+    <p class="section-label">State</p>
+    <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
+    <div id="state-list"></div>
+    <p class="section-label">Federal</p>
+    <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
+    <div id="fed-list"></div>
+  </details>
 
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
 </div>
@@ -1005,13 +1082,15 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     };
   }
 
-  function openActionModal(idx) {
-    const entry = CURRENT[idx];
-    if (!entry) return;
+  // Split out so the focus zone's "Take action now" (a bill not
+  // necessarily present in CURRENT's rendered list) can open the same
+  // modal directly, not just entries the detailed Federal list happens
+  // to have rendered.
+  function openActionModalFor(bill, hits) {
     ACTIVE = {
-      bill: entry.bill, hits: entry.hits,
+      bill, hits,
       reps: null, repsError: null, noZip: false, selectedRepId: null,
-      lean: initialLeanFor(entry.hits),
+      lean: initialLeanFor(hits),
       drafts: freshDrafts()
     };
     document.getElementById('action-overlay').style.display = 'flex';
@@ -1023,6 +1102,12 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     // "Drafting..." line. No-ops if one's already showing or the cooldown
     // hasn't cleared.
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+  }
+
+  function openActionModal(idx) {
+    const entry = CURRENT[idx];
+    if (!entry) return;
+    openActionModalFor(entry.bill, entry.hits);
   }
 
   function closeActionModal() {
@@ -1055,6 +1140,13 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 
     const takeAction = t.closest('[data-take-action]');
     if (takeAction) { openActionModal(Number(takeAction.dataset.takeAction)); return; }
+
+    const focusTakeAction = t.closest('[data-focus-take-action]');
+    if (focusTakeAction) {
+      const entry = FOCUS_ENTRIES[Number(focusTakeAction.dataset.focusTakeAction)];
+      if (entry && entry.bill) openActionModalFor(entry.bill, entry.hits);
+      return;
+    }
 
     if (t.id === 'action-overlay') { closeActionModal(); return; }
 
@@ -1306,6 +1398,66 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     enhancePlainSummaries(shown, true);
   }
 
+  // ---- Focus zone: top-3 actions, front and center ----------------------
+  // The whole reason this exists: landing on this page used to mean
+  // scrolling past municipal/state/federal noise before finding anything
+  // to actually do. Reuses buildTopDigest() — the same engine already
+  // computing builder.html's Citizen-mode digest — so "your top 3" means
+  // the same thing everywhere in the app, never two different rankings.
+  let FOCUS_ENTRIES = [];
+
+  function focusEntryHtml(e, rank) {
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : 'Your docket';
+    const whyHtml = e.hits && e.hits.length
+      ? `<div class="match-tags">${e.hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
+      : '';
+    // Only a federal entry can open the Take Action modal directly right
+    // now (state/docket don't have that flow yet, same limitation as the
+    // detailed lists below) — everything else falls back to its normal
+    // actionHref link.
+    const cta = e.kind === 'federal' && e.bill
+      ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
+      : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+    return `
+      <div class="focus-card" data-rank="${rank}">
+        <div class="focus-top">
+          <span class="focus-rank">${rank + 1}</span>
+          <div class="focus-headtext">
+            <div class="focus-headline"><span class="card-title">${esc(e.title)}</span><span class="tag">${kindLabel}</span></div>
+            ${whyHtml}
+          </div>
+        </div>
+        <p class="focus-summary">${esc(e.summary || 'No summary available yet.')}</p>
+        ${cta}
+      </div>`;
+  }
+
+  async function loadFocusZone() {
+    const zone = document.getElementById('focus-zone');
+    if (!zone || !window.CivixDigest) return;
+    const profile = loadRawProfile();
+    const issues = (profile && profile.issues) || [];
+    if (!issues.length) {
+      zone.innerHTML = `<div class="focus-empty"><strong>Build your manifesto</strong> to see your top 3 actions here — before any of the detail below. <a href="builder.html">Start now &#8594;</a></div>`;
+      return;
+    }
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+    try {
+      const top = await window.CivixDigest.buildTopDigest(profile, { limit: 3 });
+      const current = document.getElementById('focus-zone');
+      if (!current) return;
+      if (!top.length) {
+        current.innerHTML = `<div class="focus-empty">Nothing matched your declared priorities yet — check back once more legislative activity comes in, or see everything below.</div>`;
+        return;
+      }
+      FOCUS_ENTRIES = top;
+      current.innerHTML = `<p class="focus-label">Your top 3, right now</p>` + top.map(focusEntryHtml).join('');
+    } catch (e) {
+      const current = document.getElementById('focus-zone');
+      if (current) current.innerHTML = '';
+    }
+  }
+
   async function bootMunicipal() {
     const profile = loadRawProfile();
     const zip = profile && profile.place && profile.place.zip;
@@ -1471,6 +1623,16 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   boot();
   bootState();
   bootMunicipal();
+  loadFocusZone();
+
+  // Arriving via ?focus=<issue-id> (from builder.html's priority links)
+  // means "show me the filtered detail for this one issue" — a different
+  // intent than the focus zone's general top-3, so the detailed lists
+  // shouldn't stay collapsed in that case.
+  if (FOCUS_SLUG) {
+    const details = document.getElementById('everything-details');
+    if (details) details.open = true;
+  }
 })();
 </script>
 </body>
