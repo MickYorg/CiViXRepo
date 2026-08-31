@@ -159,6 +159,7 @@
     font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
     text-transform: uppercase; padding: 5px 11px; border-radius: 2px;
     cursor: pointer; transition: color .15s, border-color .15s;
+    text-decoration: none; display: inline-block;
   }
   .act:hover { color: var(--ink); border-color: var(--ink-dim); }
   .act.adopt:hover { color: var(--amber); border-color: var(--amber); }
@@ -575,7 +576,7 @@
             (i.note ? '<p class="note">' + esc(i.note) + '</p>' : '') +
             '<div class="actions">' +
               (i.state === 'docket'
-                ? '<button class="act adopt" data-do="adopt">Adopt</button>'
+                ? '<a class="act adopt" href="builder.html?openInbox=' + esc(i.id) + '">Add to manifesto &#8594;</a>'
                 : '<button class="act" data-do="return">Return to docket</button>') +
               '<button class="act" data-do="rename">Rename</button>' +
               '<button class="act strike" data-do="strike">Strike</button>' +
@@ -589,7 +590,7 @@
     if (state.view === 'adopted') {
       return '<div class="empty">' +
         '<h2>Nothing adopted yet</h2>' +
-        '<p>Adopt a filing from your docket and it becomes part of what CiViX works on for you.</p>' +
+        '<p>Open a filing and add it to your manifesto in CiViX — once it becomes a real priority there, it shows up here too.</p>' +
         '</div>';
     }
     return '<div class="empty">' +
@@ -648,12 +649,23 @@
 
     var act = btn.getAttribute('data-do');
 
-    if (act === 'adopt' || act === 'return') {
-      var next = act === 'adopt' ? 'adopted' : 'docket';
+    if (act === 'return') {
+      // Marking something 'adopted' used to be a plain local toggle right
+      // here — but that's the exact same server state builder.html's real
+      // Inbox flow uses to mean "this became an actual manifesto
+      // priority," which this button never did (it can't — it has no
+      // access to the manifesto). Net effect: a citizen who hit "Adopt"
+      // got a dead end — the item vanished from the Inbox/digest matching
+      // (both filter to state === 'docket') without ever becoming a real
+      // priority. "Adopt" is now a real link to builder.html's Inbox
+      // focus mode instead (see the 'docket' branch of render()'s card
+      // markup) — this handler only needs to cover reversing that, if
+      // the citizen changes their mind from over here.
+      var next = 'docket';
       var prev = item.state;
       item.state = next;
       render();
-      toast(act === 'adopt' ? 'Adopted.' : 'Back on the docket.');
+      toast('Back on the docket.');
       api('/api/filing?token=' + encodeURIComponent(state.token),
           { method: 'PATCH', body: { id: id, state: next } })
         .catch(function (err) {

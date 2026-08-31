@@ -3431,6 +3431,32 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     startSeededDrilldown(topic, stance);
   })();
 
+  // ?openInbox=<filing-id> arrives from send-to-civix.html's "Add to
+  // manifesto" link — jump straight into that item's real Inbox focus
+  // mode (Prioritize/Push to actions/Strike) instead of leaving the
+  // citizen to go find it themselves. Send to CiViX used to have its own
+  // local "Adopt" toggle that looked like it did this but didn't — see
+  // the note by the 'return' handler in send-to-civix.html for why that
+  // was a dead end (it flipped the same server state this real flow
+  // uses, without ever creating an actual manifesto priority).
+  (function handleOpenInboxParam() {
+    let itemId = '';
+    try { itemId = new URLSearchParams(window.location.search).get('openInbox') || ''; } catch (e) {}
+    if (!itemId) return;
+    if (MODE !== 'pro') setMode('pro');
+    const sec = document.querySelector('.shell .sec[data-sec="inbox"]');
+    if (sec) { sec.classList.add('is-open'); sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    // INBOX loads asynchronously (ensureDrop().then(loadInbox) at the
+    // very end of boot) — poll briefly instead of assuming it's ready.
+    let attempts = 0;
+    const poll = window.setInterval(() => {
+      attempts++;
+      const idx = INBOX.findIndex(i => i.id === itemId);
+      if (idx !== -1) { window.clearInterval(poll); openInboxFocus(idx); }
+      else if (attempts > 40) window.clearInterval(poll); // ~10s, give up quietly
+    }, 250);
+  })();
+
   // Thumb positioning depends on the mode pills' real rendered width,
   // which can be off against fallback-font metrics on first call, or
   // stale after a resize/rotation — re-run in both cases. Deliberately

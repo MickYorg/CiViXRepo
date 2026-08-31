@@ -209,6 +209,27 @@ see "Deliberately not yet done" below for why.
   mentioned Send to CiViX at all before, since §01's own Inbox note lives
   in the `.shell` that Citizen mode hides entirely.
 
+  **Fixed a real dead end, also 31 Aug 2026**: this page's own "Adopt"
+  button used to just PATCH the filing's server-side `state` straight to
+  `'adopted'` — the *exact* field builder.html's real Inbox flow
+  (`adoptFiling()`) uses to mean "this became an actual manifesto
+  priority." But this button had no access to the manifesto and never
+  called `addIssue()`; it only flipped the flag. Net effect: both
+  builder.html's Inbox (`loadInbox()` filters to `state === 'docket'`)
+  and `digest.js`'s docket matching (`fetchDocketItems()`, same filter)
+  stopped seeing the item — "Adopt" silently made a filing invisible to
+  every real downstream use, with no confirmation, no link back into the
+  app, nothing. Fixed by replacing the button with a real link
+  (`builder.html?openInbox=<filing-id>`) straight into that item's Inbox
+  focus mode — the actual Prioritize/Push-to-actions/Strike decision —
+  instead of a fake local toggle. builder.html's boot sequence gained a
+  matching `?openInbox=` handler (forces Pro mode, since Inbox lives in
+  the `.shell` Citizen mode hides; polls briefly for `INBOX` to load
+  before opening focus mode, since it's populated asynchronously). The
+  "Adopted" tab and its underlying state value are unchanged and still
+  meaningful — they just can no longer be set directly from this page,
+  only by actually going through the real flow.
+
 **Placeholders (styled to match, no real functionality):**
 - `connect.html`, `civil-dis.html`, `civix-track.html`, `analytics.html`
 
