@@ -245,6 +245,38 @@
   .everything-details summary:hover { color: var(--paper); }
   .everything-details[open] summary { color: var(--amber-ink); border-bottom: 1px solid var(--line); margin-bottom: 20px; }
 
+  /* Nested per-source frames inside "See everything" — independently
+     collapsible so a citizen can fold away Municipal/State/Federal
+     sections they don't care about instead of scrolling past a wall of
+     cards from all three at once. Default open (matching the old
+     always-shown behavior) since collapsing to reduce noise is the
+     point, not making someone dig to find content that's there. */
+  .section-details { margin-bottom: 26px; }
+  .section-details summary {
+    cursor: pointer;
+    list-style: none;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--paper-dim);
+    padding: 4px 0 10px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .section-details summary::-webkit-details-marker { display: none; }
+  .section-details summary::before { content: '▾ '; }
+  .section-details:not([open]) summary::before { content: '▸ '; }
+  .section-details[open] summary { color: var(--paper); border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .section-count {
+    font-size: 10px;
+    color: var(--amber-ink);
+    text-transform: none;
+    letter-spacing: 0.02em;
+  }
+
   .card {
     border: 1px solid var(--line);
     border-radius: 9px;
@@ -574,16 +606,22 @@
       <span id="focus-banner-text"></span> <a href="calendar.html">Show everything</a>
     </div>
 
-    <p class="section-label">Municipal</p>
-    <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
-    <div id="municipal-list"></div>
-    <div id="municipal-events"></div>
-    <p class="section-label">State</p>
-    <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
-    <div id="state-list"></div>
-    <p class="section-label">Federal</p>
-    <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
-    <div id="fed-list"></div>
+    <details class="section-details" id="municipal-details" open>
+      <summary>Municipal <span class="section-count" id="municipal-count"></span></summary>
+      <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
+      <div id="municipal-list"></div>
+      <div id="municipal-events"></div>
+    </details>
+    <details class="section-details" id="state-details" open>
+      <summary>State <span class="section-count" id="state-count"></span></summary>
+      <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
+      <div id="state-list"></div>
+    </details>
+    <details class="section-details" id="fed-details" open>
+      <summary>Federal <span class="section-count" id="fed-count"></span></summary>
+      <p class="fed-status mono" id="fed-status">Loading recent activity from congress.gov&hellip;</p>
+      <div id="fed-list"></div>
+    </details>
   </details>
 
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
@@ -1123,6 +1161,189 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     ACTIVE = null;
   }
 
+  // ---- General advocacy modal --------------------------------------------
+  // For a citizen's own high-conviction priority (typed into "anything
+  // else on your mind?", or a stance written directly in the manifesto)
+  // that has no matching bill — digest.js's buildTopDigest() still
+  // surfaces it, ranked first, but there's no bill to open the ordinary
+  // Take Action modal on. This is the same idea (rep lookup, drafted
+  // call/email) minus everything that assumes a specific bill exists: no
+  // For/Against (nothing to be for or against), no ICS date, one draft
+  // instead of two per-lean. Deliberately a separate, smaller path
+  // rather than threading `bill: null` through openActionModalFor()'s
+  // bill-specific rendering and prompts.
+  let GENERAL_ACTIVE = null;
+
+  function openGeneralAdvocacyModal(topic, stance, hits) {
+    GENERAL_ACTIVE = {
+      topic, stance: stance || '', hits: hits && hits.length ? hits : [topic],
+      reps: null, repsError: null, noZip: false, selectedRepId: null,
+      call: { status: 'idle' }, email: { status: 'idle' }
+    };
+    document.getElementById('action-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    renderGeneralActionCard();
+    loadRepsForGeneral();
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+  }
+
+  function closeGeneralAdvocacyModal() {
+    document.getElementById('action-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    GENERAL_ACTIVE = null;
+  }
+
+  async function loadRepsForGeneral() {
+    const active = GENERAL_ACTIVE;
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+    if (!zip) { active.noZip = true; renderGeneralActionCard(); return; }
+    try {
+      const data = await fetchReps(zip);
+      if (GENERAL_ACTIVE !== active) return; // closed or switched while in flight
+      active.reps = data.reps || [];
+      if (active.reps.length) active.selectedRepId = active.reps[0].id; // no bill to pick a chamber by — just default to the first
+      renderGeneralActionCard();
+      if (active.reps.length) generateGeneralDrafts();
+    } catch (e) {
+      if (GENERAL_ACTIVE !== active) return;
+      active.repsError = e.message || 'request failed';
+      renderGeneralActionCard();
+    }
+  }
+
+  async function generateGeneralDrafts() {
+    const active = GENERAL_ACTIVE;
+    const rep = active.reps.find(r => r.id === active.selectedRepId);
+    if (!rep) return;
+    active.call = { status: 'loading' };
+    active.email = { status: 'loading' };
+    renderGeneralActionCard();
+
+    const profile = loadRawProfile();
+    const zip = (profile && profile.place && profile.place.zip) || '';
+    const chamberWord = rep.area === 'US Senate' ? 'Senator' : 'Representative';
+    const stanceLine = active.stance
+      ? `The constituent's own words on this: "${active.stance}"`
+      : `The constituent flagged this as a priority but hasn't written specific wording yet — keep it concrete and grounded, not generic.`;
+
+    const callPrompt = `You're helping a constituent prepare for a phone call to their ${chamberWord}'s office, for a civic-engagement tool. There's no specific bill attached — this is a general concern the constituent wants on record.
+
+${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
+Topic: ${active.topic}
+${stanceLine}
+
+Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning grounded in their own words above, and a polite close asking the staffer to pass the message along.`;
+
+    const emailPrompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office, for a civic-engagement tool. There's no specific bill attached — this is a general concern the constituent wants on record.
+
+${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
+Topic: ${active.topic}
+${stanceLine}
+Constituent's ZIP: ${zip}
+
+Write a concise constituent email, under 180 words total. Respond in exactly this plain-text format, no markdown:
+
+SUBJECT: <subject line>
+BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWord} [last name]," and signed "A constituent in ${zip || '[ZIP]'}">`;
+
+    const [callResult, emailResult] = await Promise.allSettled([
+      digCheckCall(callPrompt),
+      digCheckCall(emailPrompt)
+    ]);
+
+    if (GENERAL_ACTIVE !== active) return;
+
+    active.call = callResult.status === 'fulfilled'
+      ? { status: 'done', text: callResult.value }
+      : { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+
+    if (emailResult.status === 'fulfilled') {
+      const text = emailResult.value;
+      const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
+      const bodyMatch = text.match(/BODY:\s*([\s\S]+)/i);
+      active.email = {
+        status: 'done',
+        subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${active.topic}`,
+        body: bodyMatch ? bodyMatch[1].trim() : text
+      };
+    } else {
+      active.email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
+    }
+
+    renderGeneralActionCard();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+  }
+
+  function renderGeneralActionCard() {
+    const el = document.getElementById('action-card');
+    const active = GENERAL_ACTIVE;
+    if (!active) return;
+
+    let repsSection;
+    if (active.noZip) {
+      repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your manifesto</a> to find your representatives and draft a call or email.</p>`;
+    } else if (active.repsError) {
+      repsSection = `<p class="action-empty">Couldn't look up your representatives: ${esc(active.repsError)}</p>`;
+    } else if (!active.reps) {
+      repsSection = `<p class="action-empty">Looking up your representatives&hellip;</p>`;
+    } else if (!active.reps.length) {
+      repsSection = `<p class="action-empty">No federal representatives came back for that ZIP.</p>`;
+    } else {
+      const picker = `<div class="rep-picker">${active.reps.map(r =>
+        `<button type="button" class="rep-chip ${r.id === active.selectedRepId ? 'is-on' : ''}" data-general-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} — ${r.area === 'US Senate' ? 'Senate' : 'House'}</button>`
+      ).join('')}</div>`;
+
+      const rep = active.reps.find(r => r.id === active.selectedRepId);
+      const callBody = active.call.status === 'loading'
+        ? `<div class="action-draft is-loading">Drafting a call script&hellip;</div>`
+        : active.call.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(active.call.error)}</div>`
+          : `<div class="action-draft">${esc(active.call.text || '')}</div>`;
+      const callActions = active.call.status === 'done'
+        ? `<div class="action-row">
+            ${rep && rep.phone ? `<a class="btn btn-primary" href="tel:${esc(rep.phone.replace(/[^\d+]/g, ''))}">Call ${esc(rep.phone)}</a>` : ''}
+            <button type="button" class="btn" data-copy-general-call>Copy script</button>
+          </div>`
+        : '';
+
+      const emailBody = active.email.status === 'loading'
+        ? `<div class="action-draft is-loading">Drafting an email&hellip;</div>`
+        : active.email.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(active.email.error)}</div>`
+          : `<div class="action-draft"><strong>${esc(active.email.subject || '')}</strong>\n\n${esc(active.email.body || '')}</div>`;
+      const emailActions = active.email.status === 'done'
+        ? `<div class="action-row">
+            <button type="button" class="btn btn-primary" data-copy-general-email>Copy email</button>
+            ${rep && rep.url ? `<a class="btn" href="${esc(rep.url)}" target="_blank" rel="noopener">Open contact form &#8599;</a>` : ''}
+          </div>
+          <p class="action-email-note">Congress doesn't publish direct staff emails — offices take constituent mail through their own contact form. Copy the draft above, then paste it in.</p>`
+        : '';
+
+      repsSection = `
+        ${picker}
+        <div class="action-section">
+          <div class="action-section-title">Call</div>
+          ${callBody}
+          ${callActions}
+        </div>
+        <div class="action-section">
+          <div class="action-section-title">Email</div>
+          ${emailBody}
+          ${emailActions}
+        </div>
+      `;
+    }
+
+    el.innerHTML = `
+      <button class="action-close" type="button" id="action-close">&#10005; CLOSE</button>
+      <div class="action-bill-title">${esc(active.topic)}</div>
+      <div class="action-bill-meta">No specific bill matched yet — this raises your own stated concern directly.</div>
+      ${repsSection}
+    `;
+    document.getElementById('action-close').addEventListener('click', closeGeneralAdvocacyModal);
+  }
+
   async function loadRepsForActive() {
     const active = ACTIVE;
     const profile = loadRawProfile();
@@ -1155,7 +1376,17 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       return;
     }
 
-    if (t.id === 'action-overlay') { closeActionModal(); return; }
+    const focusGeneralAction = t.closest('[data-focus-general-action]');
+    if (focusGeneralAction) {
+      const entry = FOCUS_ENTRIES[Number(focusGeneralAction.dataset.focusGeneralAction)];
+      if (entry) openGeneralAdvocacyModal(entry.title, entry.summary, entry.hits);
+      return;
+    }
+
+    if (t.id === 'action-overlay') {
+      if (GENERAL_ACTIVE) closeGeneralAdvocacyModal(); else closeActionModal();
+      return;
+    }
 
     const leanChip = t.closest('[data-lean]');
     if (leanChip && ACTIVE) { setLean(leanChip.dataset.lean); return; }
@@ -1170,17 +1401,33 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       return;
     }
 
+    const generalRepChip = t.closest('[data-general-rep]');
+    if (generalRepChip && GENERAL_ACTIVE) {
+      GENERAL_ACTIVE.selectedRepId = generalRepChip.dataset.generalRep;
+      GENERAL_ACTIVE.call = { status: 'idle' };
+      GENERAL_ACTIVE.email = { status: 'idle' };
+      generateGeneralDrafts();
+      return;
+    }
+
     if (t.closest('[data-copy-call]') && ACTIVE) { copy(ACTIVE.drafts[ACTIVE.lean].call.text || '', t.closest('[data-copy-call]')); return; }
     if (t.closest('[data-copy-email]') && ACTIVE) {
       const draft = ACTIVE.drafts[ACTIVE.lean];
       copy((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), t.closest('[data-copy-email]'));
       return;
     }
+    if (t.closest('[data-copy-general-call]') && GENERAL_ACTIVE) { copy(GENERAL_ACTIVE.call.text || '', t.closest('[data-copy-general-call]')); return; }
+    if (t.closest('[data-copy-general-email]') && GENERAL_ACTIVE) {
+      copy((GENERAL_ACTIVE.email.subject || '') + '\n\n' + (GENERAL_ACTIVE.email.body || ''), t.closest('[data-copy-general-email]'));
+      return;
+    }
     if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && ACTIVE) closeActionModal();
+    if (e.key !== 'Escape') return;
+    if (GENERAL_ACTIVE) closeGeneralAdvocacyModal();
+    else if (ACTIVE) closeActionModal();
   });
 
   // State cards intentionally have no Take Action button — reps.js only
@@ -1254,6 +1501,14 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   // FED_STATE/renderFedResults() below.
   let STATE_STATE = null;
 
+  // Keeps a live "N shown" badge in a section's <summary> even while
+  // it's collapsed — so folding a section away doesn't also hide
+  // whether there's anything in it worth opening back up.
+  function setSectionCount(id, n) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = n ? `${n} shown` : '';
+  }
+
   function renderStateResults() {
     const statusEl = document.getElementById('state-status');
     const listEl = document.getElementById('state-list');
@@ -1295,6 +1550,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
     }
     enhancePlainSummaries(shown, true);
+    setSectionCount('state-count', shown.length);
   }
 
   async function bootState() {
@@ -1404,6 +1660,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
     enhancePlainSummaries(shown, true);
     renderMunicipalEvents(s.events, s.city);
+    setSectionCount('municipal-count', shown.length + ((s.events && s.events.length) || 0));
   }
 
   // Plain chronological list, not matched/scored — see fetchEvents()'s
@@ -1436,17 +1693,20 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   let FOCUS_ENTRIES = [];
 
   function focusEntryHtml(e, rank) {
-    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : 'Your docket';
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
     const whyHtml = e.hits && e.hits.length
       ? `<div class="match-tags">${e.hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
       : '';
-    // Only a federal entry can open the Take Action modal directly right
-    // now (state/docket don't have that flow yet, same limitation as the
-    // detailed lists below) — everything else falls back to its normal
-    // actionHref link.
+    // Federal opens the bill-specific Take Action modal; 'general' (a
+    // citizen's own high-conviction priority with no matching bill —
+    // see digest.js's buildTopDigest) opens the topic-only advocacy
+    // modal instead, no bill needed. State/docket don't have a modal
+    // flow yet, same limitation as the detailed lists below.
     const cta = e.kind === 'federal' && e.bill
       ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
-      : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+      : e.kind === 'general'
+        ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
+        : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
     return `
       <div class="focus-card" data-rank="${rank}">
         <div class="focus-top">
@@ -1593,6 +1853,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       listEl.innerHTML = CURRENT.map((c, i) => renderCard(c.bill, c.hits, i, mode)).join('');
     }
     enhancePlainSummaries(CURRENT.map(c => c.bill));
+    setSectionCount('fed-count', CURRENT.length);
   }
 
   async function boot() {
@@ -1663,6 +1924,19 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const details = document.getElementById('everything-details');
     if (details) details.open = true;
   }
+
+  // ?general=<issue-name> arrives from builder.html's digest (a
+  // 'general' entry's actionHref, see digest.js's buildTopDigest) —
+  // opens the topic-only advocacy modal directly instead of leaving the
+  // citizen to find it themselves.
+  (function handleGeneralParam() {
+    let topic = '';
+    try { topic = new URLSearchParams(window.location.search).get('general') || ''; } catch (e) {}
+    if (!topic) return;
+    const profile = loadRawProfile();
+    const issue = profile && profile.issues && profile.issues.find(i => i.name === topic);
+    openGeneralAdvocacyModal(topic, issue && issue.stance, [topic]);
+  })();
 })();
 </script>
 </body>

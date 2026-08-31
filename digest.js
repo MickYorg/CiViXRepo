@@ -251,6 +251,29 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
       }
     }
 
+    // A citizen who bothered to type something in their own words (the
+    // Citizen-mode "anything else on your mind?" card, or a stance
+    // written directly in § 03) deserves to see it land somewhere, even
+    // when nothing in the matched bill/docket pool happens to touch it —
+    // otherwise typing it in felt like it went nowhere. weight === 3 +
+    // a written stance is the signal for "this was a deliberate,
+    // high-conviction addition," not just a swiped-in issue. Scored to
+    // always outrank bill/docket matches — an explicit personal
+    // statement leads, algorithmic matching follows.
+    const matchedNames = new Set();
+    results.forEach(r => (r.hits || []).forEach(h => matchedNames.add(h)));
+    issues
+      .filter(i => i.weight === 3 && i.stance && !matchedNames.has(i.name))
+      .forEach(i => {
+        results.push({
+          kind: 'general', hits: [i.name], score: 1000 + i.weight,
+          title: i.name,
+          rawSummary: i.stance, // no summaryId (nothing to AI-summarize) — the plain-language pass below falls back to this verbatim
+          summaryId: null,
+          actionHref: 'calendar.html?general=' + encodeURIComponent(i.name)
+        });
+      });
+
     results.sort((a, b) => b.score - a.score);
     const top = results.slice(0, limit);
 

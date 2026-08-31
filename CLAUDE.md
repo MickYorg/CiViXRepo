@@ -61,7 +61,21 @@ see "Deliberately not yet done" below for why.
   meant to be a frequent tap) to react to individually; swiping right on
   any of them adopts its topic as a priority the same way a headline card
   does, so agreeing with more facets is a citizen's own way of signaling
-  how much a topic matters without a slider. This same drilldown mechanic
+  how much a topic matters without a slider. As of 31 Aug 2026, a
+  drilldown card can no longer be drilled into again — the user flagged
+  the real risk of an unbounded "complicated on a complicated on a
+  complicated" spiral with no natural end. Tapping "it's complicated" on
+  a drilldown card now opens a "give mercy" screen (`showDrilldownMercy()`)
+  instead of generating 3 more facets: type freeform "how do you feel
+  about this" text (added as a priority with that text as its `stance`,
+  same as the "anything else on your mind?" card), or "Not sure — ask me
+  again later," which defers it into a new `P.backlog` array
+  (`deferToBacklog()`) instead of just discarding it. `buildBacklogCards()`
+  pulls a capped batch (3) of deferred facets back into
+  `startCitizenMode()`'s topping-up deck — "sprinkle into another round
+  of manifesto refinement" — consumed from the backlog either way
+  (adopted, skipped, or deferred yet again) so it can't grow unbounded
+  even if a citizen keeps punting on the same facet. This same drilldown mechanic
   now also has a cold-start entry point (`startSeededDrilldown()`,
   triggered by `?drilldown=<topic>&stance=<for|against>` on boot): calendar.html's
   action modal links here once a citizen declares a For/Against position
@@ -165,6 +179,32 @@ see "Deliberately not yet done" below for why.
   a collapsed `<details>` ("See everything"), open by default only when
   arriving via `?focus=<issue-id>` (a different intent — "show me this
   one issue's filtered detail" — than the focus zone's general top-3).
+  As of 31 Aug 2026, once expanded, each of Municipal/State/Federal is
+  its own independently-collapsible nested `<details>`
+  (`.section-details`) instead of one long undifferentiated wall — a
+  live "N shown" badge (`setSectionCount()`) stays visible in the
+  `<summary>` even while a section is folded away, so collapsing noise
+  doesn't also hide whether there's anything worth reopening it for.
+
+  **General advocacy modal, also 31 Aug 2026**: digest.js's
+  `buildTopDigest()` now synthesizes a `kind: 'general'` entry for a
+  citizen's own high-conviction priority (`weight === 3` *and* a written
+  `stance` — the signal for "typed in deliberately," e.g. via the
+  "anything else on your mind?" card) that has zero matches in the
+  federal/state/docket pool, scored to always rank first — a citizen who
+  bothered to type something in their own words shouldn't see it go
+  nowhere just because no bill happens to touch it yet. Its "Start
+  making noise" CTA opens `openGeneralAdvocacyModal()` (calendar.html) —
+  the same rep-lookup + AI-drafted call/email as the bill-specific
+  modal, minus everything that assumes a bill exists: no For/Against (no
+  bill to be for or against), no ICS date, one draft instead of two
+  per-lean, drafted straight from the citizen's own stance text.
+  Deliberately a separate code path from `openActionModalFor()` rather
+  than threading `bill: null` through the bill-specific rendering.
+  Reachable from calendar.html's focus zone directly
+  (`data-focus-general-action`) or via `?general=<issue-name>` (what
+  builder.html's digest links to, since it can't call calendar.html's
+  JS across pages).
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title

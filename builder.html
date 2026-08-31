@@ -1460,7 +1460,8 @@
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
     updated: null,
-    archetype: ''      // id of the matched Citizen-mode quiz archetype, once confirmed
+    archetype: '',     // id of the matched Citizen-mode quiz archetype, once confirmed
+    backlog: []        // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
   };
 
   let P = load();
@@ -2641,6 +2642,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         { type: 'issues-marker' },
         { type: 'zip' },
         ...buildActionCards(actionPool),
+        ...buildBacklogCards(),
         { type: 'more-priorities' },
         { type: 'done' }
       ];
@@ -3011,6 +3013,11 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
   // AI-drafted facets of the same topic to react to individually —
   // agreeing with more of them is a citizen's own way of signaling how
   // strongly a topic actually matters, without a slider.
+  // Deliberately no 'drilldown' case — a facet spawned by "it's
+  // complicated" can't itself be drilled into again. That recursion has
+  // no natural end (complicated-on-complicated-on-complicated...), so a
+  // drilldown card gets a different, bounded set of options instead — see
+  // commitComplicated()'s drilldown branch and showDrilldownMercy().
   function drilldownSeed(card) {
     switch (card.type) {
       case 'trait': case 'category': case 'action':
@@ -3019,8 +3026,6 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
         return { title: card.title, context: ISSUE_BLURBS[card.title] || '' };
       case 'headline':
         return { title: card.article.title, context: card.talkingPoint };
-      case 'drilldown':
-        return { title: card.talkingPoint, context: 'One facet of "' + card.parentTitle + '"' };
       default:
         return null;
     }
@@ -3053,7 +3058,14 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
 
   async function commitComplicated() {
     const card = deck[deckIndex];
-    const seed = card && drilldownSeed(card);
+    if (!card) return;
+
+    // A facet already came from "it's complicated" once — no further
+    // recursion, just a bounded way to resolve it. See the comment on
+    // drilldownSeed() for why.
+    if (card.type === 'drilldown') { showDrilldownMercy(card); return; }
+
+    const seed = drilldownSeed(card);
     if (!seed) return; // not a swipeable/drillable card — button shouldn't even be visible here
 
     deck.splice(deckIndex, 1);
@@ -3067,6 +3079,62 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       deck.splice(deckIndex, 1, ...subs);
       renderCitizenCard();
     }
+  }
+
+  // Records a facet the citizen wasn't ready to decide on now, to
+  // resurface in a later refinement round (buildBacklogCards(), pulled
+  // into startCitizenMode()'s topping-up deck) instead of just vanishing.
+  function deferToBacklog(card) {
+    if (!Array.isArray(P.backlog)) P.backlog = [];
+    P.backlog.push({ topic: card.topic, talkingPoint: card.talkingPoint, parentTitle: card.parentTitle, at: Date.now() });
+    save();
+  }
+
+  // The "give mercy" screen for a drilldown card: instead of a flat
+  // yes/no (or, worse, drilling in yet again), offer to capture the
+  // citizen's own words on it, or defer the decision entirely. Swaps the
+  // card content in place rather than advancing the deck — resolution
+  // happens via the two buttons below, not a swipe.
+  function showDrilldownMercy(card) {
+    document.getElementById('citizen-controls').style.display = 'none';
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">💭</div>
+        <div class="citizen-title">How do you feel about this?</div>
+        <p class="citizen-blurb">${esc(card.talkingPoint)}</p>
+        <textarea class="field citizen-freeform" id="citizen-drilldown-feeling" rows="3" placeholder="In your own words…"></textarea>
+        <button type="button" class="btn btn-primary citizen-cta" id="citizen-drilldown-feeling-submit">Save this &#8594;</button>
+        <button type="button" class="btn btn-quiet citizen-cta" id="citizen-drilldown-later">Not sure — ask me again later &#8594;</button>
+        <button type="button" class="btn btn-quiet citizen-cta" id="citizen-drilldown-back">&#8592; Back</button>
+      </div>`;
+    document.getElementById('citizen-drilldown-feeling-submit').addEventListener('click', () => {
+      const text = document.getElementById('citizen-drilldown-feeling').value.trim();
+      if (text) {
+        addIssue(card.topic);
+        const iss = findIssue(slug(card.topic));
+        if (iss) { iss.weight = 2; iss.stance = text; }
+        save();
+      }
+      advanceCitizen();
+    });
+    document.getElementById('citizen-drilldown-later').addEventListener('click', () => {
+      deferToBacklog(card);
+      advanceCitizen();
+    });
+    document.getElementById('citizen-drilldown-back').addEventListener('click', () => renderCitizenCard());
+  }
+
+  // Pulls a capped batch of deferred facets back into the topping-up
+  // deck — "sprinkle into another round of manifesto refinement," not an
+  // unbounded resurfacing. Consumed from P.backlog either way (adopted,
+  // skipped, or deferred again via showDrilldownMercy) so it can't grow
+  // forever even if a citizen keeps punting on the same facet.
+  function buildBacklogCards() {
+    const items = (P.backlog || []).slice(0, 3);
+    if (!items.length) return [];
+    P.backlog = (P.backlog || []).slice(3);
+    save();
+    return items.map(b => ({ type: 'drilldown', topic: b.topic, talkingPoint: b.talkingPoint, parentTitle: b.parentTitle }));
   }
 
   // Cold-start version of the same drilldown mechanic, entered from
@@ -3148,9 +3216,12 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   }
 
   function digestEntryHtml(e, rank) {
-    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : 'Your docket';
-    const ctaLabel = e.kind === 'docket' ? 'Open in your docket' : e.kind === 'federal' ? 'Make your voice heard' : 'Take a look';
-    const eta = e.kind === 'federal'
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
+    const ctaLabel = e.kind === 'docket' ? 'Open in your docket'
+      : e.kind === 'federal' ? 'Make your voice heard'
+      : e.kind === 'general' ? 'Start making noise'
+      : 'Take a look';
+    const eta = e.kind === 'federal' || e.kind === 'general'
       ? `<p class="citizen-digest-eta">~2 min — CiViX drafts the call or email for you.</p>`
       : '';
     return `
