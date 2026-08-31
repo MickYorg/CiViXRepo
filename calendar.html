@@ -1131,6 +1131,21 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   // necessarily present in CURRENT's rendered list) can open the same
   // modal directly, not just entries the detailed Federal list happens
   // to have rendered.
+  // Refines P.jurisdictionLean (set once during Citizen-mode onboarding,
+  // see builder.html's 'jurisdiction-lean' card) by which jurisdiction's
+  // actions a citizen actually takes — a real signal on top of the
+  // initial guess, per the citizen's own request. Small nudge per
+  // action, not a reset, so one click doesn't overwrite the stated
+  // preference outright.
+  function bumpJurisdictionLean(level) {
+    const profile = loadRawProfile();
+    if (!profile) return;
+    const lean = profile.jurisdictionLean || { municipal: 1, state: 1, federal: 1 };
+    lean[level] = (lean[level] || 1) + 0.5;
+    profile.jurisdictionLean = lean;
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+  }
+
   function openActionModalFor(bill, hits) {
     ACTIVE = {
       bill, hits,
@@ -1142,6 +1157,10 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     document.body.style.overflow = 'hidden';
     renderActionCard();
     loadRepsForActive();
+    // Only ever called for federal bills today — state/municipal have no
+    // take-action flow yet (reps.js is federal-only). Revisit this when
+    // they do, rather than assuming 'federal' unconditionally.
+    bumpJurisdictionLean('federal');
     // Rep lookup + call/email drafting both involve a real network+AI
     // wait — give the citizen something to read instead of a bare
     // "Drafting..." line. No-ops if one's already showing or the cooldown
@@ -1185,6 +1204,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     renderGeneralActionCard();
     loadRepsForGeneral();
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+    bumpJurisdictionLean('federal'); // reps.js only resolves federal contacts today
   }
 
   function closeGeneralAdvocacyModal() {
@@ -1693,7 +1713,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
   let FOCUS_ENTRIES = [];
 
   function focusEntryHtml(e, rank) {
-    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'municipal' ? 'Municipal' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
     const whyHtml = e.hits && e.hits.length
       ? `<div class="match-tags">${e.hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
       : '';

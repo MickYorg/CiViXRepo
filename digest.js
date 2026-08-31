@@ -112,6 +112,20 @@
     return { bills: data.bills || [], state: data.state || '' };
   }
 
+  // Municipal wasn't part of the digest at all before 31 Aug 2026 — added
+  // alongside jurisdiction-lean weighting (see buildTopDigest) so a
+  // citizen who cares most about local government can actually have that
+  // show up in their top 3, not just federal/state. `covered: false`
+  // (an uncovered city) is a normal, silent no-op here, same as it is on
+  // calendar.html — not an error.
+  async function fetchMunicipalBills(zip) {
+    if (!zip) return { bills: [], covered: false };
+    const r = await fetch('/api/municipal?zip=' + encodeURIComponent(zip));
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+    return { bills: data.bills || [], covered: !!data.covered };
+  }
+
   async function fetchDocketItems(token) {
     if (!token) return [];
     const r = await fetch(CAPTURE_API + '/api/filings?token=' + encodeURIComponent(token));
@@ -221,9 +235,10 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
     const zip = profile && profile.place && profile.place.zip;
     const results = [];
 
-    const [fed, state, docket] = await Promise.allSettled([
+    const [fed, state, municipal, docket] = await Promise.allSettled([
       fetchFederalBills(),
       fetchStateBills(zip),
+      fetchMunicipalBills(zip),
       fetchDocketItems(profile && profile.token)
     ]);
 
@@ -233,6 +248,26 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
     if (state.status === 'fulfilled' && issues.length) {
       matchBills(state.value.bills, issues).forEach(m => results.push(billEntry('state', m.bill, m.hits, m.score)));
     }
+    if (municipal.status === 'fulfilled' && municipal.value.covered && issues.length) {
+      matchBills(municipal.value.bills, issues).forEach(m => results.push(billEntry('municipal', m.bill, m.hits, m.score)));
+    }
+
+    // Jurisdiction lean (31 Aug 2026, P.jurisdictionLean — set once during
+    // Citizen mode's onboarding, see builder.html's 'jurisdiction-lean'
+    // card, refined afterward by which jurisdiction's actions a citizen
+    // actually takes) weights which level's matches surface first. Only
+    // applied to the three bill-derived kinds — 'general' entries below
+    // outrank everything regardless of jurisdiction on purpose (a
+    // citizen's own explicit priority isn't about which level of
+    // government it happens to touch), and 'docket' isn't tied to a
+    // jurisdiction at all.
+    const lean = (profile && profile.jurisdictionLean) || { municipal: 1, state: 1, federal: 1 };
+    results.forEach(r => {
+      if (r.kind === 'federal' || r.kind === 'state' || r.kind === 'municipal') {
+        r.score = r.score * (lean[r.kind] || 1);
+      }
+    });
+
     if (docket.status === 'fulfilled' && docket.value.length && issues.length) {
       for (const item of docket.value) {
         const topic = await classifyDocketItem(item);
@@ -290,7 +325,7 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
 
   window.CivixDigest = {
     slug, keywordsFor, scoreAgainstIssues, matchBills,
-    fetchFederalBills, fetchStateBills, fetchDocketItems,
+    fetchFederalBills, fetchStateBills, fetchMunicipalBills, fetchDocketItems,
     classifyDocketItem, plainSummarize, buildTopDigest
   };
 })();

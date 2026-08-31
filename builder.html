@@ -1461,7 +1461,8 @@
     log: [],           // { at, kind: 'add'|'del', text }
     updated: null,
     archetype: '',     // id of the matched Citizen-mode quiz archetype, once confirmed
-    backlog: []        // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
+    backlog: [],       // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
+    jurisdictionLean: null  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in calendar.html
   };
 
   let P = load();
@@ -2630,6 +2631,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         ...QUIZ_QUESTIONS.map(q => ({ type: 'quiz-question', ...q })),
         { type: 'archetype-reveal' },
         { type: 'zip' },
+        ...jurisdictionLeanCard(),
         { type: 'more-priorities' },
         { type: 'done' }
       ];
@@ -2641,6 +2643,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         { type: 'encourage' },
         { type: 'issues-marker' },
         { type: 'zip' },
+        ...jurisdictionLeanCard(),
         ...buildActionCards(actionPool),
         ...buildBacklogCards(),
         { type: 'more-priorities' },
@@ -2791,6 +2794,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     deck = [
       ...headlineCards,
       ...(P.place.zip ? [] : [{ type: 'zip' }]),
+      ...jurisdictionLeanCard(),
       { type: 'more-priorities' },
       { type: 'done' }
     ];
@@ -3137,6 +3141,21 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     return items.map(b => ({ type: 'drilldown', topic: b.topic, talkingPoint: b.talkingPoint, parentTitle: b.parentTitle }));
   }
 
+  // Asked once, ever — subsequent deck builds skip it once P.jurisdictionLean
+  // is set. "Refined afterward" (per the citizen's own request) happens
+  // passively via bumpJurisdictionLean() in calendar.html, not by asking
+  // this question again.
+  function jurisdictionLeanCard() {
+    return P.jurisdictionLean ? [] : [{ type: 'jurisdiction-lean' }];
+  }
+
+  function setJurisdictionLean(level) {
+    const base = { municipal: 1, state: 1, federal: 1 };
+    if (level) base[level] = 3;
+    P.jurisdictionLean = base;
+    save();
+  }
+
   // Cold-start version of the same drilldown mechanic, entered from
   // outside the swipe deck entirely — calendar.html's action modal links
   // here (?drilldown=<bill title>&stance=<for|against>) once a citizen
@@ -3165,7 +3184,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       startCitizenMode();
       return;
     }
-    deck = [...subs, ...(P.place.zip ? [] : [{ type: 'zip' }]), { type: 'more-priorities' }, { type: 'done' }];
+    deck = [...subs, ...(P.place.zip ? [] : [{ type: 'zip' }]), ...jurisdictionLeanCard(), { type: 'more-priorities' }, { type: 'done' }];
     deckIndex = 0;
     renderCitizenCard();
   }
@@ -3216,7 +3235,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   }
 
   function digestEntryHtml(e, rank) {
-    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
+    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'municipal' ? 'Municipal' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
     const ctaLabel = e.kind === 'docket' ? 'Open in your docket'
       : e.kind === 'federal' ? 'Make your voice heard'
       : e.kind === 'general' ? 'Start making noise'
@@ -3448,6 +3467,31 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         save();
         advanceCitizen();
       });
+      return;
+    }
+
+    // Asked once, ever (jurisdictionLeanCard() skips it once P.jurisdictionLean
+    // is set) — sets which level of government's matches lead the top-3,
+    // refined afterward by which jurisdiction's actions a citizen actually
+    // takes (bumpJurisdictionLean() in calendar.html), not by asking again.
+    if (card.type === 'jurisdiction-lean') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">🗺️</div>
+          <div class="citizen-title">Where do you want your voice heard most?</div>
+          <p class="citizen-blurb">City council votes on zoning tonight; Congress votes on the budget next month. CiViX will lean toward whichever level you pick first when it ranks what to show you.</p>
+          <div class="citizen-quiz-options">
+            <button type="button" class="btn citizen-quiz-opt" data-jur="municipal">🏛️ City Hall — local government</button>
+            <button type="button" class="btn citizen-quiz-opt" data-jur="state">🏢 My state capitol</button>
+            <button type="button" class="btn citizen-quiz-opt" data-jur="federal">🏦 Washington — Congress</button>
+          </div>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-jur-skip">They all matter equally to me &#8594;</button>
+        </div>`;
+      document.querySelectorAll('[data-jur]').forEach(btn => {
+        btn.addEventListener('click', () => { setJurisdictionLean(btn.dataset.jur); advanceCitizen(); });
+      });
+      document.getElementById('citizen-jur-skip').addEventListener('click', () => { setJurisdictionLean(null); advanceCitizen(); });
       return;
     }
 

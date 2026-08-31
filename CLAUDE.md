@@ -269,6 +269,33 @@ see "Deliberately not yet done" below for why.
     path is piggybacking on the existing GNews headline pipeline rather
     than a dedicated source, and coverage would be inherently spottier
     than the structured-data sources above.
+
+  **Jurisdiction lean, 31 Aug 2026**: the citizen asked for CiViX to
+  ascertain "the citizen's lean on municipal, state, federal" during
+  manifesto seeding and refine it further from real actions taken, not
+  just ask once and forget. `builder.html` gained a one-time swipe card
+  (`jurisdiction-lean` type, "Where do you want your voice heard most?" —
+  City Hall / state capitol / Washington, or "They all matter equally to
+  me") inserted right after the ZIP card in every deck-construction path
+  (firstPass quiz, topping-up, headline deck, seeded-drilldown), gated by
+  `jurisdictionLeanCard()` so it's asked exactly once per profile —
+  `setJurisdictionLean()` writes `P.jurisdictionLean = {municipal, state,
+  federal}` (default weight 1 each, chosen level bumped to 3; all stay 1
+  on skip). This is also what finally pulled municipal into the top-3
+  digest: `digest.js`'s `buildTopDigest()` never fetched municipal at all
+  before today (only federal/state/docket) — it now calls the new
+  `fetchMunicipalBills()` alongside the others and applies
+  `P.jurisdictionLean` as a score multiplier across all three bill-derived
+  kinds (`general`/`docket` entries are left alone — the lean is about
+  which level of government, not about typed-in priorities or filings).
+  The lean also refines itself from real behavior, not just the one-time
+  card: `calendar.html`'s `bumpJurisdictionLean()` nudges the relevant
+  level up by 0.5 every time a citizen actually takes action through it —
+  currently always `'federal'`, since `reps.js` only resolves federal
+  contacts today, so that's the only level with a real take-action flow
+  to bump on (`openActionModalFor()` and `openGeneralAdvocacyModal()`
+  both call it). Revisit which level gets bumped once state/municipal
+  gain their own take-action flows (see "State Take Action" below).
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
   facts + quote-matching quizzes), included on every page. As of 31 Aug
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
