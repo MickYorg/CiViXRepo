@@ -51,7 +51,28 @@ see "Deliberately not yet done" below for why.
   meant to be a frequent tap) to react to individually; swiping right on
   any of them adopts its topic as a priority the same way a headline card
   does, so agreeing with more facets is a citizen's own way of signaling
-  how much a topic matters without a slider. The "done" card's top-3
+  how much a topic matters without a slider. As of 31 Aug 2026 the whole
+  headline pipeline (fetch -> boildown -> photo) is also pre-warmed:
+  `functions/api/headlines-batch.js` builds a ready 5-card batch server-
+  side (reusing `/api/dig-check` and `/api/headline-image` via internal
+  same-origin fetches, not duplicated logic) and caches it in KV,
+  stale-while-revalidate — any GET returns whatever's cached instantly and
+  kicks off a background rebuild via `waitUntil()` if it's past its
+  1-hour freshness window, so the caller that trips the rebuild isn't the
+  one who waits on it. `index.html` fire-and-forget pings this endpoint on
+  every load purely to be that background trigger ("ready by the first
+  splash load of the hour"), never reading its response.
+  `startHeadlineMode()` tries this batch first — a warm hit skips the
+  live pipeline entirely with no loading flash and no civics popup (the
+  initial paint is `quiet:true` specifically so an instant hit never
+  shows a wait-filler for a wait that barely happened) — and only falls
+  back to the live multi-step pipeline (unchanged) on a miss. GNews-
+  fetching (`fetchGNews`) and the issue taxonomy list both now live in
+  `functions/_lib/` (`gnews.js`, `issue-taxonomy.js`) so `/api/headlines`
+  and `/api/headlines-batch` share one implementation instead of two
+  copies drifting apart — `issue-taxonomy.js` is a manually-kept-in-sync
+  copy of builder.html's `CATALOG` (client JS and server Functions can't
+  share a module today), flagged in its own file comment. The "done" card's top-3
   digest also got a "pop" pass (31 Aug 2026): each entry now shows a rank
   badge (#1 visibly stronger — amber border/background, not just a bigger
   number), a template-built "why this matches you" line naming the actual

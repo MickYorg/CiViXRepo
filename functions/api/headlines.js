@@ -8,32 +8,10 @@
 // `q` param already threads through to a real keyword search today, the
 // client just doesn't send one for a brand-new citizen yet.
 
+import { fetchGNews } from '../_lib/gnews.js';
+
 const CACHE_TTL_SECONDS = 60 * 30; // headlines move faster than the bill calendar
 const DEFAULT_LIMIT = 10;
-
-function slimArticle(a) {
-  return {
-    title: a.title || '',
-    description: a.description || '',
-    url: a.url || '',
-    image: a.image || '',
-    source: (a.source && a.source.name) || '',
-    publishedAt: a.publishedAt || null
-  };
-}
-
-async function fetchGNews(env, { q, limit }) {
-  const apiKey = env.GNEWS_API_KEY;
-  if (!apiKey) throw new Error('missing-key:GNEWS_API_KEY');
-  const base = q
-    ? `https://gnews.io/api/v4/search?q=${encodeURIComponent(q)}&lang=en&country=us`
-    : `https://gnews.io/api/v4/top-headlines?category=nation&lang=en&country=us`;
-  const url = `${base}&max=${limit}&apikey=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`gnews-http-${res.status}`);
-  const data = await res.json();
-  return (data.articles || []).map(slimArticle);
-}
 
 // Registered sources, in the order results are pulled from when more than
 // one is active. Adding a source later: write a fetchX(env, {q, limit})

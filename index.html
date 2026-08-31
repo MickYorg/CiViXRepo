@@ -884,6 +884,14 @@
   }
   cta.addEventListener('click', goToBuilder);
   document.getElementById('cta-sticky').addEventListener('click', goToBuilder);
+
+  // Fire-and-forget: functions/api/headlines-batch.js checks its own
+  // freshness and rebuilds in the background if stale, so the splash
+  // being the site's highest-traffic page makes it the natural trigger to
+  // keep builder.html's headline-swipe deck pre-warmed — "ready by the
+  // first splash load of the hour" without this page waiting on or doing
+  // anything with the response itself.
+  fetch('/api/headlines-batch').catch(() => {});
 })();
 </script>
 </body>

@@ -2647,7 +2647,12 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     }
   }
 
-  function renderHeadlineLoading(status) {
+  // quiet:true paints the loading card without the civics wait-filler —
+  // used for the initial paint while the fast-path pre-warmed-batch check
+  // is still in flight, so a warm hit (the common case) never flashes a
+  // popup for a wait that, from the citizen's side, barely happened.
+  function renderHeadlineLoading(status, opts) {
+    opts = opts || {};
     controlsHidden();
     document.getElementById('citizen-card-slot').innerHTML = `
       <div class="citizen-card citizen-card-static">
@@ -2655,10 +2660,10 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
         <div class="citizen-title">Getting today's headlines ready</div>
         <p class="citizen-blurb">${esc(status || 'Fetching real headlines and boiling each one down…')}</p>
       </div>`;
-    // Give the wait something to read instead of a bare status line —
-    // no-ops if one's already showing or the cooldown hasn't cleared, so
-    // this being called multiple times per pipeline run is harmless.
-    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+    // Give a genuine wait something to read instead of a bare status line
+    // — no-ops if one's already showing or the cooldown hasn't cleared,
+    // so this being called multiple times per pipeline run is harmless.
+    if (!opts.quiet && window.CivicsEngine) window.CivicsEngine.showDuringWait();
   }
   function controlsHidden() {
     const controls = document.getElementById('citizen-controls');
@@ -2675,10 +2680,50 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     return top.map(i => `"${i.name}"`).join(' OR ');
   }
 
+  // Shared by both the pre-warmed fast path and the live pipeline's own
+  // tail below — same card shape either way.
+  function buildHeadlineDeckFrom(cards) {
+    const headlineCards = cards.map(c => ({
+      type: 'headline',
+      article: c.article,
+      topic: c.topic,
+      talkingPoint: c.talkingPoint,
+      photo: c.photo
+    }));
+    deck = [
+      ...headlineCards,
+      ...(P.place.zip ? [] : [{ type: 'zip' }]),
+      { type: 'done' }
+    ];
+    deckIndex = 0;
+    renderCitizenCard();
+  }
+
   async function startHeadlineMode() {
     firstPass = false; // done card should reflect real accumulated state, not the 30-second-quiz framing
     deck = [{ type: 'headline-loading' }];
     deckIndex = 0;
+    renderHeadlineLoading('One moment…', { quiet: true });
+
+    // Fast path: functions/api/headlines-batch.js pre-warms a ready deck
+    // in the background (see index.html's on-load ping and its own
+    // stale-while-revalidate refresh) — when one's ready, this skips the
+    // whole fetch -> boildown -> photo pipeline below entirely, and (since
+    // the paint above was quiet) never shows a wait-filler for a wait
+    // that, from the citizen's side, barely happened.
+    try {
+      const br = await fetch('/api/headlines-batch');
+      const bdata = await br.json();
+      if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
+        buildHeadlineDeckFrom(bdata.cards);
+        return;
+      }
+    } catch (e) {
+      // fall through to the live pipeline below
+    }
+
+    // No pre-warmed batch available — now it's a genuine wait, so switch
+    // to the full loading treatment (status text + wait-filler).
     renderHeadlineLoading();
 
     let articles = [];
@@ -2718,21 +2763,12 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       s.photo = await fetchHeadlinePhoto(s.boildown.imageQuery);
     }));
 
-    const headlineCards = survivors.map(s => ({
-      type: 'headline',
+    buildHeadlineDeckFrom(survivors.map(s => ({
       article: s.article,
       topic: s.boildown.topic,
       talkingPoint: s.boildown.talkingPoint,
       photo: s.photo
-    }));
-
-    deck = [
-      ...headlineCards,
-      ...(P.place.zip ? [] : [{ type: 'zip' }]),
-      { type: 'done' }
-    ];
-    deckIndex = 0;
-    renderCitizenCard();
+    })));
   }
 
   // ---- Archetype quiz scoring / application ---------------------------
