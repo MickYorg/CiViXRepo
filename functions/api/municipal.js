@@ -28,6 +28,7 @@ const CITY_CLIENTS = {
 const ZIP_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30; // ZIP->city is effectively static
 const MATTERS_CACHE_TTL_SECONDS = 60 * 60; // 1 hour, matching calendar.js/state-bills.js
 const MATTER_LIMIT = 20;
+const EVENT_LIMIT = 10;
 
 function cityKey(city, stateAbbr) {
   return (city || '').trim().toLowerCase() + '|' + (stateAbbr || '').trim().toLowerCase();
@@ -59,6 +60,42 @@ function slim(m, client) {
     updateDate: latestDate,
     url: matterUrl(client, m)
   };
+}
+
+// Upcoming meetings — town halls, council sessions, committee hearings —
+// a real "show up" opportunity distinct from the Matters (legislation)
+// list above. Unlike Matters, an Event has no policy-topic text worth
+// keyword-matching against a citizen's priorities (EventBodyName is just
+// "City Council" or "Planning Commission", not a subject) — so this is
+// presented as a plain chronological list of what's coming up in the
+// covered city, not a personalized match.
+function slimEvent(ev) {
+  return {
+    body: ev.EventBodyName || '',
+    date: ev.EventDate || null,
+    time: ev.EventTime || '',
+    location: ev.EventLocation || '',
+    agendaStatus: ev.EventAgendaStatusName || '',
+    agendaUrl: ev.EventAgendaFile || null,
+    url: ev.EventInSiteURL || null
+  };
+}
+
+// Best-effort, separate from the Matters fetch — a citizen still gets
+// their matched legislation even if the Events endpoint hiccups.
+async function fetchEvents(client) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const filterValue = `EventDate ge datetime'${today}'`;
+    const eventsUrl = `https://webapi.legistar.com/v1/${client}/events` +
+      `?$filter=${encodeURIComponent(filterValue)}&$orderby=${encodeURIComponent('EventDate asc')}&$top=${EVENT_LIMIT}`;
+    const res = await fetch(eventsUrl);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (Array.isArray(data) ? data : []).map(slimEvent);
+  } catch (e) {
+    return [];
+  }
 }
 
 export async function onRequestGet({ request, env }) {
@@ -104,10 +141,10 @@ export async function onRequestGet({ request, env }) {
 
   const client = CITY_CLIENTS[cityKey(place.city, place.stateAbbr)];
   if (!client) {
-    return json({ covered: false, city: place.city, state: place.state, bills: [] });
+    return json({ covered: false, city: place.city, state: place.state, bills: [], events: [] });
   }
 
-  const cacheKey = 'municipal:' + client;
+  const cacheKey = 'municipal:v2:' + client; // v2: adds events, bumped so pre-existing cached entries don't return the old shape
   if (kv) {
     try {
       const cached = await kv.get(cacheKey, { type: 'json' });
@@ -139,7 +176,9 @@ export async function onRequestGet({ request, env }) {
     .filter(m => m.MatterTitle && !/^(test|wkj test)\b/i.test(m.MatterTitle.trim()))
     .map(m => slim(m, client));
 
-  const payload = { bills, fetchedAt: Date.now() };
+  const events = await fetchEvents(client);
+
+  const payload = { bills, events, fetchedAt: Date.now() };
   if (kv) {
     try { await kv.put(cacheKey, JSON.stringify(payload), { expirationTtl: MATTERS_CACHE_TTL_SECONDS }); } catch (e) {}
   }

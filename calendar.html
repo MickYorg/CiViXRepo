@@ -577,6 +577,7 @@
     <p class="section-label">Municipal</p>
     <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
     <div id="municipal-list"></div>
+    <div id="municipal-events"></div>
     <p class="section-label">State</p>
     <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
     <div id="state-list"></div>
@@ -1402,6 +1403,28 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode, 'Municipal')).join('');
     }
     enhancePlainSummaries(shown, true);
+    renderMunicipalEvents(s.events, s.city);
+  }
+
+  // Plain chronological list, not matched/scored — see fetchEvents()'s
+  // comment in municipal.js for why (an Event has no topic text worth
+  // keyword-matching, just a body name like "City Council"). This is
+  // "what's coming up," not "what's relevant to you."
+  function renderMunicipalEvents(events, city) {
+    const el = document.getElementById('municipal-events');
+    if (!el) return;
+    if (!events || !events.length) { el.innerHTML = ''; return; }
+    el.innerHTML =
+      `<p class="section-label">Upcoming in ${esc(city || 'your city')}</p>` +
+      events.map(ev => `
+        <div class="card">
+          <div class="card-top"><span class="card-title">${esc(ev.body || 'Meeting')}</span><span class="tag">Meeting</span></div>
+          <div class="card-meta">${esc(fmtDate(ev.date))}${ev.time ? ' · ' + esc(ev.time) : ''}${ev.location ? ' · ' + esc(ev.location) : ''}</div>
+          <div class="card-body">
+            ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Meeting details &#8594;</a>` : ''}
+            ${ev.agendaUrl ? ` &nbsp;·&nbsp; <a href="${esc(ev.agendaUrl)}" target="_blank" rel="noopener">Agenda (PDF) &#8594;</a>` : ''}
+          </div>
+        </div>`).join('');
   }
 
   // ---- Focus zone: top-3 actions, front and center ----------------------
@@ -1493,8 +1516,9 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     }
 
     const bills = data.bills || [];
+    const events = data.events || [];
     if (!bills.length) {
-      MUNICIPAL_STATE = { kind: 'no-bills', city: data.city };
+      MUNICIPAL_STATE = { kind: 'no-bills', city: data.city, events };
       renderMunicipalResults();
       return;
     }
@@ -1503,7 +1527,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const focusIssue = FOCUS_SLUG ? issues.find(i => i.id === FOCUS_SLUG) : null;
 
     if (!issues.length) {
-      MUNICIPAL_STATE = { kind: 'no-issues', bills, city: data.city };
+      MUNICIPAL_STATE = { kind: 'no-issues', bills, city: data.city, events };
       renderMunicipalResults();
       return;
     }
@@ -1511,18 +1535,18 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const matched = matchBills(bills, issues);
 
     if (focusIssue) {
-      MUNICIPAL_STATE = { kind: 'focused', bills, matched, focusIssue, city: data.city };
+      MUNICIPAL_STATE = { kind: 'focused', bills, matched, focusIssue, city: data.city, events };
       renderMunicipalResults();
       return;
     }
 
     if (!matched.length) {
-      MUNICIPAL_STATE = { kind: 'no-match', bills, city: data.city };
+      MUNICIPAL_STATE = { kind: 'no-match', bills, city: data.city, events };
       renderMunicipalResults();
       return;
     }
 
-    MUNICIPAL_STATE = { kind: 'matched', bills, matched, city: data.city, fetchedAt: data.fetchedAt };
+    MUNICIPAL_STATE = { kind: 'matched', bills, matched, city: data.city, fetchedAt: data.fetchedAt, events };
     renderMunicipalResults();
   }
 

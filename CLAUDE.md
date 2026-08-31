@@ -194,6 +194,41 @@ see "Deliberately not yet done" below for why.
   same reasoning as State. Legistar has no "public comment open" flag and
   no direct public URL field on a Matter (constructed from the known
   `{client}.legistar.com/LegislationDetail.aspx?ID=...` pattern instead).
+  As of 31 Aug 2026, `municipal.js` also pulls Legistar's `Events`
+  endpoint (upcoming town halls, council sessions, committee hearings —
+  real "show up" opportunities, the first piece of "beyond legislative"
+  content in the app) alongside `Matters`, filtered to today-forward,
+  ordered soonest-first. Deliberately **not** matched/scored against a
+  citizen's priorities the way bills are — an Event has no policy-topic
+  text worth keyword-matching (`EventBodyName` is just "City Council" or
+  "Planning Commission"), so calendar.html renders it as a plain
+  chronological "what's coming up in your city" list instead
+  (`renderMunicipalEvents()`, `#municipal-events`, right below the
+  Matters list). Best-effort and independent of the Matters fetch — a
+  citizen still sees matched legislation even if the Events endpoint
+  hiccups. Verified live against Boston: real upcoming meetings with
+  correct dates/times/locations, working links to both the meeting page
+  and its agenda PDF.
+
+  **"Beyond legislative" roadmap** (31 Aug 2026, user asked for rallies/
+  demonstrations/town halls/hearings/speeches/press conferences,
+  regulatory comment periods, elections/ballot measures, executive
+  actions, and local non-legislative decisions — local meetings via
+  Legistar Events, above, is the first of these shipped). Remaining,
+  roughly in order of feasibility:
+  - **Executive actions** — Federal Register has a solid, free, well-
+    documented API (executive orders, presidential documents),
+    comparable effort to the congress.gov integration.
+  - **Regulatory comment periods** — regulations.gov has a comparable
+    free federal API.
+  - **Elections & ballot measures** — needs source research first; the
+    obvious free option (Google's Civic Information API) has had parts
+    deprecated, so confirm what's actually still live before committing.
+  - **Rallies/demonstrations/speeches/press conferences** — no
+    structured public API tracks these comprehensively. Most likely
+    path is piggybacking on the existing GNews headline pipeline rather
+    than a dedicated source, and coverage would be inherently spottier
+    than the structured-data sources above.
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
   facts + quote-matching quizzes), included on every page. As of 31 Aug
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
