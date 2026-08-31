@@ -554,6 +554,23 @@
     border: 1px solid var(--amber); border-radius: 20px; padding: 3px 9px; display: inline-block; margin-top: 4px;
   }
 
+  /* State legislator identity form — real PII, collected inline the
+     first time it's actually needed for a real send (see calendar.js's
+     state-action-modal comment for the privacy contract). */
+  .identity-form { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .identity-input {
+    background: var(--ink); border: 1px solid var(--line); color: var(--paper);
+    font-family: Newsreader, Georgia, serif; font-size: 14px; padding: 9px 12px; border-radius: 7px;
+  }
+  .identity-input:focus { outline: none; border-color: var(--amber); }
+  .identity-signed { font-size: 12.5px; color: var(--paper-dim); margin: 0 0 8px; }
+  .identity-signed strong { color: var(--paper); }
+  .link-btn {
+    appearance: none; background: none; border: none; padding: 0; cursor: pointer;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; color: var(--amber-ink);
+    text-decoration: underline;
+  }
+
   .stat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -915,6 +932,9 @@
   function watchKeyForGeneral(topic) {
     return 'general:' + topic;
   }
+  function watchKeyForState(bill) {
+    return 'state:' + (bill.session || '') + ':' + (bill.identifier || '');
+  }
   function loadWatchlist() {
     const profile = loadRawProfile();
     return (profile && Array.isArray(profile.watching)) ? profile.watching : [];
@@ -933,13 +953,18 @@
     try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
     return idx === -1;
   }
-  function checkWatchlistUpdates(bills) {
+  // kind/keyFn default to federal (calendar.js's own fetch) — bootState()
+  // passes 'state'/watchKeyForState so a watched state bill gets the same
+  // real return-visit diffing, not just federal.
+  function checkWatchlistUpdates(bills, kind, keyFn) {
+    kind = kind || 'federal';
+    keyFn = keyFn || watchKeyFor;
     const list = loadWatchlist();
     if (!list.length) return;
     const byKey = {};
-    (bills || []).forEach(b => { byKey[watchKeyFor(b)] = b; });
+    (bills || []).forEach(b => { byKey[keyFn(b)] = b; });
     list.forEach(w => {
-      if (w.kind !== 'federal') return;
+      if (w.kind !== kind) return;
       const b = byKey[w.key];
       if (!b) return;
       const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
@@ -1582,6 +1607,277 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     }
   }
 
+  // ---- State action modal: the one real one-button send ----------------
+  // OpenStates gives a genuine, published email for most state
+  // legislators (see functions/_lib/openstates-people.js) — unlike
+  // federal, where 5calls has no recipient email and official contact
+  // forms are CAPTCHA-protected. That real recipient is what makes an
+  // actual send possible here instead of the honest copy+paste federal
+  // is stuck with.
+  //
+  // Identity (name + mailing address, optionally email) is collected
+  // once, inline, the first time a citizen is about to send — never
+  // upfront in the manifesto — and stored only in civix-profile.identity
+  // (localStorage). It leaves the browser exactly once per send, in the
+  // POST to /api/send-state-email, and that endpoint never persists it
+  // (see its own file comment). "Forget my info" clears it outright.
+  let STATE_ACTIVE = null;
+
+  function loadIdentity() {
+    const profile = loadRawProfile();
+    return (profile && profile.identity) || null;
+  }
+  function saveIdentity(identity) {
+    const profile = loadRawProfile();
+    if (!profile) return;
+    profile.identity = identity;
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+  }
+
+  function openStateActionModal(bill, hits) {
+    STATE_ACTIVE = {
+      bill, hits,
+      reps: null, repsError: null, noZip: false, selectedRepId: null,
+      draft: { status: 'idle' },
+      editIdentity: false,
+      sendResult: null
+    };
+    document.getElementById('action-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    renderStateActionCard();
+    loadRepsForState();
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+    bumpJurisdictionLean('state');
+  }
+  function openStateActionModalIdx(idx) {
+    const entry = STATE_CURRENT[idx];
+    if (entry) openStateActionModal(entry.bill, entry.hits);
+  }
+  function closeStateActionModal() {
+    document.getElementById('action-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+    STATE_ACTIVE = null;
+  }
+
+  async function loadRepsForState() {
+    const active = STATE_ACTIVE;
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+    if (!zip) { active.noZip = true; renderStateActionCard(); return; }
+    try {
+      const r = await fetch('/api/state-reps?zip=' + encodeURIComponent(zip));
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+      if (STATE_ACTIVE !== active) return;
+      active.reps = data.reps || [];
+      if (active.reps.length) active.selectedRepId = active.reps[0].id;
+      renderStateActionCard();
+      if (active.reps.length) generateStateDraft();
+    } catch (e) {
+      if (STATE_ACTIVE !== active) return;
+      active.repsError = e.message || 'request failed';
+      renderStateActionCard();
+    }
+  }
+
+  async function generateStateDraft() {
+    const active = STATE_ACTIVE;
+    const rep = active.reps.find(r => r.id === active.selectedRepId);
+    if (!rep) return;
+    active.draft = { status: 'loading' };
+    active.sendResult = null;
+    renderStateActionCard();
+
+    const bill = active.bill;
+    const profile = loadRawProfile();
+    const matchedIssues = (profile && profile.issues || []).filter(i => (active.hits || []).includes(i.name));
+    const stanceText = matchedIssues.length
+      ? matchedIssues.map(i => i.stance ? `${i.name}: "${i.stance}"` : i.name).join('; ')
+      : '';
+    const chamberWord = rep.chamber === 'upper' ? 'State Senator' : 'State Representative';
+    const billLine = `${bill.identifier} — "${bill.title}"`;
+    const actionLine = bill.latestAction ? bill.latestAction.text : 'No recorded action yet.';
+
+    const prompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office about a bill in their state legislature, for a civic-engagement tool.
+
+${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
+Bill: ${billLine}
+Latest action: ${actionLine}
+${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : "The constituent hasn't stated a specific position yet — keep this focused on urging attention to the bill rather than assuming a side."}
+
+Write a concise constituent email, under 160 words, about this bill. Respond in exactly this plain-text format, no markdown, and do not include a signature or sign-off (the sender's real name and address are appended separately):
+
+SUBJECT: <subject line>
+BODY: <the email body, a few short paragraphs>`;
+
+    let text;
+    try {
+      text = await digCheckCall(prompt);
+    } catch (e) {
+      if (STATE_ACTIVE !== active) return;
+      active.draft = { status: 'error', error: e.message || 'request failed' };
+      renderStateActionCard();
+      return;
+    }
+    if (STATE_ACTIVE !== active) return;
+    const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
+    const bodyMatch = text.match(/BODY:\s*([\s\S]+)/i);
+    active.draft = {
+      status: 'done',
+      subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${billLine}`,
+      body: bodyMatch ? bodyMatch[1].trim() : text
+    };
+    renderStateActionCard();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+  }
+
+  async function sendStateEmail() {
+    const active = STATE_ACTIVE;
+    const rep = active.reps.find(r => r.id === active.selectedRepId);
+    const identity = loadIdentity();
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+    if (!rep || !identity || !zip) return;
+    active.sendResult = { status: 'sending' };
+    renderStateActionCard();
+    try {
+      const r = await fetch('/api/send-state-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zip, repId: rep.id,
+          subject: active.draft.subject, message: active.draft.body,
+          senderName: identity.name, senderAddress: identity.address, senderEmail: identity.email || ''
+        })
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+      if (STATE_ACTIVE !== active) return;
+      active.sendResult = { status: 'sent', sentTo: data.sentTo || rep.name, at: new Date().toLocaleTimeString() };
+      renderStateActionCard();
+    } catch (e) {
+      if (STATE_ACTIVE !== active) return;
+      active.sendResult = { status: 'error', error: e.message || 'request failed' };
+      renderStateActionCard();
+    }
+  }
+
+  function renderIdentityForm(prefill) {
+    const v = prefill || {};
+    return `
+      <div class="identity-form">
+        <p class="noise-hint">State legislative offices expect a name and mailing address to confirm you're a constituent. Stored only on this device, sent to CiViX's server only at the moment you send a message, never stored there afterward, never shared or sold.</p>
+        <input type="text" class="identity-input" id="identity-name" placeholder="Full name" value="${esc(v.name || '')}">
+        <input type="text" class="identity-input" id="identity-address" placeholder="Mailing address (street, city, state, ZIP)" value="${esc(v.address || '')}">
+        <input type="email" class="identity-input" id="identity-email" placeholder="Email (optional — so the office can reply to you)" value="${esc(v.email || '')}">
+        <button type="button" class="btn btn-primary" data-save-identity>Save &amp; continue</button>
+      </div>`;
+  }
+
+  function renderStateActionCard() {
+    const el = document.getElementById('action-card');
+    const active = STATE_ACTIVE;
+    if (!active) return;
+    const bill = active.bill;
+    const identity = loadIdentity();
+
+    const watching = !!findWatch(watchKeyForState(bill));
+    const watchSection = `
+      <div class="action-section">
+        <button type="button" class="watch-toggle ${watching ? 'is-on' : ''}" data-watch-state>
+          ${watching ? '🐕 Watching — tap to stop' : '🐕 Watch this bill'}
+        </button>
+        <p class="watch-note">${watching ? "CiViX will flag it in your Watching list below if there's new activity next time you're on this page." : "No live alerts yet — watching adds it to a list below and flags it here on your next visit if it moves."}</p>
+      </div>`;
+    const noiseSection = `
+      <div class="action-section">
+        <div class="action-section-title">Beyond email</div>
+        <p class="noise-hint">CiViX doesn't have its own petition, rally, or meetup data yet — these hand off to real public tools instead of faking results.</p>
+        <div class="noise-links">
+          <a class="btn" href="https://www.change.org/search?q=${encodeURIComponent(bill.title || '')}" target="_blank" rel="noopener">Sign or start a petition &#8599;</a>
+          <a class="btn" href="https://www.mobilize.us/search/?q=${encodeURIComponent(bill.title || '')}" target="_blank" rel="noopener">Find a rally or event &#8599;</a>
+          <button type="button" class="btn" data-organize-tips>Organize your own meeting</button>
+        </div>
+        <div class="action-draft organize-tips" id="organize-tips" hidden>
+          <strong>Organizing something yourself?</strong>
+          <ul>
+            <li>Pick a concrete ask — one bill, one clear outcome.</li>
+            <li>Book a public, accessible space — a library meeting room or community center is usually free or low-cost.</li>
+            <li>Give people 2–3 weeks' notice and a way to RSVP so you know how many chairs to set up.</li>
+            <li>Invite your legislator's office — a staffer showing up is itself a form of accountability.</li>
+            <li>Follow up in writing afterward, even with just a few attendees — a written record outlasts the room.</li>
+          </ul>
+        </div>
+      </div>`;
+
+    let repsSection;
+    if (active.noZip) {
+      repsSection = `<p class="action-empty">Add your ZIP in <a href="builder.html">your manifesto</a> to find your state legislators.</p>`;
+    } else if (active.repsError) {
+      repsSection = `<p class="action-empty">Couldn't look up your state legislators: ${esc(active.repsError)}</p>`;
+    } else if (!active.reps) {
+      repsSection = `<p class="action-empty">Looking up your state legislators&hellip;</p>`;
+    } else if (!active.reps.length) {
+      repsSection = `<p class="action-empty">No state legislators came back for that ZIP.</p>`;
+    } else {
+      const picker = `<div class="rep-picker">${active.reps.map(r =>
+        `<button type="button" class="rep-chip ${r.id === active.selectedRepId ? 'is-on' : ''}" data-state-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} — ${esc(r.chamberLabel)}</button>`
+      ).join('')}</div>`;
+
+      const rep = active.reps.find(r => r.id === active.selectedRepId);
+      const draft = active.draft;
+      const draftBody = draft.status === 'loading'
+        ? `<div class="action-draft is-loading">Drafting a message&hellip;</div>`
+        : draft.status === 'error'
+          ? `<div class="action-draft">Couldn't draft this: ${esc(draft.error)}</div>`
+          : draft.status === 'done'
+            ? `<div class="action-draft"><strong>${esc(draft.subject || '')}</strong>\n\n${esc(draft.body || '')}</div>`
+            : '';
+
+      let sendSection = '';
+      if (draft.status === 'done') {
+        if (!rep.email) {
+          sendSection = `<p class="action-empty">No email address on file for ${esc(rep.name)} — try Copy instead.</p>
+            <div class="action-row"><button type="button" class="btn" data-copy-state>Copy</button></div>`;
+        } else if (!identity || active.editIdentity) {
+          sendSection = renderIdentityForm(identity);
+        } else if (active.sendResult && active.sendResult.status === 'sent') {
+          sendSection = `<p class="watch-note">&#10003; Sent to ${esc(active.sendResult.sentTo)}'s office${active.sendResult.at ? ' at ' + esc(active.sendResult.at) : ''}.</p>`;
+        } else {
+          const sending = active.sendResult && active.sendResult.status === 'sending';
+          const sendError = active.sendResult && active.sendResult.status === 'error' ? active.sendResult.error : '';
+          sendSection = `
+            <p class="identity-signed">Signed as <strong>${esc(identity.name)}</strong>, ${esc(identity.address)} — <button type="button" class="link-btn" data-edit-identity>edit</button> &middot; <button type="button" class="link-btn" data-forget-identity>forget my info</button></p>
+            <div class="action-row">
+              <button type="button" class="btn btn-primary" data-send-state ${sending ? 'disabled' : ''}>${sending ? 'Sending…' : 'Send to ' + esc(rep.name) + ' →'}</button>
+              <button type="button" class="btn" data-copy-state>Copy instead</button>
+            </div>
+            ${sendError ? `<p class="action-email-note">Couldn't send: ${esc(sendError)}</p>` : ''}
+            <p class="action-email-note">To: ${esc(rep.email)}. This really sends — CiViX's server relays it by email and doesn't keep a copy afterward.</p>`;
+        }
+      }
+
+      repsSection = `
+        ${picker}
+        <div class="action-section">
+          <div class="action-section-title">Message</div>
+          ${draftBody}
+          ${sendSection}
+        </div>
+      `;
+    }
+
+    el.innerHTML = `
+      <button class="action-close" type="button" id="action-close">&#10005; CLOSE</button>
+      <div class="action-bill-title">${esc(bill.identifier)} — ${esc(bill.title)}</div>
+      <div class="action-bill-meta">${esc(bill.session || '')} &middot; ${esc(bill.latestAction ? bill.latestAction.text : '')}</div>
+      ${repsSection}
+      ${watchSection}
+      ${noiseSection}
+    `;
+    document.getElementById('action-close').addEventListener('click', closeStateActionModal);
+  }
+
   document.addEventListener('click', (e) => {
     const t = e.target;
 
@@ -1603,9 +1899,14 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     }
 
     if (t.id === 'action-overlay') {
-      if (GENERAL_ACTIVE) closeGeneralAdvocacyModal(); else closeActionModal();
+      if (GENERAL_ACTIVE) closeGeneralAdvocacyModal();
+      else if (STATE_ACTIVE) closeStateActionModal();
+      else closeActionModal();
       return;
     }
+
+    const takeStateAction = t.closest('[data-take-state-action]');
+    if (takeStateAction) { openStateActionModalIdx(Number(takeStateAction.dataset.takeStateAction)); return; }
 
     const leanChip = t.closest('[data-lean]');
     if (leanChip && ACTIVE) { setLean(leanChip.dataset.lean); return; }
@@ -1677,12 +1978,64 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
       renderWatchingZone();
       return;
     }
+    const watchState = t.closest('[data-watch-state]');
+    if (watchState && STATE_ACTIVE) {
+      const bill = STATE_ACTIVE.bill;
+      toggleWatch({
+        key: watchKeyForState(bill), kind: 'state',
+        title: bill.identifier + ': ' + bill.title,
+        url: bill.url || null,
+        lastSeenActionDate: (bill.latestAction && bill.latestAction.date) || bill.updateDate || null,
+        addedAt: Date.now()
+      });
+      renderStateActionCard();
+      renderWatchingZone();
+      return;
+    }
     const unwatch = t.closest('[data-unwatch]');
     if (unwatch) {
       toggleWatch({ key: unwatch.dataset.unwatch });
       renderWatchingZone();
       if (ACTIVE) renderActionCard();
       if (GENERAL_ACTIVE) renderGeneralActionCard();
+      if (STATE_ACTIVE) renderStateActionCard();
+      return;
+    }
+
+    const stateRepChip = t.closest('[data-state-rep]');
+    if (stateRepChip && STATE_ACTIVE) {
+      STATE_ACTIVE.selectedRepId = stateRepChip.dataset.stateRep;
+      STATE_ACTIVE.sendResult = null;
+      generateStateDraft();
+      return;
+    }
+    if (t.closest('[data-copy-state]') && STATE_ACTIVE) {
+      const d = STATE_ACTIVE.draft;
+      copy((d.subject || '') + '\n\n' + (d.body || ''), t.closest('[data-copy-state]'));
+      return;
+    }
+    if (t.closest('[data-save-identity]') && STATE_ACTIVE) {
+      const name = (document.getElementById('identity-name') || {}).value || '';
+      const address = (document.getElementById('identity-address') || {}).value || '';
+      const email = (document.getElementById('identity-email') || {}).value || '';
+      if (!name.trim() || !address.trim()) return;
+      saveIdentity({ name: name.trim(), address: address.trim(), email: email.trim() });
+      STATE_ACTIVE.editIdentity = false;
+      renderStateActionCard();
+      return;
+    }
+    if (t.closest('[data-edit-identity]') && STATE_ACTIVE) {
+      STATE_ACTIVE.editIdentity = true;
+      renderStateActionCard();
+      return;
+    }
+    if (t.closest('[data-forget-identity]') && STATE_ACTIVE) {
+      saveIdentity(null);
+      renderStateActionCard();
+      return;
+    }
+    if (t.closest('[data-send-state]') && STATE_ACTIVE) {
+      sendStateEmail();
       return;
     }
 
@@ -1696,17 +2049,19 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (GENERAL_ACTIVE) closeGeneralAdvocacyModal();
+    else if (STATE_ACTIVE) closeStateActionModal();
     else if (ACTIVE) closeActionModal();
   });
 
-  // State cards intentionally have no Take Action button — reps.js only
-  // resolves federal (US House/Senate) contacts today, so wiring the same
-  // button in here would show a state bill's reader their federal rep,
-  // which is simply wrong. State-legislator lookup + drafting is future
-  // scope, not shipped alongside this data slice.
-  function renderStateCard(bill, hits, mode, tag) {
+  // State cards get a real Take Action button as of 31 Aug 2026 —
+  // functions/api/state-reps.js resolves real state legislators (with,
+  // often, a real published email via OpenStates), so this no longer
+  // risks showing a state bill's reader their federal rep the way it
+  // would have with reps.js's federal-only data.
+  function renderStateCard(bill, hits, idx, mode, tag) {
     tag = tag || 'State';
     const bodyId = 'body-' + esc(slug(bill.identifier || ''));
+    const takeActionBtn = `<button type="button" class="take-action" data-take-state-action="${idx}">Take action &#8594;</button>`;
 
     if (mode === 'citizen') {
       const officialTitle = bill.url
@@ -1720,6 +2075,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
             <div class="card-title">${officialTitle}</div>
           </details>
           ${matchTagsHtml(hits, mode)}
+          <div>${takeActionBtn}</div>
         </div>`;
     }
 
@@ -1734,6 +2090,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
         ${metaHtml}
         <div class="card-body" id="${bodyId}">${action}</div>
         ${matchTagsHtml(hits, mode)}
+        <div>${takeActionBtn}</div>
       </div>`;
   }
 
@@ -1778,6 +2135,11 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     if (el) el.textContent = n ? `${n} shown` : '';
   }
 
+  // STATE_CURRENT indexes whatever's actually rendered so
+  // data-take-state-action="N" can open the right bill — mirrors CURRENT
+  // for federal.
+  let STATE_CURRENT = [];
+
   function renderStateResults() {
     const statusEl = document.getElementById('state-status');
     const listEl = document.getElementById('state-list');
@@ -1786,6 +2148,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     const caps = CAPS[mode] || CAPS.activist;
     const s = STATE_STATE;
     let shown = [];
+    STATE_CURRENT = [];
 
     if (s.kind === 'no-zip') {
       statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see state legislative activity — CiViX needs it to know which state's legislature to check.`;
@@ -1797,13 +2160,15 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     } else if (s.kind === 'no-issues') {
       statusEl.innerHTML = `Showing the most recently updated bills in ${esc(s.stateName)}'s legislature. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
       shown = s.bills.slice(0, caps.fallback);
-      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode)).join('');
+      STATE_CURRENT = shown.map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = STATE_CURRENT.map((c, i) => renderStateCard(c.bill, c.hits, i, mode)).join('');
     } else if (s.kind === 'focused') {
       const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
       if (focused.length) {
         statusEl.textContent = `Showing ${focused.length} ${s.stateName} bill${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
         shown = focused.map(m => m.bill);
-        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
+        STATE_CURRENT = focused.map(m => ({ bill: m.bill, hits: m.hits }));
+        listEl.innerHTML = STATE_CURRENT.map((c, i) => renderStateCard(c.bill, c.hits, i, mode)).join('');
       } else {
         statusEl.textContent = `No ${s.stateName} bills matched to "${s.focusIssue.name}" yet.`;
         listEl.innerHTML = '';
@@ -1811,12 +2176,14 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     } else if (s.kind === 'no-match') {
       statusEl.textContent = `Checked ${s.bills.length} recently updated ${s.stateName} bills — none matched your declared priorities yet. Showing the most recent activity instead.`;
       shown = s.bills.slice(0, caps.fallback);
-      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode)).join('');
+      STATE_CURRENT = shown.map(b => ({ bill: b, hits: [] }));
+      listEl.innerHTML = STATE_CURRENT.map((c, i) => renderStateCard(c.bill, c.hits, i, mode)).join('');
     } else if (s.kind === 'matched') {
       statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated ${s.stateName} bills against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
       const matchedSlice = s.matched.slice(0, caps.matched);
       shown = matchedSlice.map(m => m.bill);
-      listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode)).join('');
+      STATE_CURRENT = matchedSlice.map(m => ({ bill: m.bill, hits: m.hits }));
+      listEl.innerHTML = STATE_CURRENT.map((c, i) => renderStateCard(c.bill, c.hits, i, mode)).join('');
     }
     enhancePlainSummaries(shown, true);
     setSectionCount('state-count', shown.length);
@@ -1844,6 +2211,8 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     }
 
     const bills = data.bills || [];
+    checkWatchlistUpdates(bills, 'state', watchKeyForState);
+    renderWatchingZone();
     if (!bills.length) {
       STATE_STATE = { kind: 'no-bills', stateName: data.state };
       renderStateResults();

@@ -224,10 +224,70 @@ see "Deliberately not yet done" below for why.
   State section is also real: `functions/api/state-bills.js` resolves the
   profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
   matched bills from OpenStates, the same "one API covers all 50
-  legislatures" role congress.gov plays federally. State cards
-  deliberately have **no** Take Action button yet — `reps.js` only
-  resolves federal contacts, so reusing that button would show a state
-  bill's reader their federal rep. Municipal is now real for a curated
+  legislatures" role congress.gov plays federally.
+
+  **State Take Action is real, including a genuine one-button send (31
+  Aug 2026)** — the citizen pushed on "do we have info needed to do 1
+  button press email my rep?" for federal specifically. The honest
+  answer for federal stayed no (see the "Send it" entry above: no real
+  recipient email from 5calls, and most official contact forms run
+  CAPTCHA/bot-detection that auto-submission would have to defeat — a
+  line that isn't getting crossed regardless of authorization). But
+  checking OpenStates' actual schema turned up something federal doesn't
+  have: state legislators' `Person` object carries a real, often-
+  published `email` field. That's a genuine recipient, which is what a
+  real send needs and federal doesn't have.
+  - `functions/_lib/openstates-people.js` — shared resolver: ZIP →
+    lat/lng (Zippopotam, cached under `zipgeo:<zip>`) → OpenStates'
+    `/people.geo?lat=&lng=` (which returns both state legislators *and*
+    members of Congress for a point — filtered here to
+    `jurisdiction.classification === 'state'` only, so federal
+    representation stays on 5calls as its one canonical source rather
+    than growing a second, divergent one). Returns `{id, name, party,
+    chamber, chamberLabel, district, email, phone, url}` per legislator.
+  - `functions/api/state-reps.js` — thin `GET ?zip=` wrapper around the
+    resolver, for the frontend's rep picker.
+  - `functions/api/send-state-email.js` — the actual send, via Resend.
+    Never trusts a client-supplied recipient: `to` is re-derived
+    server-side from `repId` by re-running the same resolver, so this
+    can't become an open relay to arbitrary addresses. Rate-limited two
+    ways (global daily cap under Resend's free-tier ceiling, plus a
+    per-IP daily cap), mirroring dig-check.js's existing counter
+    pattern. Nothing in the request — name, address, email, message
+    text — is written to KV or logged; the only thing this function
+    persists is the rate-limit counters.
+  - calendar.html: state bill cards get a real **Take action** button
+    (`STATE_ACTIVE`, `openStateActionModal()`/`renderStateActionCard()`,
+    mirroring the federal/general modals' architecture). A citizen's
+    name + mailing address (+ optional email, so the office can reply to
+    an actual person) are collected **contextually**, inline, the first
+    time a real send is about to happen — not upfront in the manifesto,
+    per the citizen's explicit "permit required on a case-by-case basis"
+    framing — and stored only in `civix-profile.identity`
+    (localStorage). This is a deliberate, one-time reversal of the
+    "we never ask for your address" stance noted elsewhere in this file,
+    scoped narrowly to state-legislator email and gated by real,
+    visible consent: the compose view always shows exactly who it's
+    addressed to ("To: `<rep email>`") right next to the Send button, so
+    each send is its own explicit act, and "forget my info" clears the
+    stored identity outright. Identity leaves the browser exactly once
+    per send, in the POST to `/api/send-state-email` — never persisted
+    server-side (see that file's own comment). On success the modal
+    shows a genuine "✓ Sent to `<rep>`'s office" — accurate this time,
+    unlike federal's "Send it," because it really was relayed by email.
+    A "Copy instead" fallback stays available for anyone who'd rather
+    not use the real-send path. State bills also gained the same watch
+    toggle and "Beyond email" (petition/rally/organize) section as
+    federal/general, via the shared `toggleWatch()`/`checkWatchlistUpdates()`
+    machinery (now generalized to take a `kind`/`keyFn` pair instead of
+    being federal-only).
+  - **New required secret**: `RESEND_API_KEY` (see "Required Cloudflare
+    Pages secrets" below) — needs mycivix.com verified as a sending
+    domain in Resend's dashboard (DNS records added at the registrar,
+    something only the account holder can do) before real sends work;
+    without it the endpoint fails cleanly with a clear server-side
+    error, verified locally.
+  Municipal is now real for a curated
   list of cities (31 Aug 2026): `functions/api/municipal.js` resolves the
   profile's ZIP to a city (Zippopotam.us, same as state) and, for any city
   confirmed to run Legistar (Granicus' legislative platform — hundreds of
@@ -300,11 +360,11 @@ see "Deliberately not yet done" below for why.
   The lean also refines itself from real behavior, not just the one-time
   card: `calendar.html`'s `bumpJurisdictionLean()` nudges the relevant
   level up by 0.5 every time a citizen actually takes action through it —
-  currently always `'federal'`, since `reps.js` only resolves federal
-  contacts today, so that's the only level with a real take-action flow
-  to bump on (`openActionModalFor()` and `openGeneralAdvocacyModal()`
-  both call it). Revisit which level gets bumped once state/municipal
-  gain their own take-action flows (see "State Take Action" below).
+  `openActionModalFor()`/`openGeneralAdvocacyModal()` bump `'federal'`,
+  and (since 31 Aug 2026, once state gained its own real take-action
+  flow — see "State Take Action is real" below) `openStateActionModal()`
+  bumps `'state'`. Municipal still has no take-action flow, so nothing
+  bumps that level yet.
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
   facts + quote-matching quizzes), included on every page. As of 31 Aug
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
@@ -451,7 +511,16 @@ deployment (not just "Retry deployment") is required after adding one:
   Inbox/calendar-action AI drafting, which reuse the same endpoint).
 - `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
 - `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
-- `OPENSTATES_API_KEY` — powers `/api/state-bills` (free, openstates.org/api/register).
+- `OPENSTATES_API_KEY` — powers `/api/state-bills` and `/api/state-reps`
+  (free, openstates.org/api/register).
+- `RESEND_API_KEY` — powers `/api/send-state-email`, the real one-button
+  state-legislator send (free tier, 100/day — resend.com). **Also
+  requires mycivix.com to be added and verified as a sending domain in
+  Resend's dashboard** (DNS records added at the domain registrar) before
+  real sends succeed — an API key alone isn't enough here, unlike every
+  other secret in this list. Optional tuning vars: `EMAIL_DAILY_LIMIT`
+  (default 80, headroom under Resend's 100/day cap), `EMAIL_DAILY_LIMIT_PER_IP`
+  (default 5), `EMAIL_FROM` (default `CiViX <noreply@mycivix.com>`).
 - `GNEWS_API_KEY` — powers `/api/headlines` for builder.html's headline-
   swipe path (free tier, 100 req/day, allows production use — gnews.io).
 - `UNSPLASH_ACCESS_KEY` — powers `/api/headline-image`, finding a real
@@ -542,12 +611,13 @@ they'd pay off, are:
   federally/per-state; Legistar covers this list but is per-city, so
   growing coverage means verifying and adding one city's client slug at a
   time, not a single source swap.
-- **State Take Action** — state bills match against the profile but have
-  no call/email drafting yet, unlike federal. `functions/api/reps.js`
-  would need to resolve state legislators too (5calls supports this via
-  its `area` field — `StateUpper`/`StateLower` — reps.js currently
-  filters to federal only) before this is a small extension rather than
-  new infrastructure.
+- **~~State Take Action~~ — resolved 31 Aug 2026.** State bills now have
+  a real Take Action modal with drafting *and* a genuine one-button send
+  (via OpenStates' legislator `email` field + Resend) — see the
+  "State Take Action is real" entry above. Built via a new OpenStates
+  geo lookup (`functions/_lib/openstates-people.js`) rather than
+  extending reps.js's federal-only 5calls data, since 5calls doesn't
+  cover state legislators at all today.
 - **Petition and rally/event actions — partially real as of 31 Aug
   2026.** The action modals' new "Beyond calls & email" section (see
   calendar.html's entry above) hands off to Change.org/Mobilize.us
@@ -561,19 +631,28 @@ they'd pay off, are:
   citizen who isn't on the page. Building that is a real infrastructure
   project (accounts, a job runner, an email/push channel), not a small
   extension — the "mock it up now" scope stopped short of it on purpose.
-- **One-tap "Send it" still ends in a copy+paste, not a real send** —
+- **Federal "Send it" still ends in a copy+paste, not a real send** —
   calendar.html's `fireOff()` (see entry above) removed a manual step but
   not the fundamental blocker: 5calls has no real recipient email address
-  to send to, and CiViX doesn't auto-submit third-party government
-  contact forms on a citizen's behalf. Solving this for real means either
-  a data source with real staff emails (doesn't appear to exist publicly)
-  or scripted form-filling, which needs its own trust/reliability
-  tradeoffs worked out before it's worth building.
+  to send to, and CiViX won't auto-submit third-party government contact
+  forms (most run CAPTCHA/bot-detection) on a citizen's behalf. This is
+  now a real, permanent asymmetry rather than a temporary gap: state
+  gained a genuine one-button send on 31 Aug 2026 (OpenStates publishes
+  real legislator emails; Congress doesn't), and federal likely never
+  will unless a public source of real congressional staff emails
+  appears — solving it via scripted form-filling isn't happening,
+  CAPTCHA-bypass is off the table regardless of authorization.
 - **ZIP-only rep lookup is best-effort** — 5calls resolves a ZIP to a
   district, but ZIPs don't map 1:1 to congressional districts, so it can
   be wrong for a split ZIP. Precise lookup would mean asking for a full
-  address, which cuts against `builder.html`'s current "we never ask for
-  your address" positioning — a real tradeoff, not yet decided either way.
+  address; `builder.html`'s manifesto itself still never asks (still
+  ZIP-only there) — the 31 Aug 2026 state-email feature asks for a
+  mailing address, but narrowly, contextually in calendar.html's state
+  action modal, only from someone about to actually send, and stored
+  local-only (see "State Take Action is real" above). Whether to also
+  use that address to sharpen federal district resolution is a separate
+  decision not made here — today it's used only for signing state
+  emails, nothing else.
 - **~~DIG's own source list vs. the profile's § 04 sources~~ — resolved
   29 Aug 2026.** DIG now reads and writes `P.sources` directly (the same
   `civix-profile` localStorage key `builder.html` uses) instead of its own
