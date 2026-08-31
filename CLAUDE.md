@@ -38,6 +38,17 @@ see "Deliberately not yet done" below for why.
   already biases toward a citizen's existing top 2 priorities when they
   have any (a first step toward "the manifesto should influence the
   headlines"); a brand-new citizen just gets the general national feed.
+  Every swipeable card in Citizen mode (trait/category/issue/action/
+  headline alike — the only true swipe-deck UI in the app; DIG's and the
+  Inbox's own "focus mode" card browsers are prev/next paging, not this)
+  also got a third, deliberately smaller "it's complicated" button between
+  skip and yes. Tapping it defers the current card to the end of the deck
+  and inserts 3 AI-drafted facets of that same topic (`/api/dig-check`,
+  text-only — no generated image, to keep cost/latency down for what's
+  meant to be a frequent tap) to react to individually; swiping right on
+  any of them adopts its topic as a priority the same way a headline card
+  does, so agreeing with more facets is a citizen's own way of signaling
+  how much a topic matters without a slider.
 - `calendar.html` — Federal section is real: `functions/api/calendar.js`
   pulls recent bills from congress.gov, matched client-side against the
   profile's declared issues (weighted, hand-authored synonym map). Each

@@ -316,6 +316,18 @@
   .citizen-btn:active { transform: scale(0.92); }
   .citizen-btn-no:hover { color: var(--strike); border-color: var(--strike); }
   .citizen-btn-yes:hover { color: var(--amber-ink); border-color: var(--amber); }
+  /* Tertiary, deliberately smaller than yes/no — this isn't a third swipe
+     direction, it's "give me more before I decide," so it shouldn't read
+     as equally weighted against accept/reject. */
+  .citizen-btn-complicated {
+    width: 42px; height: 42px; font-size: 18px; align-self: center;
+  }
+  .citizen-btn-complicated:hover { color: var(--paper); border-color: var(--paper-dim); }
+  .citizen-drilldown-context {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: 0.04em; color: var(--paper-dim);
+    max-width: none;
+  }
   @media (max-width: 480px) {
     .citizen-card { padding: 26px 20px; min-height: 340px; }
     .citizen-emoji { font-size: 52px; }
@@ -896,6 +908,7 @@
   </div>
   <div class="citizen-controls" id="citizen-controls">
     <button type="button" class="citizen-btn citizen-btn-no" id="citizen-no" aria-label="Skip this one">&#10005;</button>
+    <button type="button" class="citizen-btn citizen-btn-complicated" id="citizen-complicated" aria-label="It's complicated — dig deeper first">&#129300;</button>
     <button type="button" class="citizen-btn citizen-btn-yes" id="citizen-yes" aria-label="Yes, that's me">&#9825;</button>
   </div>
 </div>
@@ -2768,7 +2781,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       }
     } else if (card.type === 'action') {
       if (P.actions.indexOf(card.id) === -1) P.actions.push(card.id);
-    } else if (card.type === 'headline') {
+    } else if (card.type === 'headline' || card.type === 'drilldown') {
       addIssue(card.topic);
     }
     save();
@@ -2823,8 +2836,74 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     }
     window.setTimeout(() => advanceCitizen(direction), 180);
   }
+
+  // ---- "It's complicated" — every swipeable card type gets a third,
+  // deliberately smaller option beside yes/no: don't decide yet, look
+  // closer first. The current card is deferred to the end of the deck
+  // (still swipeable later, just not right now) and replaced with 3
+  // AI-drafted facets of the same topic to react to individually —
+  // agreeing with more of them is a citizen's own way of signaling how
+  // strongly a topic actually matters, without a slider.
+  function drilldownSeed(card) {
+    switch (card.type) {
+      case 'trait': case 'category': case 'action':
+        return { title: card.title, context: card.blurb || '' };
+      case 'issue':
+        return { title: card.title, context: ISSUE_BLURBS[card.title] || '' };
+      case 'headline':
+        return { title: card.article.title, context: card.talkingPoint };
+      case 'drilldown':
+        return { title: card.talkingPoint, context: 'One facet of "' + card.parentTitle + '"' };
+      default:
+        return null;
+    }
+  }
+
+  async function buildDrilldownCards(seed) {
+    const prompt = `A citizen tapped "it's complicated" while swiping through a civic-engagement manifesto builder — instead of a flat yes/no on this topic, they want to look closer first. Give 3 distinct, concrete facets of it, each specific enough to react to on its own (meaningfully different from one another, not restatements of the same point).
+
+Topic: "${seed.title}"${seed.context ? `\nContext: "${seed.context}"` : ''}
+
+Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other text:
+[{
+  "topic": one of these exact strings, whichever is the closest fit — ${JSON.stringify(ALL_ISSUE_NAMES)},
+  "talkingPoint": one plain sentence (under 22 words) naming that specific facet
+}, ...]`;
+    try {
+      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      return parsed.slice(0, 3).filter(p => p && p.topic && p.talkingPoint).map(p => ({
+        type: 'drilldown',
+        parentTitle: seed.title,
+        topic: ALL_ISSUE_NAMES.indexOf(p.topic) !== -1 ? p.topic : ALL_ISSUE_NAMES[0],
+        talkingPoint: p.talkingPoint
+      }));
+    } catch (e) {
+      return []; // best-effort, same as the headline pipeline's own AI calls
+    }
+  }
+
+  async function commitComplicated() {
+    const card = deck[deckIndex];
+    const seed = card && drilldownSeed(card);
+    if (!seed) return; // not a swipeable/drillable card — button shouldn't even be visible here
+
+    deck.splice(deckIndex, 1);
+    deck.push(card);
+    deck.splice(deckIndex, 0, { type: 'drilldown-loading', parentTitle: seed.title });
+    renderCitizenCard();
+
+    const subs = await buildDrilldownCards(seed);
+    if (deck[deckIndex] && deck[deckIndex].type === 'drilldown-loading') {
+      deck.splice(deckIndex, 1, ...subs);
+      renderCitizenCard();
+    }
+  }
+
   document.getElementById('citizen-yes').addEventListener('click', () => commitSwipe('right'));
   document.getElementById('citizen-no').addEventListener('click', () => commitSwipe('left'));
+  document.getElementById('citizen-complicated').addEventListener('click', () => commitComplicated());
   document.addEventListener('keydown', (e) => {
     if (MODE !== 'citizen') return;
     if (!document.getElementById('citizen-active-card')) return; // welcome/ZIP/done aren't swipeable
@@ -2967,6 +3046,29 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
             <summary>${esc(a.source || 'Source')} &mdash; original headline</summary>
             <p>${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}</p>
           </details>
+        </div>`;
+      wireSwipeGestures(document.getElementById('citizen-active-card'));
+      return;
+    }
+
+    if (card.type === 'drilldown-loading') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">🤔</div>
+          <div class="citizen-title">Digging into &ldquo;${esc(card.parentTitle)}&rdquo;</div>
+          <p class="citizen-blurb">Finding a few specific angles worth reacting to&hellip;</p>
+        </div>`;
+      return;
+    }
+
+    if (card.type === 'drilldown') {
+      controls.style.display = 'flex';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-headline-card" id="citizen-active-card">
+          <div class="citizen-headline-img citizen-headline-img-fallback">🔍</div>
+          <div class="citizen-title">${esc(card.talkingPoint)}</div>
+          <p class="citizen-blurb citizen-drilldown-context">One facet of &ldquo;${esc(card.parentTitle)}&rdquo;</p>
         </div>`;
       wireSwipeGestures(document.getElementById('citizen-active-card'));
       return;
