@@ -278,6 +278,11 @@
      base text-align: center reads badly for multi-line card content. */
   .citizen-digest { width: 100%; text-align: left; margin: 4px 0 14px; }
   .citizen-digest-status { font-size: 13px; color: var(--paper-dim); margin-bottom: 10px; }
+  .citizen-digest-nudge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.04em; color: var(--amber-ink); text-align: center;
+    margin: 2px 0 0;
+  }
   /* #1's card gets a visibly stronger border/background than #2 and #3 —
      "pop" isn't just decoration here, it's a cue for where to look first. */
   .citizen-digest-card {
@@ -446,6 +451,8 @@
   .field:focus { border-color: var(--amber); }
   .field::placeholder { color: var(--paper-dim); opacity: 0.75; }
   .field.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; }
+  .citizen-freeform { resize: vertical; min-height: 68px; margin-bottom: 12px; }
+  .citizen-freeform-send { margin: 16px 0 10px; }
 
   .btn {
     appearance: none;
@@ -2595,6 +2602,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         ...QUIZ_QUESTIONS.map(q => ({ type: 'quiz-question', ...q })),
         { type: 'archetype-reveal' },
         { type: 'zip' },
+        { type: 'more-priorities' },
         { type: 'done' }
       ];
     } else {
@@ -2606,6 +2614,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         { type: 'issues-marker' },
         { type: 'zip' },
         ...buildActionCards(actionPool),
+        { type: 'more-priorities' },
         { type: 'done' }
       ];
     }
@@ -2663,6 +2672,26 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       return parsed;
     } catch (e) {
       return null; // this headline just gets skipped — better than a broken card
+    }
+  }
+
+  // Classifies whatever a citizen typed on the 'more-priorities' card onto
+  // CiViX's fixed issue taxonomy, same reasoning as boildownHeadline() —
+  // keeps a freeform priority matchable against digest.js's SYNONYMS
+  // instead of drifting into ad hoc phrasing. Uncached on purpose: this
+  // is a one-off typed thought, not a recurring lookup like a headline.
+  async function classifyFreeformPriority(text) {
+    const prompt = `A citizen typed this into a civic-engagement manifesto builder, as something on their mind right now:
+
+"${text}"
+
+Reply with ONLY this exact string, no quotes, no markdown, no other text — whichever one of these is the closest fit to what they wrote:
+${ALL_ISSUE_NAMES.join(' | ')}`;
+    try {
+      const raw = (await digCheckCall(prompt)).trim().replace(/^["']|["']$/g, '');
+      return ALL_ISSUE_NAMES.indexOf(raw) !== -1 ? raw : null;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -2733,6 +2762,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     deck = [
       ...headlineCards,
       ...(P.place.zip ? [] : [{ type: 'zip' }]),
+      { type: 'more-priorities' },
       { type: 'done' }
     ];
     deckIndex = 0;
@@ -3040,7 +3070,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       startCitizenMode();
       return;
     }
-    deck = [...subs, ...(P.place.zip ? [] : [{ type: 'zip' }]), { type: 'done' }];
+    deck = [...subs, ...(P.place.zip ? [] : [{ type: 'zip' }]), { type: 'more-priorities' }, { type: 'done' }];
     deckIndex = 0;
     renderCitizenCard();
   }
@@ -3071,12 +3101,8 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <div class="citizen-digest" id="citizen-digest">
           <p class="citizen-digest-status">Checking federal, state, and your own docket for the fastest ways to act&hellip;</p>
         </div>
-        <div class="citizen-send-note">
-          <p class="citizen-send-note-eyebrow">Keep CiViX sharp</p>
-          <p>Already told the world what you think — a post, a reply, a comment on a local issue? <a href="send-to-civix.html">Send it to CiViX &#8594;</a> We'll match it to your priorities and check it against real bills, the same way we just did with headlines. The more you share, the better CiViX can advocate for you.</p>
-        </div>
         <div class="citizen-done-row">
-          <a class="btn btn-primary citizen-cta" href="calendar.html">See everything &#8594;</a>
+          <a class="btn citizen-cta" href="calendar.html">See everything &#8594;</a>
           <button type="button" class="btn citizen-cta" id="citizen-to-pro">Fine-tune it (Pro mode) &#8594;</button>
           <button type="button" class="btn btn-quiet citizen-cta" id="citizen-restart">Swipe through more</button>
         </div>
@@ -3138,7 +3164,8 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       }
       current.innerHTML =
         `<p class="citizen-digest-status">You're closer to being heard than you think — here's exactly where to start:</p>` +
-        top.map(digestEntryHtml).join('');
+        top.map(digestEntryHtml).join('') +
+        `<p class="citizen-digest-nudge">Pick one above and go — most take under 5 minutes.</p>`;
     } catch (e) {
       const current = document.getElementById('citizen-digest');
       if (current) current.innerHTML = '';
@@ -3323,6 +3350,51 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         save();
         advanceCitizen();
       });
+      return;
+    }
+
+    // Sits between the swipe deck finishing and the top-3 reveal on
+    // purpose — a guided moment for whatever the deck itself couldn't
+    // have surfaced (something too specific or too recent to be one of
+    // the cards just swiped), instead of only being reachable via a
+    // footnote on the done card after the fact. Two ways in: type it
+    // directly (classified the same way a headline is), or hand off to
+    // Send to CiViX right here, in context, for something already posted
+    // elsewhere.
+    if (card.type === 'more-priorities') {
+      controls.style.display = 'none';
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">💬</div>
+          <div class="citizen-title">Anything else on your mind?</div>
+          <p class="citizen-blurb">Something hot right now, a cause you care about — tell CiViX before we show you what to do next.</p>
+          <textarea class="field citizen-freeform" id="citizen-freeform" rows="3" placeholder="Type what's on your mind…"></textarea>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-add">Add this &#8594;</button>
+          <div class="citizen-send-note citizen-freeform-send">
+            <p class="citizen-send-note-eyebrow">Already said it somewhere?</p>
+            <p>Share a post, article, or tweet to CiViX and we'll fold it in the same way. <a href="send-to-civix.html" target="_blank" rel="noopener">Send to CiViX &#8594;</a></p>
+          </div>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-freeform-skip">Skip for now &#8594;</button>
+        </div>`;
+      document.getElementById('citizen-freeform-add').addEventListener('click', async () => {
+        const field = document.getElementById('citizen-freeform');
+        const text = field.value.trim();
+        if (!text) { advanceCitizen(); return; }
+        const btn = document.getElementById('citizen-freeform-add');
+        btn.textContent = 'Adding…';
+        btn.disabled = true;
+        field.disabled = true;
+        const topic = await classifyFreeformPriority(text);
+        if (topic) {
+          addIssue(topic);
+          const iss = findIssue(slug(topic));
+          if (iss) { iss.weight = 3; iss.stance = text; }
+          save();
+          if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+        }
+        advanceCitizen();
+      });
+      document.getElementById('citizen-freeform-skip').addEventListener('click', () => advanceCitizen());
       return;
     }
 

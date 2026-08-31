@@ -203,11 +203,27 @@ see "Deliberately not yet done" below for why.
   and easy," since PWA share-target requires an install nothing in the
   app currently prompts for. As of 31 Aug 2026 the page also leads with
   a `.value-note` explaining *why* to do this (there was previously zero
-  explanatory copy anywhere on this page, just mechanism), and
-  builder.html's Citizen-mode "done" card gained its own matching
-  callout (`.citizen-send-note`) linking here — Citizen mode never
-  mentioned Send to CiViX at all before, since §01's own Inbox note lives
-  in the `.shell` that Citizen mode hides entirely.
+  explanatory copy anywhere on this page, just mechanism).
+
+  A first attempt at surfacing this in builder.html's Citizen mode (a
+  `.citizen-send-note` callout tacked onto the bottom of the "done" card,
+  below the top-3 digest) turned out to be exactly the "feels bolted-on,
+  after the fact" problem it was trying to fix, per live user testing the
+  same day — found by name via a fresh, from-scratch Citizen-mode run.
+  Replaced with a real guided step: every path through Citizen mode
+  (headline swipe, the 30-second quiz, topping-up, and calendar.html's
+  seeded-drilldown handoff) now inserts a `{ type: 'more-priorities' }`
+  card right before `done` — "Anything else on your mind?" — offering
+  freeform text (classified onto the issue taxonomy the same way a
+  headline is, via `classifyFreeformPriority()`, and written into both
+  `addIssue()` *and* that issue's `stance` field, since typed text is
+  itself a stance) alongside the real Send to CiViX handoff, in context,
+  instead of a footnote after the reveal. The done card's own CTAs were
+  also rebalanced once the digest could be the single, undistracted
+  focus: "See everything" demoted from primary to secondary styling, and
+  a `.citizen-digest-nudge` line ("Pick one above and go — most take
+  under 5 minutes") added once real results load, actively pushing
+  toward acting on one of the top 3 rather than just displaying them.
 
   **Fixed a real dead end, also 31 Aug 2026**: this page's own "Adopt"
   button used to just PATCH the filing's server-side `state` straight to
