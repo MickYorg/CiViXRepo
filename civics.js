@@ -145,10 +145,25 @@
   }
 
   var showing = false;
+  // Idempotent on purpose — a fact card's auto-dismiss timer and its
+  // manual "Got it"/backdrop-click can both fire; the second call should
+  // just no-op rather than double-animate or clear an already-cleared
+  // timer.
   function dismiss(overlay) {
+    if (overlay.dataset.dismissed) return;
+    overlay.dataset.dismissed = '1';
+    if (overlay._autoTimer) window.clearTimeout(overlay._autoTimer);
     overlay.classList.add('cx-out');
     window.setTimeout(function () { overlay.remove(); showing = false; }, 350);
   }
+
+  // Purely informational — no interaction required — so it auto-dissolves
+  // on its own after a few seconds instead of waiting on a click. "Got
+  // it"/backdrop-click still skip it immediately for anyone who doesn't
+  // want to wait. The quiz card is deliberately NOT auto-dismissed: it's
+  // interactive and inviting a reaction after reveal, not just a fact to
+  // skim.
+  var AUTO_DISMISS_MS = 3800;
 
   function renderFact(item) {
     injectStyle();
@@ -167,6 +182,7 @@
     document.body.appendChild(overlay);
     overlay.querySelector('[data-act="ok"]').addEventListener('click', function () { dismiss(overlay); });
     overlay.addEventListener('click', function (e) { if (e.target === overlay) dismiss(overlay); });
+    overlay._autoTimer = window.setTimeout(function () { dismiss(overlay); }, AUTO_DISMISS_MS);
   }
 
   function renderQuiz(deck, state) {
@@ -306,6 +322,28 @@
     showNow();
   }
 
+  // Called from a real network/AI wait elsewhere in the app (fetching
+  // headlines, drafting a call script, building the top-3 digest, etc.) to
+  // give the citizen something to read instead of a bare spinner. Always a
+  // fact — never the quiz, which asks for real attention a mid-load
+  // moment shouldn't demand — and skips the random SHOW_CHANCE gate since
+  // the caller already knows a wait is actually happening, but still
+  // honors the cooldown so a wait that follows close behind another popup
+  // (ambient or another wait) doesn't stack a second one on top of it.
+  function showDuringWait() {
+    if (showing) return;
+    var state = loadState();
+    if (Date.now() - state.lastShownAt < COOLDOWN_MS) return;
+    showing = true;
+    var unseenFacts = FACTS.filter(function (f) { return state.seenFacts.indexOf(f.id) === -1; });
+    if (!unseenFacts.length) { state.seenFacts = []; unseenFacts = FACTS.slice(); }
+    var f = unseenFacts[Math.floor(Math.random() * unseenFacts.length)];
+    state.seenFacts.push(f.id);
+    state.lastShownAt = Date.now();
+    saveState(state);
+    renderFact(f);
+  }
+
   // ---- Direct access (CiViX 101) -----------------------------------------
   // Opens a specific fact or deck on demand, bypassing the cooldown/chance
   // gate that governs the sprinkled pop-ups — a citizen who came here on
@@ -339,6 +377,7 @@
   window.CivicsEngine = {
     maybeShow: maybeShow,
     showNow: showNow,
+    showDuringWait: showDuringWait,
     playFact: playFact,
     playDeck: playDeck,
     facts: FACTS.map(function (f) { return { id: f.id, title: f.title, body: f.body }; }),

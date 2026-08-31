@@ -51,7 +51,15 @@ see "Deliberately not yet done" below for why.
   meant to be a frequent tap) to react to individually; swiping right on
   any of them adopts its topic as a priority the same way a headline card
   does, so agreeing with more facets is a citizen's own way of signaling
-  how much a topic matters without a slider.
+  how much a topic matters without a slider. The "done" card's top-3
+  digest also got a "pop" pass (31 Aug 2026): each entry now shows a rank
+  badge (#1 visibly stronger — amber border/background, not just a bigger
+  number), a template-built "why this matches you" line naming the actual
+  matched priorities (no extra AI call — built from data `buildTopDigest`
+  already returns), and stronger CTA copy ("Make your voice heard" +
+  "~2 min — CiViX drafts the call or email for you" for federal entries
+  specifically, since that's the only kind with real assisted drafting
+  today — state/docket keep honest, unembellished copy).
 - `calendar.html` — Federal section is real: `functions/api/calendar.js`
   pulls recent bills from congress.gov, matched client-side against the
   profile's declared issues (weighted, hand-authored synonym map). Each
@@ -75,8 +83,36 @@ see "Deliberately not yet done" below for why.
   legislatures" role congress.gov plays federally. State cards
   deliberately have **no** Take Action button yet — `reps.js` only
   resolves federal contacts, so reusing that button would show a state
-  bill's reader their federal rep. Municipal is still sample content —
-  no unified public data source exists for city/county government.
+  bill's reader their federal rep. Municipal is now real for a curated
+  list of cities (31 Aug 2026): `functions/api/municipal.js` resolves the
+  profile's ZIP to a city (Zippopotam.us, same as state) and, for any city
+  confirmed to run Legistar (Granicus' legislative platform — hundreds of
+  cities do, but it's per-city, no unified API), pulls real matters from
+  its free/keyless Web API. Live today: Boston, Seattle, Baltimore,
+  Nashville, Phoenix, Charlotte NC, St. Paul, Pittsburgh — verified
+  individually, not assumed (several bigger cities, e.g. NYC/Philly, are
+  on Legistar but require a per-jurisdiction token so were left out; SF/
+  San Antonio/Miami-Dade/Denver returned stale or sandbox data and were
+  also left out). A ZIP outside the list gets an honest "not covered yet"
+  message instead of fake sample content. Grow `CITY_CLIENTS` in
+  `municipal.js` one verified city at a time. No Take Action button yet,
+  same reasoning as State. Legistar has no "public comment open" flag and
+  no direct public URL field on a Matter (constructed from the known
+  `{client}.legistar.com/LegislationDetail.aspx?ID=...` pattern instead).
+- `civics.js` — the shared "teachable moment" popup (word-of-the-day
+  facts + quote-matching quizzes), included on every page. As of 31 Aug
+  2026, a `fact` card auto-dissolves on its own ~3.8s after showing
+  (manual "Got it"/backdrop-click still skip it immediately) — it's pure
+  information, no interaction needed, so it shouldn't require a click to
+  go away. The interactive quiz card deliberately does NOT auto-dismiss.
+  New `CivicsEngine.showDuringWait()` entry point shows a fact (never the
+  quiz) specifically to fill a real network/AI wait elsewhere in the app —
+  still respects the existing cooldown (so it won't stack a second popup
+  right after an ambient one), but skips the random show-chance gate since
+  the caller already knows a wait is genuinely happening. Wired into:
+  builder.html's headline-swipe loading, its "it's complicated" drilldown
+  loading, its top-3 digest loading, calendar.html's action-modal rep
+  lookup/drafting, and municipal's live fetch.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.
@@ -188,10 +224,13 @@ control — is now proven end-to-end for federal, and the calendar-matching
 half also covers state. The natural next moves, in roughly the order
 they'd pay off, are:
 
-- **Municipal calendar data** — the one jurisdiction still on sample
-  content. No unified public API exists the way congress.gov/OpenStates
-  do federally/per-state; needs its own source decision(s), likely
-  per-city, before it can leave placeholder status.
+- **Municipal calendar data — no longer sample content, but only for 8
+  cities so far** (Boston, Seattle, Baltimore, Nashville, Phoenix,
+  Charlotte NC, St. Paul, Pittsburgh — see `functions/api/municipal.js`).
+  No unified public API exists the way congress.gov/OpenStates do
+  federally/per-state; Legistar covers this list but is per-city, so
+  growing coverage means verifying and adding one city's client slug at a
+  time, not a single source swap.
 - **State Take Action** — state bills match against the profile but have
   no call/email drafting yet, unlike federal. `functions/api/reps.js`
   would need to resolve state legislators too (5calls supports this via

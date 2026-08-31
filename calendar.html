@@ -467,7 +467,7 @@
 
   <div class="wip">
     <span>&#9888;</span>
-    <span><strong>Municipal is still a placeholder —</strong> there's no unified public data source for city/county government yet, so the cards below are sample content. State and Federal, below that, are both live.</span>
+    <span><strong>Municipal covers a growing list of cities —</strong> there's no unified public data source for city/county government, so CiViX verifies one city at a time (via Legistar) instead of guessing at nationwide coverage. If your city isn't covered yet, you'll see an honest note below instead of fake data. State and Federal, below that, are both fully live everywhere.</span>
   </div>
 
   <div class="build-cta" id="focus-banner" style="display:none;">
@@ -475,16 +475,8 @@
   </div>
 
 <p class="section-label">Municipal</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Zoning variance hearing — Ward 4 corridor rezoning</span><span class="tag">Municipal</span></div>
-    <div class="card-meta">Sep 9 · City Council · Public comment open</div>
-    <div class="card-body">Public comment window opens one week before the hearing. CiViX would flag this against your housing/zoning topic.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Transit budget final vote</span><span class="tag">Municipal</span></div>
-    <div class="card-meta">Sep 22 · City Council</div>
-    <div class="card-body">Follow-up to the funding proposal introduced this spring.</div>
-  </div>
+  <p class="fed-status mono" id="municipal-status">Loading municipal legislative activity&hellip;</p>
+  <div id="municipal-list"></div>
 <p class="section-label">State</p>
   <p class="fed-status mono" id="state-status">Loading state legislative activity&hellip;</p>
   <div id="state-list"></div>
@@ -920,6 +912,11 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     document.body.style.overflow = 'hidden';
     renderActionCard();
     loadRepsForActive();
+    // Rep lookup + call/email drafting both involve a real network+AI
+    // wait — give the citizen something to read instead of a bare
+    // "Drafting..." line. No-ops if one's already showing or the cooldown
+    // hasn't cleared.
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
   }
 
   function closeActionModal() {
@@ -975,7 +972,8 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
   // button in here would show a state bill's reader their federal rep,
   // which is simply wrong. State-legislator lookup + drafting is future
   // scope, not shipped alongside this data slice.
-  function renderStateCard(bill, hits, mode) {
+  function renderStateCard(bill, hits, mode, tag) {
+    tag = tag || 'State';
     const bodyId = 'body-' + esc(slug(bill.identifier || ''));
 
     if (mode === 'citizen') {
@@ -984,7 +982,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
         : esc(bill.title);
       return `
         <div class="card">
-          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">State</span></div>
+          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">${esc(tag)}</span></div>
           <details class="citizen-title-details">
             <summary>${esc(bill.identifier)} &mdash; official bill name</summary>
             <div class="card-title">${officialTitle}</div>
@@ -1000,7 +998,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     const metaHtml = `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
     return `
       <div class="card">
-        <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">State</span></div>
+        <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">${esc(tag)}</span></div>
         ${metaHtml}
         <div class="card-body" id="${bodyId}">${action}</div>
         ${matchTagsHtml(hits, mode)}
@@ -1139,6 +1137,120 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     renderStateResults();
   }
 
+  // MUNICIPAL_STATE mirrors STATE_STATE exactly — same shape, same kinds,
+  // one addition ('not-covered') for a ZIP that resolves fine but isn't on
+  // the curated Legistar city list yet. That's an honest "not covered for
+  // your city yet", not the old blanket "all municipal is sample content"
+  // disclaimer — a citizen in a covered city now sees real data.
+  let MUNICIPAL_STATE = null;
+
+  function renderMunicipalResults() {
+    const statusEl = document.getElementById('municipal-status');
+    const listEl = document.getElementById('municipal-list');
+    if (!MUNICIPAL_STATE) return;
+    const mode = currentMode();
+    const caps = CAPS[mode] || CAPS.activist;
+    const s = MUNICIPAL_STATE;
+    let shown = [];
+
+    if (s.kind === 'no-zip') {
+      statusEl.innerHTML = `Add your ZIP in <a href="builder.html">your manifesto</a> to see municipal legislative activity — CiViX needs it to know which city/county government to check.`;
+    } else if (s.kind === 'fetch-error') {
+      statusEl.textContent = "Couldn't reach the municipal calendar. Try reloading in a bit.";
+      statusEl.classList.add('is-error');
+    } else if (s.kind === 'not-covered') {
+      statusEl.innerHTML = `${esc(s.city)} isn't on CiViX's covered-cities list yet — there's no single nationwide source for municipal government, so this grows one verified city at a time. State and Federal, above, are both live regardless of your city.`;
+    } else if (s.kind === 'no-bills') {
+      statusEl.textContent = `No recent activity came back for ${s.city || 'your city'}'s legislative system — try again later.`;
+    } else if (s.kind === 'no-issues') {
+      statusEl.innerHTML = `Showing the most recently updated items in ${esc(s.city)}'s legislative system. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
+      shown = s.bills.slice(0, caps.fallback);
+      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode, 'Municipal')).join('');
+    } else if (s.kind === 'focused') {
+      const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
+      if (focused.length) {
+        statusEl.textContent = `Showing ${focused.length} ${s.city} item${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
+        shown = focused.map(m => m.bill);
+        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits, mode, 'Municipal')).join('');
+      } else {
+        statusEl.textContent = `No ${s.city} items matched to "${s.focusIssue.name}" yet.`;
+        listEl.innerHTML = '';
+      }
+    } else if (s.kind === 'no-match') {
+      statusEl.textContent = `Checked ${s.bills.length} recently updated ${s.city} items — none matched your declared priorities yet. Showing the most recent activity instead.`;
+      shown = s.bills.slice(0, caps.fallback);
+      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode, 'Municipal')).join('');
+    } else if (s.kind === 'matched') {
+      statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated ${s.city} items against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
+      const matchedSlice = s.matched.slice(0, caps.matched);
+      shown = matchedSlice.map(m => m.bill);
+      listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode, 'Municipal')).join('');
+    }
+    enhancePlainSummaries(shown, true);
+  }
+
+  async function bootMunicipal() {
+    const profile = loadRawProfile();
+    const zip = profile && profile.place && profile.place.zip;
+
+    if (!zip) {
+      MUNICIPAL_STATE = { kind: 'no-zip' };
+      renderMunicipalResults();
+      return;
+    }
+
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
+    let data;
+    try {
+      const r = await fetch('/api/municipal?zip=' + encodeURIComponent(zip));
+      data = await r.json();
+      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
+    } catch (e) {
+      MUNICIPAL_STATE = { kind: 'fetch-error' };
+      renderMunicipalResults();
+      return;
+    }
+
+    if (!data.covered) {
+      MUNICIPAL_STATE = { kind: 'not-covered', city: data.city };
+      renderMunicipalResults();
+      return;
+    }
+
+    const bills = data.bills || [];
+    if (!bills.length) {
+      MUNICIPAL_STATE = { kind: 'no-bills', city: data.city };
+      renderMunicipalResults();
+      return;
+    }
+
+    const issues = profile.issues || [];
+    const focusIssue = FOCUS_SLUG ? issues.find(i => i.id === FOCUS_SLUG) : null;
+
+    if (!issues.length) {
+      MUNICIPAL_STATE = { kind: 'no-issues', bills, city: data.city };
+      renderMunicipalResults();
+      return;
+    }
+
+    const matched = matchBills(bills, issues);
+
+    if (focusIssue) {
+      MUNICIPAL_STATE = { kind: 'focused', bills, matched, focusIssue, city: data.city };
+      renderMunicipalResults();
+      return;
+    }
+
+    if (!matched.length) {
+      MUNICIPAL_STATE = { kind: 'no-match', bills, city: data.city };
+      renderMunicipalResults();
+      return;
+    }
+
+    MUNICIPAL_STATE = { kind: 'matched', bills, matched, city: data.city, fetchedAt: data.fetchedAt };
+    renderMunicipalResults();
+  }
+
   // FED_STATE holds the fetch result branch so renderFedResults() can
   // re-slice/re-render CURRENT at a new mode's cap without a refetch —
   // it's what makes the mode picker's onChange feel instant.
@@ -1235,12 +1347,13 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 
   if (window.CivixMode) {
     window.CivixMode.renderPicker(document.getElementById('mode-picker'), {
-      onChange: () => { renderFedResults(); renderStateResults(); }
+      onChange: () => { renderFedResults(); renderStateResults(); renderMunicipalResults(); }
     });
   }
 
   boot();
   bootState();
+  bootMunicipal();
 })();
 </script>
 </body>

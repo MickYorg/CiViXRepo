@@ -278,11 +278,30 @@
      base text-align: center reads badly for multi-line card content. */
   .citizen-digest { width: 100%; text-align: left; margin: 4px 0 14px; }
   .citizen-digest-status { font-size: 13px; color: var(--paper-dim); margin-bottom: 10px; }
-  .citizen-digest-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; background: var(--ink); }
-  .citizen-digest-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  /* #1's card gets a visibly stronger border/background than #2 and #3 —
+     "pop" isn't just decoration here, it's a cue for where to look first. */
+  .citizen-digest-card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px 12px;
+    margin-bottom: 9px; background: var(--ink); position: relative;
+  }
+  .citizen-digest-card[data-rank="0"] { border-color: var(--amber); background: var(--amber-wash); }
+  .citizen-digest-top { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 5px; }
+  .citizen-digest-rank {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--amber); color: var(--btn-ink); font-weight: 700; font-size: 12px;
+    display: grid; place-items: center; margin-top: 1px;
+  }
+  .citizen-digest-card[data-rank="0"] .citizen-digest-rank { width: 26px; height: 26px; font-size: 13.5px; }
+  .citizen-digest-headtext { flex: 1; min-width: 0; }
   .citizen-digest-title { font-weight: 600; font-size: 14px; line-height: 1.3; }
-  .citizen-digest-tag { flex-shrink: 0; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-ink); }
-  .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 8px; }
+  .citizen-digest-tag { flex-shrink: 0; white-space: nowrap; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-ink); }
+  .citizen-digest-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .citizen-digest-why {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.02em;
+    color: var(--amber-ink); margin: 3px 0 7px; line-height: 1.4;
+  }
+  .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 6px; }
+  .citizen-digest-eta { font-size: 11px; color: var(--paper-dim); margin: 0 0 8px; }
   .citizen-digest-card .btn { font-size: 10.5px; padding: 6px 10px; text-decoration: none; }
   /* Headline-swipe cards lead with the generated image and the plain
      talking point — the opposite hierarchy of a trait/issue card, which
@@ -2636,6 +2655,10 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
         <div class="citizen-title">Getting today's headlines ready</div>
         <p class="citizen-blurb">${esc(status || 'Fetching real headlines and boiling each one down…')}</p>
       </div>`;
+    // Give the wait something to read instead of a bare status line —
+    // no-ops if one's already showing or the cooldown hasn't cleared, so
+    // this being called multiple times per pipeline run is harmless.
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
   }
   function controlsHidden() {
     const controls = document.getElementById('citizen-controls');
@@ -2904,6 +2927,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     deck.push(card);
     deck.splice(deckIndex, 0, { type: 'drilldown-loading', parentTitle: seed.title });
     renderCitizenCard();
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
 
     const subs = await buildDrilldownCards(seed);
     if (deck[deckIndex] && deck[deckIndex].type === 'drilldown-loading') {
@@ -2936,7 +2960,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <div class="citizen-title">Nice — your manifesto’s coming together</div>
         <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
         <div class="citizen-digest" id="citizen-digest">
-          <p class="citizen-digest-status">Finding your top picks right now&hellip;</p>
+          <p class="citizen-digest-status">Checking federal, state, and your own docket for the fastest ways to act&hellip;</p>
         </div>
         <div class="citizen-done-row">
           <a class="btn btn-primary citizen-cta" href="calendar.html">See everything &#8594;</a>
@@ -2946,16 +2970,34 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       </div>`;
   }
 
-  function digestEntryHtml(e) {
+  // "Why" line and CTA copy are both template-built from data buildTopDigest
+  // already returns (hits, kind) — no extra AI call per entry, so this never
+  // adds latency or failure surface to a card that's already loaded.
+  function digestWhyHtml(e, rank) {
+    if (!e.hits || !e.hits.length) return '';
+    const rankWord = ['your #1 match', 'your #2 match', 'your #3 match'][rank] || 'a strong match';
+    const names = e.hits.slice(0, 2).join(' and ');
+    const more = e.hits.length > 2 ? `, +${e.hits.length - 2} more` : '';
+    return `<p class="citizen-digest-why">${esc(rankWord)} — touches ${esc(names)}${more}, one of your declared priorities.</p>`;
+  }
+
+  function digestEntryHtml(e, rank) {
     const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : 'Your docket';
-    const ctaLabel = e.kind === 'docket' ? 'Open in your docket' : 'Take a look';
+    const ctaLabel = e.kind === 'docket' ? 'Open in your docket' : e.kind === 'federal' ? 'Make your voice heard' : 'Take a look';
+    const eta = e.kind === 'federal'
+      ? `<p class="citizen-digest-eta">~2 min — CiViX drafts the call or email for you.</p>`
+      : '';
     return `
-      <div class="citizen-digest-card">
+      <div class="citizen-digest-card" data-rank="${rank}">
         <div class="citizen-digest-top">
-          <span class="citizen-digest-title">${esc(e.title)}</span>
-          <span class="citizen-digest-tag">${kindLabel}</span>
+          <span class="citizen-digest-rank">${rank + 1}</span>
+          <div class="citizen-digest-headtext">
+            <div class="citizen-digest-headline"><span class="citizen-digest-title">${esc(e.title)}</span><span class="citizen-digest-tag">${kindLabel}</span></div>
+            ${digestWhyHtml(e, rank)}
+          </div>
         </div>
         <p class="citizen-digest-body">${esc(e.summary || 'No summary available yet.')}</p>
+        ${eta}
         <a class="btn btn-primary" href="${esc(e.actionHref)}">${ctaLabel} &#8594;</a>
       </div>`;
   }
@@ -2972,16 +3014,17 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       el.innerHTML = '';
       return;
     }
+    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
     try {
       const top = await window.CivixDigest.buildTopDigest(P, { limit: 3 });
       const current = document.getElementById('citizen-digest');
       if (!current) return; // moved on to another card while this was in flight
       if (!top.length) {
-        current.innerHTML = `<p class="citizen-digest-status">Nothing matched yet — check back once more legislative activity comes in.</p>`;
+        current.innerHTML = `<p class="citizen-digest-status">Nothing matched yet — check back once more legislative activity comes in. Your priorities are saved and CiViX keeps watching.</p>`;
         return;
       }
       current.innerHTML =
-        `<p class="citizen-digest-status">Your top pick${top.length === 1 ? '' : 's'} right now:</p>` +
+        `<p class="citizen-digest-status">You're closer to being heard than you think — here's exactly where to start:</p>` +
         top.map(digestEntryHtml).join('');
     } catch (e) {
       const current = document.getElementById('citizen-digest');
