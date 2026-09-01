@@ -81,7 +81,7 @@
 
   <div class="card">
     <h2>🗑️ Reset</h2>
-    <p>Wipes your manifesto, docket token, DIG's cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited.</p>
+    <p>Wipes your manifesto, DIG's cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited. Your Send to CiViX address is kept and reused, not reissued.</p>
     <div class="row">
       <button data-persona="clear" data-go="../index.html">Clear</button>
     </div>
@@ -104,10 +104,10 @@
 
   function daysAgo(n) { return Date.now() - n * 86400000; }
 
-  // Every switch below (persona load or clear) touches this same set of
-  // keys, so a persona swap can't leave a stale docket token or DIG
-  // stance-check cache pointing at the previous profile. Snapshotted and
-  // restored as a group for the same reason.
+  // Snapshotted and restored as a group so the real device state (including
+  // a real Send to CiViX address, which every switch below deliberately
+  // leaves alone) can be put back exactly. Not all of these are touched by
+  // every switch below.
   var TOUCHED_KEYS = [
     'civix-profile', 'civix-mode', 'civix-inbox-topics',
     'civix-splash-visits', 'civix-splash-seen',
@@ -263,12 +263,19 @@
         // an accumulated visit count from earlier testing would keep
         // showing the "take action" splash variant no matter which
         // persona you just loaded, which isn't what "brand new citizen"
-        // or "policy wonk" are supposed to demonstrate. Also clears the
-        // docket token and DIG's stance-check cache so a persona swap
-        // can't leave either pointing at the previous profile.
+        // or "policy wonk" are supposed to demonstrate. Also clears
+        // DIG's stance-check cache so a persona swap can't leave it
+        // pointing at the previous profile. Deliberately leaves
+        // civix.token alone, same as builder.html's own in-app wipe —
+        // it's the credential behind a real, already-issued Send to
+        // CiViX address. Clearing it here would mint a new address on
+        // every reset, which for a repeatedly-reset alpha tester means
+        // re-saving a contact each time and accumulating dead old
+        // addresses in their phone. ensureDrop() re-validates it
+        // against the live docket before reusing it, so a genuinely
+        // stale/revoked token still falls back to minting fresh.
         localStorage.removeItem('civix-splash-visits');
         localStorage.removeItem('civix-splash-seen');
-        localStorage.removeItem('civix.token');
         localStorage.removeItem('civix-dig-legacy-merged');
         localStorage.removeItem('dig-results-cache');
         if (persona === 'clear' || persona === 'new') {
