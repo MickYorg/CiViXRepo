@@ -81,9 +81,17 @@
 
   <div class="card">
     <h2>🗑️ Reset</h2>
-    <p>Wipes civix-profile, civix-mode, the inbox-topic cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited.</p>
+    <p>Wipes your manifesto, docket token, DIG's cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited.</p>
     <div class="row">
       <button data-persona="clear" data-go="index.html">Clear</button>
+    </div>
+  </div>
+
+  <div class="card" id="restore-card" style="display:none;">
+    <h2>↩️ Restore your real data</h2>
+    <p id="restore-desc"></p>
+    <div class="row">
+      <button class="primary" data-restore="1">Restore &amp; go to splash</button>
     </div>
   </div>
 
@@ -95,6 +103,67 @@
   'use strict';
 
   function daysAgo(n) { return Date.now() - n * 86400000; }
+
+  // Every switch below (persona load or clear) touches this same set of
+  // keys, so a persona swap can't leave a stale docket token or DIG
+  // stance-check cache pointing at the previous profile. Snapshotted and
+  // restored as a group for the same reason.
+  var TOUCHED_KEYS = [
+    'civix-profile', 'civix-mode', 'civix-inbox-topics',
+    'civix-splash-visits', 'civix-splash-seen',
+    'civix.token', 'civix-dig-legacy-merged', 'dig-results-cache'
+  ];
+  var BACKUP_KEY = 'civix-devbackup';
+
+  // This is a testing convenience, not a place to silently destroy
+  // whatever's really on the device — the first switch in a fresh browser
+  // snapshots the pre-existing state once, and won't overwrite that
+  // snapshot with test personas on later switches. "Restore" puts it back
+  // and clears the backup.
+  function backupIfNeeded() {
+    if (localStorage.getItem(BACKUP_KEY) !== null) return;
+    var snapshot = { at: Date.now(), keys: {} };
+    var any = false;
+    TOUCHED_KEYS.forEach(function (k) {
+      var v = localStorage.getItem(k);
+      snapshot.keys[k] = v;
+      if (v !== null) any = true;
+    });
+    if (any) {
+      try { localStorage.setItem(BACKUP_KEY, JSON.stringify(snapshot)); } catch (e) {}
+    }
+  }
+
+  function refreshRestoreCard() {
+    var raw = localStorage.getItem(BACKUP_KEY);
+    var card = document.getElementById('restore-card');
+    if (!raw) { card.style.display = 'none'; return; }
+    var snapshot;
+    try { snapshot = JSON.parse(raw); } catch (e) { card.style.display = 'none'; return; }
+    var ageMin = Math.round((Date.now() - snapshot.at) / 60000);
+    document.getElementById('restore-desc').textContent =
+      'Captured automatically before your first persona switch on this device, ' + ageMin + ' min ago. Puts your real manifesto back exactly as it was and clears this backup.';
+    card.style.display = '';
+  }
+
+  document.querySelector('[data-restore]').addEventListener('click', function () {
+    var raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return;
+    var snapshot;
+    try { snapshot = JSON.parse(raw); } catch (e) { return; }
+    Object.keys(snapshot.keys).forEach(function (k) {
+      var v = snapshot.keys[k];
+      try {
+        if (v === null) localStorage.removeItem(k);
+        else localStorage.setItem(k, v);
+      } catch (e) {}
+    });
+    try { localStorage.removeItem(BACKUP_KEY); } catch (e) {}
+    setStatus('Restored. Heading to index.html…');
+    window.setTimeout(function () { window.location.href = 'index.html'; }, 250);
+  });
+
+  refreshRestoreCard();
 
   var PERSONAS = {
     medium: {
@@ -188,19 +257,21 @@
       var persona = btn.dataset.persona;
       var go = btn.dataset.go;
       try {
+        backupIfNeeded();
         // Every persona switch also resets the splash's own memory of you
         // (return-visit wording, daily animation-replay gate) — otherwise
         // an accumulated visit count from earlier testing would keep
         // showing the "take action" splash variant no matter which
         // persona you just loaded, which isn't what "brand new citizen"
-        // or "policy wonk" are supposed to demonstrate.
+        // or "policy wonk" are supposed to demonstrate. Also clears the
+        // docket token and DIG's stance-check cache so a persona swap
+        // can't leave either pointing at the previous profile.
         localStorage.removeItem('civix-splash-visits');
         localStorage.removeItem('civix-splash-seen');
-        if (persona === 'clear') {
-          localStorage.removeItem('civix-profile');
-          localStorage.removeItem('civix-mode');
-          localStorage.removeItem('civix-inbox-topics');
-        } else if (persona === 'new') {
+        localStorage.removeItem('civix.token');
+        localStorage.removeItem('civix-dig-legacy-merged');
+        localStorage.removeItem('dig-results-cache');
+        if (persona === 'clear' || persona === 'new') {
           localStorage.removeItem('civix-profile');
           localStorage.removeItem('civix-mode');
           localStorage.removeItem('civix-inbox-topics');
@@ -213,6 +284,7 @@
         setStatus('localStorage write failed: ' + e.message);
         return;
       }
+      refreshRestoreCard();
       setStatus('Set. Heading to ' + go + '…');
       window.setTimeout(function () { window.location.href = go; }, 250);
     });
