@@ -56,8 +56,8 @@
     <h2>🆕 Brand new citizen</h2>
     <p>No manifesto at all — first visit, nothing set. Splash should say "Build your manifesto" and default to Citizen mode.</p>
     <div class="row">
-      <button class="primary" data-persona="new" data-go="index.html">Load &amp; go to splash</button>
-      <button data-persona="new" data-go="builder.html">Load &amp; go straight to builder</button>
+      <button class="primary" data-persona="new" data-go="../index.html">Load &amp; go to splash</button>
+      <button data-persona="new" data-go="../builder.html">Load &amp; go straight to builder</button>
     </div>
   </div>
 
@@ -65,8 +65,8 @@
     <h2>🧭 Modest manifesto</h2>
     <p>Someone who did a partial Citizen-mode pass a few days ago: 4 priorities, a couple with stances, 2 sources, a ZIP, 2 authorized actions.</p>
     <div class="row">
-      <button class="primary" data-persona="medium" data-go="index.html">Load &amp; go to splash</button>
-      <button data-persona="medium" data-go="builder.html">Load &amp; go straight to builder</button>
+      <button class="primary" data-persona="medium" data-go="../index.html">Load &amp; go to splash</button>
+      <button data-persona="medium" data-go="../builder.html">Load &amp; go straight to builder</button>
     </div>
   </div>
 
@@ -74,8 +74,8 @@
     <h2>🎓 Policy wonk</h2>
     <p>Days of accumulated effort: 18 priorities across most categories with real stances, 6 trusted sources, all 6 actions authorized, a long amendment log.</p>
     <div class="row">
-      <button class="primary" data-persona="wonk" data-go="index.html">Load &amp; go to splash</button>
-      <button data-persona="wonk" data-go="builder.html">Load &amp; go straight to builder</button>
+      <button class="primary" data-persona="wonk" data-go="../index.html">Load &amp; go to splash</button>
+      <button data-persona="wonk" data-go="../builder.html">Load &amp; go straight to builder</button>
     </div>
   </div>
 
@@ -83,7 +83,7 @@
     <h2>🗑️ Reset</h2>
     <p>Wipes your manifesto, docket token, DIG's cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited.</p>
     <div class="row">
-      <button data-persona="clear" data-go="index.html">Clear</button>
+      <button data-persona="clear" data-go="../index.html">Clear</button>
     </div>
   </div>
 
@@ -160,7 +160,7 @@
     });
     try { localStorage.removeItem(BACKUP_KEY); } catch (e) {}
     setStatus('Restored. Heading to index.html…');
-    window.setTimeout(function () { window.location.href = 'index.html'; }, 250);
+    window.setTimeout(function () { window.location.href = '../index.html'; }, 250);
   });
 
   refreshRestoreCard();
