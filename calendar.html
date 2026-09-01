@@ -1891,6 +1891,13 @@ BODY: <the email body, a few short paragraphs>`;
       return;
     }
 
+    const focusStateAction = t.closest('[data-focus-state-action]');
+    if (focusStateAction) {
+      const entry = FOCUS_ENTRIES[Number(focusStateAction.dataset.focusStateAction)];
+      if (entry && entry.bill) openStateActionModal(entry.bill, entry.hits);
+      return;
+    }
+
     const focusGeneralAction = t.closest('[data-focus-general-action]');
     if (focusGeneralAction) {
       const entry = FOCUS_ENTRIES[Number(focusGeneralAction.dataset.focusGeneralAction)];
@@ -2335,16 +2342,24 @@ BODY: <the email body, a few short paragraphs>`;
     const whyHtml = e.hits && e.hits.length
       ? `<div class="match-tags">${e.hits.map(h => `<span class="match-tag">${esc(h)}</span>`).join('')}</div>`
       : '';
-    // Federal opens the bill-specific Take Action modal; 'general' (a
-    // citizen's own high-conviction priority with no matching bill —
-    // see digest.js's buildTopDigest) opens the topic-only advocacy
-    // modal instead, no bill needed. State/docket don't have a modal
-    // flow yet, same limitation as the detailed lists below.
+    // Federal and state both open their own bill-specific Take Action
+    // modal directly (both carry the full bill object via digest.js's
+    // shared billEntry()); 'general' (a citizen's own high-conviction
+    // priority with no matching bill — see digest.js's buildTopDigest)
+    // opens the topic-only advocacy modal instead, no bill needed.
+    // Municipal/docket don't have a modal flow yet, same limitation as
+    // the detailed lists below — their link falls through to
+    // calendar.html?focus=, which just expands "See everything" (this
+    // used to also be state's fallback until 31 Aug 2026's Take Action
+    // work landed without updating this switch — that left state stuck
+    // reloading this same focus zone on click, a real dead-end loop).
     const cta = e.kind === 'federal' && e.bill
       ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
-      : e.kind === 'general'
-        ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
-        : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+      : e.kind === 'state' && e.bill
+        ? `<button type="button" class="take-action" data-focus-state-action="${rank}">Take action now &#8594;</button>`
+        : e.kind === 'general'
+          ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
+          : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
     return `
       <div class="focus-card" data-rank="${rank}">
         <div class="focus-top">
