@@ -45,7 +45,24 @@ see "Deliberately not yet done" below for why.
   (`index.html`'s `goToBuilder()` now fades the body out over 0.5s before
   navigating; `builder.html` starts at `opacity:0` and fades in over
   0.5s on arrival) — previously a bare `location.href` swap with no
-  transition at all, which the citizen flagged as "abrupt." Also fixed
+  transition at all, which the citizen flagged as "abrupt." The "done"
+  card got the identical hand-off later the same day: after a flat 4s
+  pause (the citizen's own number here, not the 3.8s civics.js
+  convention — this card has more to read) it auto-advances into
+  take-action.html via a new shared `goToTakeAction()` (fades
+  `<body>` out over 0.5s, then navigates), the same function a manual
+  click on the card's own "Take Action" link now triggers too — one
+  dissolve treatment regardless of what triggered the hand-off, same
+  relationship `goToBuilder()` already has with the splash's own CTA
+  button and its auto-advance. `take-action.html` picked up the matching
+  fade-in (`is-entering`, same double-rAF pattern) so arriving there
+  reads as a continuation of the same transition, not a hard cut at the
+  destination. Both "Fine-tune it (Pro mode)" and "Swipe through more"
+  cancel the pending timer, as does switching mode via the mode-track
+  directly (folded into `applyMode()` itself, not just those two
+  buttons) — otherwise a citizen who'd already moved on to Activist/Pro
+  could still get yanked into take-action.html a few seconds later by a
+  stale timer. Also fixed
   the same day: `.citizen-privacy-note` had no bottom margin, so the
   welcome card sat jammed right up against the "Private & secure" line
   on laptop-width viewports. Each headline is

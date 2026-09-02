@@ -79,6 +79,9 @@
      any other entry point) reads as a dissolve-in rather than a hard cut —
      removed by the boot script just below, right after first paint. */
   body.is-entering { opacity: 0; }
+  /* Mirrors index.html's own is-leaving — dissolve out before handing off
+     to take-action.html, same treatment the splash uses to hand off here. */
+  body.is-leaving { opacity: 0; }
 
   .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
 
@@ -2589,6 +2592,13 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
 
   function applyMode() {
     positionModeThumb();
+    // A mode switch via the mode-track itself (not the done card's own
+    // "Fine-tune it"/"Swipe through more" buttons, which already clear
+    // these) still needs to cancel any pending welcome/done auto-advance —
+    // otherwise a citizen who's moved on to Activist/Pro could still get
+    // yanked into take-action.html a few seconds later by a stale timer.
+    clearTimeout(welcomeAutoAdvanceTimer);
+    clearTimeout(doneAutoAdvanceTimer);
 
     document.getElementById('citizen-shell').hidden = MODE !== 'citizen';
     document.querySelector('.shell').style.display = MODE === 'citizen' ? 'none' : '';
@@ -2660,6 +2670,21 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // the app, not a new arbitrary delay.
   let welcomeAutoAdvanceTimer = null;
   const WELCOME_AUTO_ADVANCE_MS = 3800;
+  // Auto-leads a citizen who's just sitting on the "done" card into
+  // take-action.html — a flat 4s pause (the citizen's own stated number,
+  // not the 3.8s civics.js convention above — this is a longer read,
+  // "Nice — your manifesto's coming together" plus the row of three
+  // options, not a single popup line).
+  let doneAutoAdvanceTimer = null;
+  const DONE_AUTO_ADVANCE_MS = 4000;
+  // Shared by the auto-advance timer and a manual click on the "Take
+  // Action" link itself, same as index.html's goToBuilder() serves both
+  // the amendment sequence's own auto-advance and a manual CTA click —
+  // one dissolve treatment regardless of what triggered the hand-off.
+  function goToTakeAction() {
+    document.body.classList.add('is-leaving');
+    window.setTimeout(() => { window.location.href = 'take-action.html'; }, 500);
+  }
 
   // A citizen with nothing set yet gets the short version — the archetype
   // quiz instead of the full swipe grind (see below). Anyone topping up an
@@ -3293,7 +3318,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <div class="citizen-title">Nice — your manifesto’s coming together</div>
         <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
         <div class="citizen-done-row">
-          <a class="btn btn-primary citizen-cta" href="take-action.html">Take Action &#8594;</a>
+          <a class="btn btn-primary citizen-cta" href="take-action.html" id="citizen-take-action">Take Action &#8594;</a>
           <button type="button" class="btn citizen-cta" id="citizen-to-pro">Fine-tune it (Pro mode) &#8594;</button>
           <button type="button" class="btn btn-quiet citizen-cta" id="citizen-restart">Swipe through more</button>
         </div>
@@ -3302,6 +3327,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
 
   function renderCitizenCard() {
     clearTimeout(welcomeAutoAdvanceTimer);
+    clearTimeout(doneAutoAdvanceTimer);
     let card = deck[deckIndex];
     if (card && card.type === 'categories-marker') {
       deck.splice(deckIndex, 1, ...buildCategoryCards());
@@ -3566,9 +3592,19 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     if (card.type === 'done') {
       controls.style.display = 'none';
       slot.innerHTML = renderCitizenDone();
-      document.getElementById('citizen-to-pro').addEventListener('click', () => setMode('pro'));
-      document.getElementById('citizen-restart').addEventListener('click', () => startCitizenMode());
+      document.getElementById('citizen-take-action').addEventListener('click', (e) => {
+        e.preventDefault();
+        clearTimeout(doneAutoAdvanceTimer);
+        goToTakeAction();
+      });
+      document.getElementById('citizen-to-pro').addEventListener('click', () => { clearTimeout(doneAutoAdvanceTimer); setMode('pro'); });
+      document.getElementById('citizen-restart').addEventListener('click', () => { clearTimeout(doneAutoAdvanceTimer); startCitizenMode(); });
       renderAll();
+      // Nobody's picked a path after a few seconds sitting with the
+      // reveal — dissolve straight into take-action.html ourselves, same
+      // fade treatment (and the same function) a manual "Take Action"
+      // click triggers.
+      doneAutoAdvanceTimer = window.setTimeout(goToTakeAction, DONE_AUTO_ADVANCE_MS);
       return;
     }
 

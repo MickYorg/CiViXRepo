@@ -53,8 +53,14 @@
     color: var(--paper);
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
-    transition: background 0.25s ease, color 0.25s ease;
+    transition: background 0.25s ease, color 0.25s ease, opacity 0.5s ease;
   }
+  /* Same dissolve-in treatment builder.html uses for its own arrival from
+     the splash — starts invisible, removed by the boot script below right
+     after first paint, so landing here (from the done card's automatic
+     or manual hand-off) reads as a continuation of the same transition
+     language rather than a hard cut. */
+  body.is-entering { opacity: 0; }
 
   .topbar {
     background: var(--ink-raised);
@@ -619,7 +625,7 @@
   .home-link:hover { background: var(--amber-wash); }
 </style>
 </head>
-<body>
+<body class="is-entering">
 
 <header class="topbar">
   <a class="mark" href="index.html">C<em>i</em>V<em>i</em>X</a>
@@ -709,6 +715,15 @@
 <script>
 (function () {
   'use strict';
+
+  // Fade in from whatever's handing off to this page (builder.html's own
+  // fade-out) rather than snapping straight to full opacity — double rAF
+  // so the browser has actually painted the opacity:0 starting state
+  // before the class removal kicks off the transition. Same pattern
+  // builder.html uses for its own arrival from the splash.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('is-entering');
+  }));
 
   // Matching (SYNONYMS, slug, keywordsFor, matchBills) now lives in
   // digest.js, shared with builder.html's Citizen-mode digest — this used
