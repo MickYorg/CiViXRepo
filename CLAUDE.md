@@ -598,7 +598,33 @@ see "Deliberately not yet done" below for why.
   headline is, via `classifyFreeformPriority()`, and written into both
   `addIssue()` *and* that issue's `stance` field, since typed text is
   itself a stance) alongside the real Send to CiViX handoff, in context,
-  instead of a footnote after the reveal. The done card's own CTAs were
+  instead of a footnote after the reveal.
+
+  **Confirm-or-correct, 2 Sep 2026** — the citizen said this card "feels
+  like we are not adding to the manifesto" — typed text used to get
+  classified onto one of the ~40 taxonomy topics and committed silently,
+  no visibility into what CiViX filed it under, no way to say "that's
+  wrong," and (the real bug underneath the feeling) `classifyFreeformPriority()`'s
+  exact-string match meant any AI response that didn't match the taxonomy
+  string byte-for-byte — different casing, trailing punctuation — silently
+  discarded the whole typed thought with the card just advancing anyway.
+  Fixed both: the match is now case-insensitive with a fallback, and
+  landing a topic (guessed or not) now shows it before committing —
+  `renderFreeformConfirm()` ("Filed under **{topic}**?" / "Yes, that's it"
+  / "Not quite — choose the topic myself"), falling to
+  `renderFreeformPicker()` (the full catalog, grouped, reusing `.chip`/
+  `.cat` styling from Pro mode's own picker) either on rejection or when
+  classification failed outright — a citizen's own choice always wins
+  over the AI's guess, and a failed guess no longer means the thought
+  just vanishes. `commitFreeformTopic()` does the actual
+  `addIssue()`/`weight`/`stance` write either way, then
+  `renderFreeformDone()` confirms it landed and points at where to
+  actually see something come of it: "Filed under **{topic}**. We'll
+  surface matching actions for it on Take Action." — closing the loop
+  instead of silently cutting to the next card. All three are new
+  screens swapped into `citizen-card-slot` directly, same pattern
+  `showDrilldownMercy()` already used, not new entries in the deck array
+  itself. The done card's own CTAs were
   also rebalanced once the digest could be the single, undistracted
   focus: "See everything" demoted from primary to secondary styling, and
   a `.citizen-digest-nudge` line ("Pick one above and go — most take

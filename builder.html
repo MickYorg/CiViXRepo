@@ -463,6 +463,10 @@
   .field.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; }
   .citizen-freeform { resize: vertical; min-height: 68px; margin-bottom: 12px; }
   .citizen-freeform-send { margin: 16px 0 10px; }
+  /* Scrolls internally rather than blowing out the whole card/page height —
+     the full catalog is ~40 chips across 9 categories. */
+  .freeform-picker { width: 100%; text-align: left; max-height: 320px; overflow-y: auto; margin: 4px 0 18px; }
+  .freeform-picker .cat:last-child { margin-bottom: 0; }
 
   .btn {
     appearance: none;
@@ -2819,10 +2823,86 @@ Reply with ONLY this exact string, no quotes, no markdown, no other text — whi
 ${ALL_ISSUE_NAMES.join(' | ')}`;
     try {
       const raw = (await digCheckCall(prompt)).trim().replace(/^["']|["']$/g, '');
-      return ALL_ISSUE_NAMES.indexOf(raw) !== -1 ? raw : null;
+      if (ALL_ISSUE_NAMES.indexOf(raw) !== -1) return raw;
+      // The model occasionally answers with slightly different casing or
+      // trailing punctuation than the exact taxonomy string — a forgiving
+      // match here is the difference between a typed priority actually
+      // landing in the manifesto and it silently vanishing while the card
+      // just moves on regardless (the caller had no visibility into a
+      // failed classification before this, and neither did the citizen).
+      const lower = raw.toLowerCase();
+      const loose = ALL_ISSUE_NAMES.find(n => n.toLowerCase() === lower);
+      return loose || null;
     } catch (e) {
       return null;
     }
+  }
+
+  // ---- "Anything else on your mind?" — confirm-or-correct, then commit ----
+  // Three small screens off to the side of the main deck, same pattern
+  // showDrilldownMercy() already uses: overwrite citizen-card-slot
+  // directly rather than adding new deck card types, since none of this
+  // needs to be resumable or re-enterable the way real deck cards are.
+
+  function renderFreeformConfirm(text, topic) {
+    document.getElementById('citizen-controls').style.display = 'none';
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">🎯</div>
+        <div class="citizen-title">Filed under ${esc(topic)}?</div>
+        <p class="citizen-blurb">“${esc(text)}”</p>
+        <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-confirm">Yes, that's it &#8594;</button>
+        <button type="button" class="btn btn-quiet citizen-cta" id="citizen-freeform-repick">Not quite — choose the topic myself</button>
+      </div>`;
+    document.getElementById('citizen-freeform-confirm').addEventListener('click', () => commitFreeformTopic(text, topic));
+    document.getElementById('citizen-freeform-repick').addEventListener('click', () => renderFreeformPicker(text));
+  }
+
+  function renderFreeformPicker(text) {
+    document.getElementById('citizen-controls').style.display = 'none';
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">🎯</div>
+        <div class="citizen-title">Where does this belong?</div>
+        <p class="citizen-blurb">“${esc(text)}”</p>
+        <div class="freeform-picker">
+          ${CATALOG.map(([cat, items]) => `
+            <div class="cat">
+              <div class="cat-label">${esc(cat)}</div>
+              <div class="chips">${items.map(n => `<button type="button" class="chip" data-pick="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+            </div>`).join('')}
+        </div>
+        <button type="button" class="btn btn-quiet citizen-cta" id="citizen-freeform-cancel">Skip this one instead</button>
+      </div>`;
+    document.getElementById('citizen-card-slot').querySelectorAll('[data-pick]').forEach(btn => {
+      btn.addEventListener('click', () => commitFreeformTopic(text, btn.dataset.pick));
+    });
+    document.getElementById('citizen-freeform-cancel').addEventListener('click', () => advanceCitizen());
+  }
+
+  function commitFreeformTopic(text, topic) {
+    addIssue(topic);
+    const iss = findIssue(slug(topic));
+    if (iss) { iss.weight = 3; iss.stance = text; }
+    save();
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+    renderFreeformDone(topic);
+  }
+
+  // Closes the loop instead of just silently advancing to the next card —
+  // the citizen typed something real, it's worth a beat of confirmation
+  // that it landed, and where to actually see something come of it
+  // (take-action.html's own top-3/detailed lists, not this card).
+  function renderFreeformDone(topic) {
+    document.getElementById('citizen-controls').style.display = 'none';
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">✅</div>
+        <div class="citizen-title">Added as a priority</div>
+        <p class="citizen-blurb">Filed under <strong>${esc(topic)}</strong>. We'll surface matching actions for it on Take Action.</p>
+        <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-continue">Continue &#8594;</button>
+      </div>`;
+    document.getElementById('citizen-freeform-continue').addEventListener('click', () => advanceCitizen());
   }
 
   // Best-effort: a photo is nice-to-have, never a blocker. A failure
@@ -3576,14 +3656,15 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         btn.disabled = true;
         field.disabled = true;
         const topic = await classifyFreeformPriority(text);
-        if (topic) {
-          addIssue(topic);
-          const iss = findIssue(slug(topic));
-          if (iss) { iss.weight = 3; iss.stance = text; }
-          save();
-          if (window.CivicsEngine) window.CivicsEngine.maybeShow();
-        }
-        advanceCitizen();
+        if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+        // A confident guess still gets a beat to confirm or correct
+        // before it's added — previously this landed silently under
+        // whichever of the ~40 taxonomy topics the AI picked, with no
+        // visibility and no way to say "actually, no." A failed
+        // classification used to just as silently drop the whole typed
+        // thought; now it goes straight to picking the topic by hand.
+        if (topic) renderFreeformConfirm(text, topic);
+        else renderFreeformPicker(text);
       });
       document.getElementById('citizen-freeform-skip').addEventListener('click', () => advanceCitizen());
       return;
