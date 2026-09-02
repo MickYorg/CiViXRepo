@@ -185,23 +185,28 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
 
   // Rewrites a bill's title + raw legislative action text into one plain
-  // sentence. Cached indefinitely per bill id — a bill's own text doesn't
-  // change retroactively, so this costs one AI call per bill, ever, across
-  // every citizen's browser that happens to see it (each browser caches
-  // its own copy; there's no shared server cache, so the real-world cost
-  // is per-bill-per-visitor, not per-bill-globally).
+  // sentence. Cached locally per bill id first (this browser's own copy,
+  // for an instant repeat view with no network round-trip at all), then
+  // against /api/plain-summary's own server-side KV cache (2 Sep 2026,
+  // new — see that file's own comment) — a bill only ever costs one real
+  // Anthropic call, period, shared across every citizen who's ever asked,
+  // not once per browser the way this used to work when it called
+  // /api/dig-check directly with a fresh prompt every time a browser
+  // hadn't personally seen that bill before.
   async function plainSummarize(id, title, actionText) {
     const cache = loadJSON(SUMMARY_KEY, {});
     if (cache[id]) return cache[id].text;
     try {
-      const prompt = `Rewrite this piece of legislative activity as ONE plain-language sentence a busy person with no policy background could understand in five seconds — what it actually does or what just happened, not legal procedure. No markdown, no quotes, under 25 words.
-
-Bill: ${title}
-Latest action: ${actionText || 'No recorded action yet.'}`;
-      const text = (await digCheckCall(prompt)).replace(/^["']|["']$/g, '').trim();
-      cache[id] = { text, at: Date.now() };
+      const r = await fetch('/api/plain-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title, actionText })
+      });
+      const data = await r.json();
+      if (!r.ok || data.error || !data.text) return null;
+      cache[id] = { text: data.text, at: Date.now() };
       saveJSON(SUMMARY_KEY, cache);
-      return text;
+      return data.text;
     } catch (e) {
       return null; // caller falls back to the raw text
     }

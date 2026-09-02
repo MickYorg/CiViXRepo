@@ -1002,8 +1002,9 @@
   // showing in the main federal/state list at the same time, so this
   // targets its own watch-specific DOM id (avoiding a duplicate-id
   // collision) while still keying the plainSummarize cache off the
-  // bill's own natural id, so it's still only ever one AI call per bill
-  // per browser, shared with the main list.
+  // bill's own natural id, so it's still only ever one real Anthropic
+  // call per bill, ever (see /api/plain-summary's own comment), shared
+  // with the main list and with every other citizen's browser too.
   function enhanceWatchSummaries(entries) {
     if (!window.CivixDigest || !entries.length) return;
     entries.forEach(({ w, live, isState }) => {
@@ -2181,9 +2182,12 @@ BODY: <the email body, a few short paragraphs>`;
   // Progressive enhancement: every card renders immediately with a
   // "Getting the plain-English version..." placeholder in its lead
   // synopsis span, then each visible one's plain-language rewrite fills
-  // in once it resolves — cached (and shared with builder.html's
-  // Citizen-mode digest via digest.js), so a bill only ever costs one AI
-  // call per browser, not one per view. Every mode uses this same
+  // in once it resolves — cached both locally and server-side (shared
+  // with builder.html's Citizen-mode digest via digest.js's
+  // plainSummarize(), see /api/plain-summary's own comment for the 2 Sep
+  // 2026 server-cache rework), so a bill only ever costs one real
+  // Anthropic call, ever, not one per browser and not one per view. Every
+  // mode uses this same
   // placeholder now (2 Sep 2026 — see the .card-synopsis CSS comment), so
   // a failed rewrite needs the same raw-text fallback everywhere, not
   // just in Citizen mode.

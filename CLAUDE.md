@@ -627,8 +627,9 @@ see "Deliberately not yet done" below for why.
   be both watched and separately visible in the main list at the same
   time — same element id in both places would collide. The
   `plainSummarize()` cache key stays the bill's own natural id either
-  way, so a bill still only ever costs one AI call per browser total, not
-  one for the main list and a second for its watch card.
+  way, so a bill still only ever costs one AI call total, not one for the
+  main list and a second for its watch card (and, as of the server-cache
+  rework further down, not one per browser either).
 
   **Bill status, also 2 Sep 2026** — the citizen asked to pull the bill's
   actual status from congress.gov and show it on take-action cards and
@@ -649,6 +650,35 @@ see "Deliberately not yet done" below for why.
   `.status-tag` chip shows next to the jurisdiction tag wherever a
   federal bill's card renders (`renderCard()`, `focusEntryHtml()`,
   `watchCardHtml()`).
+
+  **Shared server-side summary cache, 2 Sep 2026** — the citizen hit
+  DIG's 30/day per-IP `/api/dig-check` limit on what they thought was
+  their first DIG use in days. Root cause: that limit is shared across
+  every feature calling `/api/dig-check`, not just DIG's own UI, and
+  `digest.js`'s `plainSummarize()` (the plain-language rewrite behind
+  every bill card's synopsis, everywhere it renders) had no server-side
+  cache at all — only a per-browser localStorage one. A citizen's first
+  visit to take-action.html could burn through a dozen-plus individual
+  calls summarizing bills nobody's browser had ever asked about before,
+  and every *other* citizen's own first visit to those same popular bills
+  repeated the exact same spend independently. New
+  `functions/api/plain-summary.js` fixes this properly rather than just
+  raising the limit: a KV cache keyed by bill id, shared across every
+  visitor, 60-day TTL. `plainSummarize()` now checks its local cache
+  first (unchanged — an instant repeat view costs nothing), then calls
+  this endpoint instead of building a raw prompt for `/api/dig-check`
+  directly. Deliberately **not** rate-limited per-IP the way
+  `/api/dig-check` is — a cache miss here is a rare, system-wide event
+  (the first citizen anywhere to see a given bill), not personal usage
+  that should compete against that visitor's own quota for interactive
+  features elsewhere (Inbox, drafting, DIG itself). Still shares
+  `/api/dig-check`'s own overall daily `$` budget (same `usage:<date>` KV
+  key) — real Anthropic spend either way, bounded by the same cap
+  regardless of which endpoint spent it. Cache is keyed by bill id alone,
+  same staleness tradeoff `plainSummarize()` already accepted before this
+  existed: a cached summary can go mildly stale once a bill's
+  `latestAction` moves on to something new, and this doesn't
+  auto-regenerate for that.
   Every piece of copy says
   "flags changes when you visit," never "alerted" or "sent" — the gap
   between what's real (persisted list + return-visit diffing) and what's
