@@ -1,11 +1,11 @@
 // digest.js — shared "what should this citizen actually do right now"
 // engine. Single source of truth for matching manifesto issues against
-// federal/state bills (previously duplicated only in calendar.html — moved
-// here so builder.html's Citizen-mode digest and calendar.html's own lists
-// can't drift the way index.html/builder.html's hasManifesto check once
-// did) plus two additions:
+// federal/state bills (previously duplicated only in take-action.html —
+// moved here so builder.html's Citizen-mode digest and take-action.html's
+// own lists can't drift the way index.html/builder.html's hasManifesto
+// check once did) plus two additions:
 //   - Docket items filed via Send to CiViX feed into the same ranked pool
-//     as calendar matches, via the same AI topic-classification already
+//     as legislative matches, via the same AI topic-classification already
 //     used for Inbox triage (civix-inbox-topics), not a separate mechanism.
 //   - A cached, AI-backed plain-language one-liner for any bill/item, so
 //     raw legislative text ("Referred to the Subcommittee on...") doesn't
@@ -18,7 +18,7 @@
   const INBOX_TOPICS_KEY = 'civix-inbox-topics'; // shared with builder.html's Inbox
   const SUMMARY_KEY = 'civix-plain-summaries';
 
-  // ---- Matching (moved from calendar.html) -----------------------------
+  // ---- Matching (moved from take-action.html) ---------------------------
   const SYNONYMS = {
     'wages-and-labor': ['minimum wage', 'wage', 'labor', 'union', 'worker', 'overtime'],
     'taxes': ['tax', 'taxes', 'irs', 'tax credit', 'tax cut'],
@@ -117,7 +117,7 @@
   // citizen who cares most about local government can actually have that
   // show up in their top 3, not just federal/state. `covered: false`
   // (an uncovered city) is a normal, silent no-op here, same as it is on
-  // calendar.html — not an error.
+  // take-action.html — not an error.
   async function fetchMunicipalBills(zip) {
     if (!zip) return { bills: [], covered: false };
     const r = await fetch('/api/municipal?zip=' + encodeURIComponent(zip));
@@ -217,14 +217,14 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
     const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || bill.identifier || '');
     return {
       kind, hits, score, bill, // the full bill object travels with the entry —
-      // calendar.html's focus view uses it to open the Take Action modal
+      // take-action.html's focus view uses it to open the Take Action modal
       // directly on a federal entry, instead of only linking to a filtered list
       title: bill.title,
       label: label.trim(),
       rawSummary: bill.latestAction ? bill.latestAction.text : '',
       summaryId: bill.identifier || (bill.congress + '-' + bill.type + bill.number),
       url: bill.url || '',
-      actionHref: 'calendar.html' + (hits.length ? '?focus=' + encodeURIComponent(slug(hits[0])) : '')
+      actionHref: 'take-action.html' + (hits.length ? '?focus=' + encodeURIComponent(slug(hits[0])) : '')
     };
   }
 
@@ -305,7 +305,7 @@ Latest action: ${actionText || 'No recorded action yet.'}`;
           title: i.name,
           rawSummary: i.stance, // no summaryId (nothing to AI-summarize) — the plain-language pass below falls back to this verbatim
           summaryId: null,
-          actionHref: 'calendar.html?general=' + encodeURIComponent(i.name)
+          actionHref: 'take-action.html?general=' + encodeURIComponent(i.name)
         });
       });
 

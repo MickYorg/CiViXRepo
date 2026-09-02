@@ -5,7 +5,7 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 31 Aug 2026)
+## Current state (as of 2 Sep 2026)
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -34,7 +34,21 @@ see "Deliberately not yet done" below for why.
   today) instead of trait/category cards — the original 30-second
   archetype quiz is still there, demoted to a quiet second option below
   (headlines shipped 31 Aug 2026 as the secondary path and was promoted
-  to primary the same day once it proved out). Each headline is
+  to primary the same day once it proved out). As of 2 Sep 2026 the
+  welcome card also auto-advances into the headline deck on its own —
+  a 3.8s read-then-act window (the same `AUTO_DISMISS_MS` civics.js's
+  fact popups already use, so it's a timing rhythm a citizen's been
+  trained on elsewhere in the app), then the card dissolves (1s fade)
+  and `startHeadlineMode()` fires, same as tapping the button directly.
+  Picking either button on the card cancels the timer. This pairs with
+  a real fade-in/fade-out across the splash → builder hand-off itself
+  (`index.html`'s `goToBuilder()` now fades the body out over 0.5s before
+  navigating; `builder.html` starts at `opacity:0` and fades in over
+  0.5s on arrival) — previously a bare `location.href` swap with no
+  transition at all, which the citizen flagged as "abrupt." Also fixed
+  the same day: `.citizen-privacy-note` had no bottom margin, so the
+  welcome card sat jammed right up against the "Private & secure" line
+  on laptop-width viewports. Each headline is
   boiled down via `/api/dig-check` into a topic on CiViX's own fixed issue
   taxonomy (so it matches cleanly against `digest.js`'s existing
   SYNONYMS), a one-sentence talking point, and a search query for a real
@@ -45,8 +59,9 @@ see "Deliberately not yet done" below for why.
   photos from a public source, not AI-generated illustrations, and search
   is free where generation had a real per-image cost. A swiped-right headline adopts
   its topic as a priority exactly like a swiped issue card, so it flows
-  straight into the same zip → done → top-3 digest → calendar.html
-  take-action pipeline the quiz path already ends at — no separate
+  straight into the same zip → done → take-action.html hand-off the quiz
+  path already ends at (see 2 Sep 2026 note below — the done card no
+  longer shows the top-3 digest inline itself) — no separate
   "propose actions" logic needed. The query sent to `/api/headlines`
   already biases toward a citizen's existing top 2 priorities when they
   have any (a first step toward "the manifesto should influence the
@@ -77,10 +92,10 @@ see "Deliberately not yet done" below for why.
   (adopted, skipped, or deferred yet again) so it can't grow unbounded
   even if a citizen keeps punting on the same facet. This same drilldown mechanic
   now also has a cold-start entry point (`startSeededDrilldown()`,
-  triggered by `?drilldown=<topic>&stance=<for|against>` on boot): calendar.html's
+  triggered by `?drilldown=<topic>&stance=<for|against>` on boot): take-action.html's
   action modal links here once a citizen declares a For/Against position
   on a bill, so "go deeper on this" doesn't need its own swipe-card UI
-  duplicated in calendar.html — it hands off to the exact same deck,
+  duplicated in take-action.html — it hands off to the exact same deck,
   seeded with the bill and stance so the 3 facets build on the position
   already stated instead of re-litigating it. The trait deck (`TRAITS`)
   also gained two "posture" cards (31 Aug 2026) — "Direct action" ("We're
@@ -130,8 +145,31 @@ see "Deliberately not yet done" below for why.
   already returns), and stronger CTA copy ("Make your voice heard" +
   "~2 min — CiViX drafts the call or email for you" for federal entries
   specifically, since that's the only kind with real assisted drafting
-  today — state/docket keep honest, unembellished copy).
-- `calendar.html` — Federal section is real: `functions/api/calendar.js`
+  today — state/docket keep honest, unembellished copy). **Reverted 2 Sep
+  2026** — see the "done card simplified" note further down: the citizen
+  complained the done card was "getting heavy," so the whole inline digest
+  (rank badges, why-lines, per-entry CTAs — `digestEntryHtml()`,
+  `digestWhyHtml()`, `loadCitizenDigest()`, all deleted) came back out.
+  builder.html no longer calls `digest.js`/`buildTopDigest()` at all —
+  that reveal now lives solely on take-action.html — so builder.html
+  dropped its `<script src="digest.js">` include too.
+- `take-action.html` — **renamed from `calendar.html` 2 Sep 2026** (file,
+  browser tab `<title>`, `<h1>`, and every internal link/href/comment
+  across `index.html`/`builder.html`/`digest.js` moved with it in the
+  same pass — see `filenames-match-user-facing-names` in memory). The
+  citizen asked to "rebrand everything that is currently calendar to
+  Take Action" — the page's H1 and the splash's own nav button (§03,
+  "get engaged") both now read **"Take Action"** instead of "Calendar."
+  Deliberately scoped to the page's own branding, not the domain concept
+  underneath it: `functions/api/calendar.js` (the congress.gov bill
+  fetcher) keeps its name — it's genuinely fetching a legislative
+  calendar, distinct from what this page is now called — and the real
+  "add to calendar" `.ics`-download feature below is untouched for the
+  same reason. A root `_redirects` file (new, 2 Sep 2026 — this is the
+  first entry in it) 301s `/calendar.html` and `/calendar` to
+  `/take-action.html`, since alpha testers may already have the old URL
+  bookmarked or linked and this is a real, in-use app now, not just
+  `/dev/personas` housekeeping. Federal section is real: `functions/api/calendar.js`
   pulls recent bills from congress.gov, matched client-side against the
   profile's declared issues (weighted, hand-authored synonym map). Each
   matched bill has a **Take action** button opening a modal that looks up
@@ -203,16 +241,16 @@ see "Deliberately not yet done" below for why.
   federal/state/docket pool, scored to always rank first — a citizen who
   bothered to type something in their own words shouldn't see it go
   nowhere just because no bill happens to touch it yet. Its "Start
-  making noise" CTA opens `openGeneralAdvocacyModal()` (calendar.html) —
+  making noise" CTA opens `openGeneralAdvocacyModal()` (take-action.html) —
   the same rep-lookup + AI-drafted call/email as the bill-specific
   modal, minus everything that assumes a bill exists: no For/Against (no
   bill to be for or against), no ICS date, one draft instead of two
   per-lean, drafted straight from the citizen's own stance text.
   Deliberately a separate code path from `openActionModalFor()` rather
   than threading `bill: null` through the bill-specific rendering.
-  Reachable from calendar.html's focus zone directly
+  Reachable from take-action.html's focus zone directly
   (`data-focus-general-action`) or via `?general=<issue-name>` (what
-  builder.html's digest links to, since it can't call calendar.html's
+  builder.html's digest links to, since it can't call take-action.html's
   JS across pages).
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
@@ -256,7 +294,7 @@ see "Deliberately not yet done" below for why.
     pattern. Nothing in the request — name, address, email, message
     text — is written to KV or logged; the only thing this function
     persists is the rate-limit counters.
-  - calendar.html: state bill cards get a real **Take action** button
+  - take-action.html: state bill cards get a real **Take action** button
     (`STATE_ACTIVE`, `openStateActionModal()`/`renderStateActionCard()`,
     mirroring the federal/general modals' architecture). A citizen's
     name + mailing address (+ optional email, so the office can reply to
@@ -310,7 +348,7 @@ see "Deliberately not yet done" below for why.
   ordered soonest-first. Deliberately **not** matched/scored against a
   citizen's priorities the way bills are — an Event has no policy-topic
   text worth keyword-matching (`EventBodyName` is just "City Council" or
-  "Planning Commission"), so calendar.html renders it as a plain
+  "Planning Commission"), so take-action.html renders it as a plain
   chronological "what's coming up in your city" list instead
   (`renderMunicipalEvents()`, `#municipal-events`, right below the
   Matters list). Best-effort and independent of the Matters fetch — a
@@ -358,7 +396,7 @@ see "Deliberately not yet done" below for why.
   kinds (`general`/`docket` entries are left alone — the lean is about
   which level of government, not about typed-in priorities or filings).
   The lean also refines itself from real behavior, not just the one-time
-  card: `calendar.html`'s `bumpJurisdictionLean()` nudges the relevant
+  card: `take-action.html`'s `bumpJurisdictionLean()` nudges the relevant
   level up by 0.5 every time a citizen actually takes action through it —
   `openActionModalFor()`/`openGeneralAdvocacyModal()` bump `'federal'`,
   and (since 31 Aug 2026, once state gained its own real take-action
@@ -381,7 +419,7 @@ see "Deliberately not yet done" below for why.
   right after an ambient one), but skips the random show-chance gate since
   the caller already knows a wait is genuinely happening. Wired into:
   builder.html's headline-swipe loading, its "it's complicated" drilldown
-  loading, its top-3 digest loading, calendar.html's action-modal rep
+  loading, its top-3 digest loading, take-action.html's action-modal rep
   lookup/drafting, and municipal's live fetch. `FACTS` gained six new
   entries (31 Aug 2026, citizen asked for "info cards on electoral
   college and convention of states and a few of the more obscure
@@ -412,7 +450,7 @@ see "Deliberately not yet done" below for why.
   after the fact" problem it was trying to fix, per live user testing the
   same day — found by name via a fresh, from-scratch Citizen-mode run.
   Replaced with a real guided step: every path through Citizen mode
-  (headline swipe, the 30-second quiz, topping-up, and calendar.html's
+  (headline swipe, the 30-second quiz, topping-up, and take-action.html's
   seeded-drilldown handoff) now inserts a `{ type: 'more-priorities' }`
   card right before `done` — "Anything else on your mind?" — offering
   freeform text (classified onto the issue taxonomy the same way a
@@ -425,6 +463,11 @@ see "Deliberately not yet done" below for why.
   a `.citizen-digest-nudge` line ("Pick one above and go — most take
   under 5 minutes") added once real results load, actively pushing
   toward acting on one of the top 3 rather than just displaying them.
+  **Reverted 2 Sep 2026** along with the rest of the inline digest — the
+  done card's link into take-action.html (relabeled **"Take Action"**,
+  see below) is primary-styled again, since it's once more the card's
+  single next step rather than one option next to a digest already doing
+  the convincing.
 
   **Watchdog mockup: watchlist, one-tap send, "beyond calls & email," 31
   Aug 2026** — the citizen asked for CiViX to prove out its "personal
@@ -563,7 +606,7 @@ build, which does pick it up.
   with `main` tracking `origin/main`, and the working tree is clean as of
   25 Aug 2026 (10 commits). The old "no git history" debt is resolved.
 - **Design tokens are hand-copied per page**, and have already drifted:
-  `index.html`/`calendar.html`/`builder.html` share one token system (navy/
+  `index.html`/`take-action.html`/`builder.html` share one token system (navy/
   paper/amber, Newsreader + IBM Plex Mono); `send-to-civix.html` runs a
   visibly different one (different amber, different fonts — JetBrains Mono + Source
   Serif 4). Worth extracting into one shared stylesheet all pages `<link>` to.
@@ -620,11 +663,11 @@ they'd pay off, are:
   cover state legislators at all today.
 - **Petition and rally/event actions — partially real as of 31 Aug
   2026.** The action modals' new "Beyond calls & email" section (see
-  calendar.html's entry above) hands off to Change.org/Mobilize.us
+  take-action.html's entry above) hands off to Change.org/Mobilize.us
   search links today rather than CiViX's own data — real external
   tools, not fake results, but still not a curated petition partner or
   a local-events feed of CiViX's own. That remains the real gap here.
-- **Real-time watch alerts** — calendar.html's new watchlist (see
+- **Real-time watch alerts** — take-action.html's new watchlist (see
   entry above) does honest return-visit change detection against the
   federal calendar's own fetch, but there's no accounts system,
   notification backend, or scheduled job to actually push an alert to a
@@ -632,7 +675,7 @@ they'd pay off, are:
   project (accounts, a job runner, an email/push channel), not a small
   extension — the "mock it up now" scope stopped short of it on purpose.
 - **Federal "Send it" still ends in a copy+paste, not a real send** —
-  calendar.html's `fireOff()` (see entry above) removed a manual step but
+  take-action.html's `fireOff()` (see entry above) removed a manual step but
   not the fundamental blocker: 5calls has no real recipient email address
   to send to, and CiViX won't auto-submit third-party government contact
   forms (most run CAPTCHA/bot-detection) on a citizen's behalf. This is
@@ -647,7 +690,7 @@ they'd pay off, are:
   be wrong for a split ZIP. Precise lookup would mean asking for a full
   address; `builder.html`'s manifesto itself still never asks (still
   ZIP-only there) — the 31 Aug 2026 state-email feature asks for a
-  mailing address, but narrowly, contextually in calendar.html's state
+  mailing address, but narrowly, contextually in take-action.html's state
   action modal, only from someone about to actually send, and stored
   local-only (see "State Take Action is real" above). Whether to also
   use that address to sharpen federal district resolution is a separate

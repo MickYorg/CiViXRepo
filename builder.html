@@ -278,41 +278,6 @@
      is declared later in this stylesheet, so a same-specificity .citizen-
      quiz-opt rule loses to it on source order alone. */
   .citizen-quiz-options .citizen-quiz-opt { text-decoration: none; display: block; white-space: normal; text-align: left; line-height: 1.35; width: 100%; }
-  /* The "done" card's top-3 digest — real matched activity, not just a
-     link out to go find it yourself. Left-aligned since .citizen-card's
-     base text-align: center reads badly for multi-line card content. */
-  .citizen-digest { width: 100%; text-align: left; margin: 4px 0 14px; }
-  .citizen-digest-status { font-size: 13px; color: var(--paper-dim); margin-bottom: 10px; }
-  .citizen-digest-nudge {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
-    letter-spacing: 0.04em; color: var(--amber-ink); text-align: center;
-    margin: 2px 0 0;
-  }
-  /* #1's card gets a visibly stronger border/background than #2 and #3 —
-     "pop" isn't just decoration here, it's a cue for where to look first. */
-  .citizen-digest-card {
-    border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px 12px;
-    margin-bottom: 9px; background: var(--ink); position: relative;
-  }
-  .citizen-digest-card[data-rank="0"] { border-color: var(--amber); background: var(--amber-wash); }
-  .citizen-digest-top { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 5px; }
-  .citizen-digest-rank {
-    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
-    background: var(--amber); color: var(--btn-ink); font-weight: 700; font-size: 12px;
-    display: grid; place-items: center; margin-top: 1px;
-  }
-  .citizen-digest-card[data-rank="0"] .citizen-digest-rank { width: 26px; height: 26px; font-size: 13.5px; }
-  .citizen-digest-headtext { flex: 1; min-width: 0; }
-  .citizen-digest-title { font-weight: 600; font-size: 14px; line-height: 1.3; }
-  .citizen-digest-tag { flex-shrink: 0; white-space: nowrap; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-ink); }
-  .citizen-digest-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .citizen-digest-why {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.02em;
-    color: var(--amber-ink); margin: 3px 0 7px; line-height: 1.4;
-  }
-  .citizen-digest-body { font-size: 13px; color: var(--paper-dim); line-height: 1.45; margin-bottom: 6px; }
-  .citizen-digest-eta { font-size: 11px; color: var(--paper-dim); margin: 0 0 8px; }
-  .citizen-digest-card .btn { font-size: 10.5px; padding: 6px 10px; text-decoration: none; }
   /* Send-to-CiViX callout on the done card — the value/"why" this is
      worth doing, not just the mechanism (send-to-civix.html carries the
      mechanism). Citizen mode never showed this at all before; it's
@@ -556,7 +521,7 @@
   }
   .prow:last-child { border-bottom: none; }
   .prow-name { font-size: 16px; font-weight: 600; }
-  /* Transient landing highlight for a ?focus= deep link from calendar.html's
+  /* Transient landing highlight for a ?focus= deep link from take-action.html's
      citizen-mode match chips — fades on its own, not tied to interaction. */
   .prow.is-focused { background: var(--amber-wash); border-radius: 8px; padding-left: 10px; padding-right: 10px; margin: 0 -10px; transition: background 1.8s ease; }
   .prow.is-focused.is-fading { background: transparent; }
@@ -1137,7 +1102,6 @@
 </div>
 
 <script src="civics.js"></script>
-<script src="digest.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1475,9 +1439,9 @@
     updated: null,
     archetype: '',     // id of the matched Citizen-mode quiz archetype, once confirmed
     backlog: [],       // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
-    jurisdictionLean: null,  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in calendar.html
-    watching: [],      // { key, kind, title, ... } — calendar.html's watchlist, see toggleWatch()/checkWatchlistUpdates() there
-    identity: null     // { name, address, email } — collected by calendar.html's state action modal, consent-gated, local-only; see CLAUDE.md's "real state email send" note for why this exists and what it's used for
+    jurisdictionLean: null,  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in take-action.html
+    watching: [],      // { key, kind, title, ... } — take-action.html's watchlist, see toggleWatch()/checkWatchlistUpdates() there
+    identity: null     // { name, address, email } — collected by take-action.html's state action modal, consent-gated, local-only; see CLAUDE.md's "real state email send" note for why this exists and what it's used for
   };
 
   let P = load();
@@ -1647,9 +1611,9 @@
 
   // ---- Matched-activity link ------------------------------------------
   // Adopting a topic used to be a dead end — it became a priority here,
-  // but nothing pointed to calendar.html, and nothing there pointed back
+  // but nothing pointed to take-action.html, and nothing there pointed back
   // to a specific priority either. This runs the same keyword match
-  // calendar.html itself uses (duplicated, not shared — no build system
+  // take-action.html itself uses (duplicated, not shared — no build system
   // to share it through) against the same federal/state data, so a
   // priority with real matched activity links straight to it, filtered.
   const CAL_SYNONYMS = {
@@ -1752,7 +1716,7 @@
         <div class="prow-stance">
           <input class="field" type="text" data-stance="${i.id}" value="${esc(i.stance)}" placeholder="What would count as a win here?">
         </div>
-        ${n ? `<div class="prow-matched"><a href="calendar.html?focus=${encodeURIComponent(i.id)}">${n} matched — Take action &#8594;</a></div>` : ''}
+        ${n ? `<div class="prow-matched"><a href="take-action.html?focus=${encodeURIComponent(i.id)}">${n} matched — Take action &#8594;</a></div>` : ''}
       </div>`;
     }).join('');
   }
@@ -2074,7 +2038,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       const topic = inboxTopics[it.id] && inboxTopics[it.id].topic;
       const name = topic || it.title;
       adoptFiling(it.id, { name: name, weight: focusRatings[it.id] });
-      window.location.href = 'calendar.html?focus=' + encodeURIComponent(slug(name));
+      window.location.href = 'take-action.html?focus=' + encodeURIComponent(slug(name));
     });
     document.getElementById('ifocus-strike').addEventListener('click', () => {
       strikeFiling(it.id);
@@ -2681,8 +2645,8 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // and a search query for a real stock photo (via /api/headline-image,
   // Unsplash), then run the exact same swipe-right-to-adopt mechanics the
   // rest of Citizen mode already uses. A swiped-in topic becomes a priority the
-  // same way an 'issue' card does, so it flows into the same zip/done ->
-  // buildTopDigest() -> calendar.html take-action pipeline for free.
+  // same way an 'issue' card does, so it flows into the same zip -> done ->
+  // Take Action hand-off for free.
   const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
 
   function hashStr(s) {
@@ -3164,7 +3128,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
 
   // Asked once, ever — subsequent deck builds skip it once P.jurisdictionLean
   // is set. "Refined afterward" (per the citizen's own request) happens
-  // passively via bumpJurisdictionLean() in calendar.html, not by asking
+  // passively via bumpJurisdictionLean() in take-action.html, not by asking
   // this question again.
   function jurisdictionLeanCard() {
     return P.jurisdictionLean ? [] : [{ type: 'jurisdiction-lean' }];
@@ -3178,7 +3142,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   }
 
   // Cold-start version of the same drilldown mechanic, entered from
-  // outside the swipe deck entirely — calendar.html's action modal links
+  // outside the swipe deck entirely — take-action.html's action modal links
   // here (?drilldown=<bill title>&stance=<for|against>) once a citizen
   // has declared a position on a bill, offering to go deeper on that
   // specific topic right away instead of only surfacing it if they
@@ -3233,81 +3197,12 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <div class="citizen-emoji">🎉</div>
         <div class="citizen-title">Nice — your manifesto’s coming together</div>
         <p class="citizen-blurb">${bits.join(', ')}. Everything’s saved right here on this device, private and secure — nothing shared, nothing sold, nothing sent anywhere.</p>
-        <div class="citizen-digest" id="citizen-digest">
-          <p class="citizen-digest-status">Checking federal, state, and your own docket for the fastest ways to act&hellip;</p>
-        </div>
         <div class="citizen-done-row">
-          <a class="btn citizen-cta" href="calendar.html">See everything &#8594;</a>
+          <a class="btn btn-primary citizen-cta" href="take-action.html">Take Action &#8594;</a>
           <button type="button" class="btn citizen-cta" id="citizen-to-pro">Fine-tune it (Pro mode) &#8594;</button>
           <button type="button" class="btn btn-quiet citizen-cta" id="citizen-restart">Swipe through more</button>
         </div>
       </div>`;
-  }
-
-  // "Why" line and CTA copy are both template-built from data buildTopDigest
-  // already returns (hits, kind) — no extra AI call per entry, so this never
-  // adds latency or failure surface to a card that's already loaded.
-  function digestWhyHtml(e, rank) {
-    if (!e.hits || !e.hits.length) return '';
-    const rankWord = ['your #1 match', 'your #2 match', 'your #3 match'][rank] || 'a strong match';
-    const names = e.hits.slice(0, 2).join(' and ');
-    const more = e.hits.length > 2 ? `, +${e.hits.length - 2} more` : '';
-    return `<p class="citizen-digest-why">${esc(rankWord)} — touches ${esc(names)}${more}, one of your declared priorities.</p>`;
-  }
-
-  function digestEntryHtml(e, rank) {
-    const kindLabel = e.kind === 'federal' ? 'Federal' : e.kind === 'state' ? 'State' : e.kind === 'municipal' ? 'Municipal' : e.kind === 'general' ? 'Your own priority' : 'Your docket';
-    const ctaLabel = e.kind === 'docket' ? 'Open in your docket'
-      : e.kind === 'federal' ? 'Make your voice heard'
-      : e.kind === 'general' ? 'Start making noise'
-      : 'Take a look';
-    const eta = e.kind === 'federal' || e.kind === 'general'
-      ? `<p class="citizen-digest-eta">~2 min — CiViX drafts the call or email for you.</p>`
-      : '';
-    return `
-      <div class="citizen-digest-card" data-rank="${rank}">
-        <div class="citizen-digest-top">
-          <span class="citizen-digest-rank">${rank + 1}</span>
-          <div class="citizen-digest-headtext">
-            <div class="citizen-digest-headline"><span class="citizen-digest-title">${esc(e.title)}</span><span class="citizen-digest-tag">${kindLabel}</span></div>
-            ${digestWhyHtml(e, rank)}
-          </div>
-        </div>
-        <p class="citizen-digest-body">${esc(e.summary || 'No summary available yet.')}</p>
-        ${eta}
-        <a class="btn btn-primary" href="${esc(e.actionHref)}">${ctaLabel} &#8594;</a>
-      </div>`;
-  }
-
-  // Fetches and shows real matched activity right on the done card —
-  // federal, state, and anything filed via Send to CiViX all feed the
-  // same ranked pool (digest.js), instead of just linking out to go find
-  // it yourself. Best-effort: any failure here just quietly falls back to
-  // the plain "See everything" link already on the card.
-  async function loadCitizenDigest() {
-    const el = document.getElementById('citizen-digest');
-    if (!el || !window.CivixDigest) return;
-    if (!P.issues.length) {
-      el.innerHTML = '';
-      return;
-    }
-    if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
-    try {
-      const top = await window.CivixDigest.buildTopDigest(P, { limit: 3 });
-      const current = document.getElementById('citizen-digest');
-      if (!current) return; // moved on to another card while this was in flight
-      if (!top.length) {
-        current.innerHTML = `<p class="citizen-digest-status">Nothing matched yet — check back once more legislative activity comes in. Your priorities are saved and CiViX keeps watching.</p>`;
-        return;
-      }
-      current.innerHTML =
-        `<p class="citizen-digest-status">You're closer to being heard than you think — here's exactly where to start:</p>` +
-        top.map(digestEntryHtml).join('') +
-        `<p class="citizen-digest-nudge">Pick one above and go — most take under 5 minutes.</p>`;
-    } catch (e) {
-      const current = document.getElementById('citizen-digest');
-      if (current) current.innerHTML = '';
-    }
   }
 
   function renderCitizenCard() {
@@ -3506,7 +3401,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     // Asked once, ever (jurisdictionLeanCard() skips it once P.jurisdictionLean
     // is set) — sets which level of government's matches lead the top-3,
     // refined afterward by which jurisdiction's actions a citizen actually
-    // takes (bumpJurisdictionLean() in calendar.html), not by asking again.
+    // takes (bumpJurisdictionLean() in take-action.html), not by asking again.
     if (card.type === 'jurisdiction-lean') {
       controls.style.display = 'none';
       slot.innerHTML = `
@@ -3579,7 +3474,6 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       document.getElementById('citizen-to-pro').addEventListener('click', () => setMode('pro'));
       document.getElementById('citizen-restart').addEventListener('click', () => startCitizenMode());
       renderAll();
-      loadCitizenDigest();
       return;
     }
 
@@ -3641,9 +3535,9 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   renderAll();
   applyMode();
 
-  // ?focus=<issue-id> arrives from calendar.html's citizen-mode match
+  // ?focus=<issue-id> arrives from take-action.html's citizen-mode match
   // chips (the mirror image of builder.html's own outbound ?focus= into
-  // calendar.html) — jump straight to that priority in Pro mode instead
+  // take-action.html) — jump straight to that priority in Pro mode instead
   // of leaving the visitor to go find it themselves.
   (function handleFocusParam() {
     let focusId = '';
@@ -3660,7 +3554,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     }, 60);
   })();
 
-  // ?drilldown=<topic>&stance=<for|against> arrives from calendar.html's
+  // ?drilldown=<topic>&stance=<for|against> arrives from take-action.html's
   // action-modal "go deeper" link, once a citizen has declared a For/
   // Against position on a specific bill — jump straight into a stance-
   // aware drilldown deck on that topic instead of the normal welcome
@@ -3717,7 +3611,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     modeResizeTimer = setTimeout(positionModeThumb, 150);
   });
   // Fetched asynchronously and re-renders § 03 once it lands — same
-  // matched-activity data calendar.html itself fetches, just consumed
+  // matched-activity data take-action.html itself fetches, just consumed
   // here to link each priority straight to its filtered view there.
   loadMatchBills();
   // Issued asynchronously so a slow or unreachable worker never blocks the

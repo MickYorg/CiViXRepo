@@ -1,0 +1,5 @@
+# calendar.html was renamed to take-action.html (2 Sep 2026) as part of the
+# Calendar -> Take Action rebrand. Alpha testers may already have the old
+# URL bookmarked or linked, so redirect rather than let it 404/fall through.
+/calendar.html  /take-action.html  301
+/calendar       /take-action.html  301
