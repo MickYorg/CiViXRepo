@@ -57,7 +57,25 @@ see "Deliberately not yet done" below for why.
   API guidelines). This replaced an earlier OpenAI `gpt-image-1`
   generation attempt (31 Aug 2026) — the citizen explicitly wanted real
   photos from a public source, not AI-generated illustrations, and search
-  is free where generation had a real per-image cost. A swiped-right headline adopts
+  is free where generation had a real per-image cost. **2 Sep 2026**: the
+  talking point stopped being a neutral "what's at stake" summary — the
+  citizen pointed out an ambiguous, hard-to-react-to headline isn't
+  swipeable in any meaningful sense, since it's unclear what agreeing or
+  disagreeing would even mean. The boildown prompt (both copies — see the
+  sync note on `boildownHeadline()` in builder.html and `boildownPrompt()`
+  in `functions/api/headlines-batch.js`) now asks for a genuine,
+  opinionated position statement instead, with an explicit instruction to
+  zoom out to the broader policy area rather than force a confusing stance
+  from tangled/ambiguous specifics. "It's complicated" (unchanged) stays
+  the deliberate way out for anything still genuinely nuanced. A
+  swiped-right headline now also writes that talking point onto the
+  adopted issue's `stance` field (`resolveCitizenCard()`), same as typing
+  one into the "more-priorities" card already did — previously the stance
+  a citizen was actually reacting to was discarded, only the bare topic
+  survived the swipe. The "it's complicated" drilldown facet prompt
+  (`buildDrilldownCards()`) got the same position-statement treatment for
+  consistency, since its facets share this exact code path. A
+  swiped-right headline adopts
   its topic as a priority exactly like a swiped issue card, so it flows
   straight into the same zip → done → take-action.html hand-off the quiz
   path already ends at (see 2 Sep 2026 note below — the done card no

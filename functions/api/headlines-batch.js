@@ -24,6 +24,10 @@ const FRESH_SECONDS = 60 * 60; // "ready by the top of the hour" framing
 const STORE_TTL_SECONDS = FRESH_SECONDS * 6; // keep a stale batch around well past freshness as a fallback
 const BATCH_SIZE = 5;
 
+// NOTE: builder.html's own boildownHeadline() carries an equivalent copy
+// of this prompt for the live (non-batch) pipeline — client JS and server
+// Functions can't share a module today, so keep the two in sync by hand,
+// same caveat as issue-taxonomy.js's own file comment.
 function boildownPrompt(article) {
   return `A citizen is swiping through today's news headlines to build a civic-engagement manifesto. Reduce this one headline to something a busy person can react to in five seconds.
 
@@ -33,7 +37,7 @@ ${article.description ? `Description: "${article.description}"` : ''}
 Reply with ONLY a JSON object, no markdown fences, no other text:
 {
   "topic": one of these exact strings, whichever is the closest fit — ${JSON.stringify(ALL_ISSUE_NAMES)},
-  "talkingPoint": one plain sentence (under 22 words) capturing what's actually at stake for an ordinary person — not a restatement of the headline,
+  "talkingPoint": one clear, opinionated position statement (under 22 words) a citizen can swipe agree or disagree with — a stance someone could push back on ("Landlords shouldn't be allowed to...", "The city isn't doing enough to..."), not a neutral summary of what's at stake. If the headline's own specifics are ambiguous, procedural, or too tangled to turn into one clean position, zoom out and state a clear position on the broader policy area instead of forcing a confusing one from the details,
   "imageQuery": 2-4 concrete, photographable keywords for a stock-photo search that captures the scene (e.g. "apartment building renters", "hospital waiting room") — no proper nouns, no politician or public-figure names, nothing that would try to identify a real specific person
 }`;
 }
