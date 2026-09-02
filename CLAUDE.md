@@ -7,6 +7,27 @@ this file exists so a fresh Claude Code session has the context instantly.
 
 ## Current state (as of 2 Sep 2026)
 
+**Pick up here** — mid-session as of this note, paused for later the same
+day. `functions/api/plain-summary.js` (the new shared server-side cache
+for bill plain-language summaries, see its own entry further down) is
+fully written, committed, and pushed (`5ed7a62`, retry-triggered again at
+`a638278`) — but **not yet confirmed live**. Cloudflare Pages' build
+pipeline was stuck twice in a row when last checked: the first build sat
+in its `initialize` stage 9+ minutes with zero progress; an empty-commit
+retry (`a638278`, same fix as the documented `CONGRESS_API_KEY` incident
+below) produced a new deployment that was itself still stuck in `queued`
+3+ minutes later. Two stuck builds back-to-back, on a pipeline that
+deployed everything else that day in under a minute, points to a
+Cloudflare-side platform issue, not anything wrong in the repo. **First
+thing next session**: check `mycivix.com/digest.js` for a `plain-summary`
+reference (confirms the new deploy is live) and `POST
+/api/plain-summary` for a 200 instead of 405 — if still stuck, check
+Cloudflare's own status page and the dashboard at
+`dash.cloudflare.com/094e80416bbb9abcaa87f0c90090247e/pages/view/mycivix`
+before doing anything else (no need to re-push again unless a genuinely
+new build is also stuck). The code itself needs no further changes —
+this is purely a "wait for Cloudflare" situation.
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
