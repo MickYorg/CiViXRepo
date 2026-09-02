@@ -98,10 +98,17 @@ export async function onRequestPost({ request, env }) {
     } catch (e) {}
   }
 
+  // No orientation filter: the client always crops to a 1:1 square via
+  // CSS (object-fit: cover on .citizen-headline-img) regardless of the
+  // source photo's native aspect ratio, so requesting orientation=squarish
+  // here bought no visual benefit — it only narrowed Unsplash's candidate
+  // pool, and a narrow AI-generated query (2-4 specific keywords) combined
+  // with that extra constraint was coming up with zero results often
+  // enough that several cards in a row would show no photo at all.
   let res;
   try {
     res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish&content_filter=high`,
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&content_filter=high`,
       { headers: { Authorization: `Client-ID ${apiKey}` } }
     );
   } catch (e) {
