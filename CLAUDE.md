@@ -276,7 +276,29 @@ see "Deliberately not yet done" below for why.
   collapses into a small `<details>` disclosure — and matched priorities
   render as named links back into `builder.html?focus=<issue-id>` (§03,
   scrolled to and briefly highlighted) instead of a bare "matches N"
-  count. Activist/Pro cards are unchanged.
+  count. **2 Sep 2026: extended to every mode and every list on the
+  page** — the citizen expected this everywhere, not just Citizen mode.
+  `renderCard()` (federal) and `renderStateCard()` (state, also reused
+  by municipal) no longer branch on mode at all for this: every card
+  leads with the synopsis (`.card-synopsis`, renamed off `.citizen-*`)
+  and collapses the official name behind `.title-details`, an ambiguous
+  or hard-to-parse official title included — Activist/Pro previously got
+  the plain-language rewrite too (`enhancePlainSummaries()` always
+  fetched it) but had it buried in the card body below the raw legalese
+  title instead of leading with it. The **focus zone itself** (the top-3
+  "results reveal," the very first thing on the page) got the same
+  treatment in `focusEntryHtml()` — it was leading with `e.title` (the
+  raw `bill.title`) above the already-plain `e.summary` the whole time,
+  the same mismatch in the page's most prominent spot. Scoped to
+  federal/state/municipal entries only (`e.title` is real legalese there,
+  via `digest.js`'s shared `billEntry()`); `general`/`docket` entries
+  keep their original layout since `e.title` is already plain there (a
+  citizen's own priority name or filing title) — nothing official to
+  hide. Every card (all three detailed lists, all three modes, plus the
+  focus zone) also gained a **"Send to DIG ↗"** link (`digUrl()`, new,
+  mirrors builder.html's Inbox's own `digUrl()`/`?topic=` convention
+  exactly) — pre-fills DIG's topic field with the bill/priority title,
+  never auto-runs the check, so it's free to offer everywhere.
   State section is also real: `functions/api/state-bills.js` resolves the
   profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
   matched bills from OpenStates, the same "one API covers all 50

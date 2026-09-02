@@ -348,20 +348,23 @@
   .card-title a { color: inherit; text-decoration: none; }
   .card-title a:hover { text-decoration: underline; }
 
-  /* Citizen mode inverts the card's usual hierarchy: the plain-language
-     synopsis leads (large, high-contrast) and the official bill name —
-     useless to skim, necessary to have — collapses behind a small
-     <details> disclosure instead of sitting up top in bold. */
-  .citizen-synopsis {
+  /* Every bill card leads with the plain-language synopsis (large,
+     high-contrast) — the official bill name, useless to skim but
+     necessary to have, collapses behind a small <details> disclosure
+     instead of sitting up top in bold. Was Citizen-mode-only until
+     2 Sep 2026; Activist/Pro already got the plain-language rewrite via
+     enhancePlainSummaries() same as Citizen did, just buried in
+     .card-body below the legalese title instead of leading with it. */
+  .card-synopsis {
     font-size: 16px;
     line-height: 1.5;
     color: var(--paper);
     margin-bottom: 8px;
   }
-  .citizen-title-details {
+  .title-details {
     margin-bottom: 8px;
   }
-  .citizen-title-details summary {
+  .title-details summary {
     cursor: pointer;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -369,10 +372,12 @@
     color: var(--paper-dim);
     list-style: none;
   }
-  .citizen-title-details summary::-webkit-details-marker { display: none; }
-  .citizen-title-details summary::before { content: '▸ '; }
-  .citizen-title-details[open] summary::before { content: '▾ '; }
-  .citizen-title-details .card-title { font-size: 13px; margin-top: 4px; }
+  .title-details summary::-webkit-details-marker { display: none; }
+  .title-details summary::before { content: '▸ '; }
+  .title-details[open] summary::before { content: '▾ '; }
+  .title-details .card-title { font-size: 13px; margin-top: 4px; }
+  .card-cta-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .card-cta-row .take-action { margin-top: 0; }
   .match-tag.is-link {
     color: inherit;
     text-decoration: none;
@@ -760,6 +765,13 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Same deep-link convention builder.html's Inbox already uses for its
+  // own "Send to DIG" link — pre-fills DIG's topic field, never auto-runs
+  // the check (real API spend), so this is free to offer on every card.
+  function digUrl(topic) {
+    return 'dig/?topic=' + encodeURIComponent(topic);
+  }
+
   // Citizen mode trims the raw legislative metadata (congress number, ISO
   // date) and condenses the match-tag chip list to a count — Activist
   // renders exactly what this card always has; Pro is identical to
@@ -785,35 +797,26 @@
   function renderCard(bill, hits, idx, mode) {
     const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
     const bodyId = 'body-' + esc(slug(billSummaryId(bill)));
-
-    if (mode === 'citizen') {
-      const officialTitle = bill.url
-        ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
-        : esc(bill.title);
-      return `
-        <div class="card">
-          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">Federal</span></div>
-          <details class="citizen-title-details">
-            <summary>${esc(label)} &mdash; official bill name</summary>
-            <div class="card-title">${officialTitle}</div>
-          </details>
-          ${matchTagsHtml(hits, mode)}
-          <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
-        </div>`;
-    }
-
-    const title = bill.url
+    const officialTitle = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
-    const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    const meta = `${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}`;
+    // Metadata (congress number, ISO update date) stays Activist/Pro-only —
+    // that's a real information-density choice for Citizen, unrelated to
+    // which text leads the card.
+    const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}</div>`;
     return `
       <div class="card">
-        <div class="card-top"><span class="card-title">${title}</span><span class="tag">Federal</span></div>
-        <div class="card-meta">${meta}</div>
-        <div class="card-body" id="${bodyId}">${action}</div>
+        <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">Federal</span></div>
+        ${metaHtml}
+        <details class="title-details">
+          <summary>${esc(label)} &mdash; official bill name</summary>
+          <div class="card-title">${officialTitle}</div>
+        </details>
         ${matchTagsHtml(hits, mode)}
-        <div><button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button></div>
+        <div class="card-cta-row">
+          <button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button>
+          <a class="btn" href="${esc(digUrl(bill.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>
+        </div>
       </div>`;
   }
 
@@ -2070,42 +2073,33 @@ BODY: <the email body, a few short paragraphs>`;
     const bodyId = 'body-' + esc(slug(bill.identifier || ''));
     const takeActionBtn = `<button type="button" class="take-action" data-take-state-action="${idx}">Take action &#8594;</button>`;
 
-    if (mode === 'citizen') {
-      const officialTitle = bill.url
-        ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
-        : esc(bill.title);
-      return `
-        <div class="card">
-          <div class="card-top"><span class="citizen-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">${esc(tag)}</span></div>
-          <details class="citizen-title-details">
-            <summary>${esc(bill.identifier)} &mdash; official bill name</summary>
-            <div class="card-title">${officialTitle}</div>
-          </details>
-          ${matchTagsHtml(hits, mode)}
-          <div>${takeActionBtn}</div>
-        </div>`;
-    }
-
-    const title = bill.url
+    const officialTitle = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
       : esc(bill.title);
-    const action = bill.latestAction ? esc(bill.latestAction.text) : 'No recorded action yet.';
-    const metaHtml = `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
+    const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
+    const digBtn = `<a class="btn" href="${esc(digUrl(bill.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
     return `
       <div class="card">
-        <div class="card-top"><span class="card-title">${esc(bill.identifier)} — ${title}</span><span class="tag">${esc(tag)}</span></div>
+        <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">${esc(tag)}</span></div>
         ${metaHtml}
-        <div class="card-body" id="${bodyId}">${action}</div>
+        <details class="title-details">
+          <summary>${esc(bill.identifier)} &mdash; official bill name</summary>
+          <div class="card-title">${officialTitle}</div>
+        </details>
         ${matchTagsHtml(hits, mode)}
-        <div>${takeActionBtn}</div>
+        <div class="card-cta-row">${takeActionBtn}${digBtn}</div>
       </div>`;
   }
 
-  // Progressive enhancement: cards render immediately with the raw
-  // legislative text (as before), then each visible one's plain-language
-  // rewrite fills in once it resolves — cached (and shared with builder.
-  // html's Citizen-mode digest via digest.js), so a bill only ever costs
-  // one AI call per browser, not one per view.
+  // Progressive enhancement: every card renders immediately with a
+  // "Getting the plain-English version..." placeholder in its lead
+  // synopsis span, then each visible one's plain-language rewrite fills
+  // in once it resolves — cached (and shared with builder.html's
+  // Citizen-mode digest via digest.js), so a bill only ever costs one AI
+  // call per browser, not one per view. Every mode uses this same
+  // placeholder now (2 Sep 2026 — see the .card-synopsis CSS comment), so
+  // a failed rewrite needs the same raw-text fallback everywhere, not
+  // just in Citizen mode.
   function enhancePlainSummaries(bills, isState) {
     if (!window.CivixDigest || !bills || !bills.length) return;
     bills.forEach(bill => {
@@ -2117,14 +2111,7 @@ BODY: <the email body, a few short paragraphs>`;
         .then(plain => {
           const el = document.getElementById(domId);
           if (!el) return;
-          // Citizen mode's placeholder ("Getting the plain-English
-          // version...") is never the raw legislative text, so a failed
-          // rewrite still needs a fallback — Activist/Pro already show the
-          // raw text up front and simply leave it untouched on failure.
-          if (plain) el.textContent = plain;
-          else if (el.classList.contains('citizen-synopsis')) {
-            el.textContent = bill.latestAction ? bill.latestAction.text : 'No recorded action yet.';
-          }
+          el.textContent = plain || (bill.latestAction ? bill.latestAction.text : 'No recorded action yet.');
         });
     });
   }
@@ -2360,17 +2347,35 @@ BODY: <the email body, a few short paragraphs>`;
         : e.kind === 'general'
           ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
           : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+    const digBtn = `<a class="btn" href="${esc(digUrl(e.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
+
+    // 'general'/'docket' titles are already plain-language (a citizen's own
+    // typed priority or filing note) — nothing official to hide behind a
+    // disclosure. federal/state/municipal carry a real bill.title (legalese)
+    // via digest.js's billEntry(), so those get the same synopsis-leads/
+    // title-collapses treatment the detailed lists below already use
+    // (renderCard()/renderStateCard()) — this is the very first thing on
+    // the page, so it's the most important place to get this right.
+    const hasOfficialTitle = e.kind === 'federal' || e.kind === 'state' || e.kind === 'municipal';
+    const headtextHtml = hasOfficialTitle
+      ? `<div class="card-top"><span class="card-synopsis">${esc(e.summary || 'No summary available yet.')}</span><span class="tag">${kindLabel}</span></div>
+         <details class="title-details">
+           <summary>${esc(e.label || '')} &mdash; official bill name</summary>
+           <div class="card-title">${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</div>
+         </details>
+         ${whyHtml}`
+      : `<div class="focus-headline"><span class="card-title">${esc(e.title)}</span><span class="tag">${kindLabel}</span></div>
+         ${whyHtml}`;
     return `
       <div class="focus-card" data-rank="${rank}">
         <div class="focus-top">
           <span class="focus-rank">${rank + 1}</span>
           <div class="focus-headtext">
-            <div class="focus-headline"><span class="card-title">${esc(e.title)}</span><span class="tag">${kindLabel}</span></div>
-            ${whyHtml}
+            ${headtextHtml}
           </div>
         </div>
-        <p class="focus-summary">${esc(e.summary || 'No summary available yet.')}</p>
-        ${cta}
+        ${hasOfficialTitle ? '' : `<p class="focus-summary">${esc(e.summary || 'No summary available yet.')}</p>`}
+        <div class="card-cta-row">${cta}${digBtn}</div>
       </div>`;
   }
 
