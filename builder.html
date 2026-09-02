@@ -467,6 +467,10 @@
      the full catalog is ~40 chips across 9 categories. */
   .freeform-picker { width: 100%; text-align: left; max-height: 320px; overflow-y: auto; margin: 4px 0 18px; }
   .freeform-picker .cat:last-child { margin-bottom: 0; }
+  /* align-self:stretch so the chip grid wraps across the card's actual
+     width instead of shrinking to its own content (the card's flex
+     column otherwise just centers each child at its natural size). */
+  .issue-picker-chips { align-self: stretch; justify-content: center; margin: 4px 0 20px; }
 
   .btn {
     appearance: none;
@@ -2756,9 +2760,9 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // CiViX's own issue taxonomy, a one-line plain-language talking point,
   // and a search query for a real stock photo (via /api/headline-image,
   // Unsplash), then run the exact same swipe-right-to-adopt mechanics the
-  // rest of Citizen mode already uses. A swiped-in topic becomes a priority the
-  // same way an 'issue' card does, so it flows into the same zip -> done ->
-  // Take Action hand-off for free.
+  // rest of Citizen mode already uses. A swiped-in topic becomes a priority
+  // the same way picking a chip off an 'issue-picker' card does, so it
+  // flows into the same zip -> done -> Take Action hand-off for free.
   const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
 
   function hashStr(s) {
@@ -3123,17 +3127,23 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       return { type: 'category', id: cat, title: cat, emoji: meta[0], blurb: meta[1], issues };
     }).sort((a, b) => categoryBoost(b.issues) - categoryBoost(a.issues));
   }
+  // Only reachable from the non-firstPass (topping-up) deck now — the
+  // firstPass deck goes through the archetype quiz instead. One card per
+  // chosen category, not one per issue: a citizen used to get every issue
+  // in a category as its own isolated swipe verdict ("do you care about
+  // this? yes/no"), and every one of them reads as reasonable in
+  // isolation — nothing to compare against, so everything got approved
+  // ("moms and apple pie," the citizen's own words). Same problem the old
+  // Activist/Pro picker (renderCatalog()) never had, because it showed a
+  // whole category's issues as a chip grid on one screen — comparing
+  // options side-by-side instead of approving them one at a time. This
+  // borrows that presentation for Citizen mode's topping-up flow.
   function buildIssueCards() {
-    // Only reachable from the non-firstPass (topping-up) deck now — the
-    // firstPass deck goes through the archetype quiz instead — so this
-    // always shows the full unswiped list per chosen category, no cap.
     const cards = [];
     CATALOG.forEach(([cat, issues]) => {
       if (chosenCategories.indexOf(cat) === -1) return;
-      const unswiped = issues.filter(name => !findIssue(slug(name))); // already a priority — nothing to swipe
-      unswiped.forEach(name => {
-        cards.push({ type: 'issue', id: name, title: name, emoji: '📌', blurb: ISSUE_BLURBS[name] || '' });
-      });
+      const unswiped = issues.filter(name => !findIssue(slug(name))); // already a priority — nothing to pick
+      if (unswiped.length) cards.push({ type: 'issue-picker', id: cat, title: cat, issues: unswiped });
     });
     return cards;
   }
@@ -3144,11 +3154,6 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       if (P.traits.indexOf(card.id) === -1) P.traits.push(card.id);
     } else if (card.type === 'category') {
       chosenCategories.push(card.id);
-    } else if (card.type === 'issue') {
-      if (addIssue(card.title)) {
-        const iss = findIssue(slug(card.title));
-        if (iss) iss.weight = 2;
-      }
     } else if (card.type === 'action') {
       if (P.actions.indexOf(card.id) === -1) P.actions.push(card.id);
     } else if (card.type === 'headline' || card.type === 'drilldown') {
@@ -3230,8 +3235,6 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     switch (card.type) {
       case 'trait': case 'category': case 'action':
         return { title: card.title, context: card.blurb || '' };
-      case 'issue':
-        return { title: card.title, context: ISSUE_BLURBS[card.title] || '' };
       case 'headline':
         return { title: card.article.title, context: card.talkingPoint };
       default:
@@ -3705,6 +3708,39 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       // fade treatment (and the same function) a manual "Take Action"
       // click triggers.
       doneAutoAdvanceTimer = window.setTimeout(goToTakeAction, DONE_AUTO_ADVANCE_MS);
+      return;
+    }
+
+    if (card.type === 'issue-picker') {
+      controls.style.display = 'none';
+      const meta = CATEGORY_META[card.title] || ['📌', ''];
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static citizen-issue-picker">
+          <div class="citizen-emoji">${meta[0]}</div>
+          <div class="citizen-title">${esc(card.title)}</div>
+          <p class="citizen-blurb">Tap whichever of these actually hit for you — as many or as few as you want.</p>
+          <div class="issue-picker-chips chips">
+            ${card.issues.map(name => `<button type="button" class="chip${findIssue(slug(name)) ? ' is-on' : ''}" data-issue-pick="${esc(name)}" title="${esc(ISSUE_BLURBS[name] || '')}">${esc(name)}</button>`).join('')}
+          </div>
+          <button type="button" class="btn btn-primary citizen-cta" id="citizen-issue-continue">Continue &#8594;</button>
+        </div>`;
+      slot.querySelectorAll('[data-issue-pick]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const name = btn.dataset.issuePick;
+          const existing = findIssue(slug(name));
+          if (existing) {
+            removeIssue(existing.id);
+            btn.classList.remove('is-on');
+          } else {
+            addIssue(name);
+            const iss = findIssue(slug(name));
+            if (iss) iss.weight = 2;
+            btn.classList.add('is-on');
+          }
+          save();
+        });
+      });
+      document.getElementById('citizen-issue-continue').addEventListener('click', () => advanceCitizen());
       return;
     }
 

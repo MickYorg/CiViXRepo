@@ -202,7 +202,41 @@ see "Deliberately not yet done" below for why.
   health, environment) keyed off the current UTC hour (31 Aug 2026,
   citizen asked for "new/refreshed headlines for the initial manifesto
   build") — same one-request-per-fetch budget, real variety over time
-  instead of a frozen feed. The "done" card's top-3
+  instead of a frozen feed.
+
+  **Issue-picker cards, 2 Sep 2026** — the citizen flagged that the
+  topping-up deck's issue-swiping (`buildIssueCards()`, reached after
+  swiping right on a category) showed every issue in that category as
+  its own isolated full-screen swipe card — "do you care about this?
+  yes/no," one at a time, nothing to compare it against. Every issue
+  reads as reasonable alone ("moms and apple pie," the citizen's own
+  words), so a citizen just swiped right on all of them, producing an
+  undifferentiated manifesto with no real signal about what actually
+  matters most. The citizen pointed at the *old* Activist/Pro picker
+  (`renderCatalog()`, §02) as the fix already sitting in the codebase: it
+  shows a whole category's issues as a chip grid on one screen, so a
+  citizen compares options side-by-side instead of approving them one at
+  a time — even though it's technically still multi-select, most people
+  never noticed that and picked more selectively anyway, just from the
+  presentation. `buildIssueCards()` now returns one `issue-picker` card
+  per chosen category (not one per issue) carrying that category's
+  unswiped issues; a new render branch shows them as tappable chips
+  (`.chip`/`.chips`, the exact classes `renderCatalog()` already uses)
+  with each pick committing immediately via `addIssue()`/`removeIssue()`
+  — live, like the Pro-mode picker, not batched behind a "confirm"
+  step — and a **Continue** button to move on once done comparing. Each
+  chip's `title` attribute carries `ISSUE_BLURBS`' existing one-line
+  description as a native hover tooltip, reusing data that would
+  otherwise have gone unused now that individual swipe cards (which
+  showed the blurb inline) are gone. The now-dead `'issue'` card type —
+  `resolveCitizenCard()`'s branch for it, `drilldownSeed()`'s case for
+  it — was removed rather than left unreachable; only `buildIssueCards()`
+  ever constructed one, and nothing constructs it anymore. Scoped to the
+  topping-up deck only, per the citizen's own framing ("assuming users
+  get interested and we promote them to continuously refine") — the
+  firstPass deck still goes through the archetype quiz or headline swipe
+  instead, neither of which uses `buildIssueCards()`.
+  The "done" card's top-3
   digest also got a "pop" pass (31 Aug 2026): each entry now shows a rank
   badge (#1 visibly stronger — amber border/background, not just a bigger
   number), a template-built "why this matches you" line naming the actual
