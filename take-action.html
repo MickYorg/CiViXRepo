@@ -309,6 +309,11 @@
     padding: 2px 9px;
     white-space: nowrap;
   }
+  /* Federal-only (congress.gov has no per-bill status field to pull for
+     state/municipal today) — a neutral gray so it doesn't compete with
+     the amber jurisdiction tag it always sits next to. */
+  .status-tag { color: var(--paper-dim); border-color: var(--line); }
+  .card-tags { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .card-meta {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -547,12 +552,6 @@
   .organize-tips { margin-top: 10px; }
   .organize-tips ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.6; }
   .watching-zone { margin-bottom: 8px; }
-  .watching-card {
-    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
-    background: var(--ink-raised); display: flex; align-items: center; justify-content: space-between;
-    gap: 10px; flex-wrap: wrap;
-  }
-  .watching-title { font-size: 13.5px; }
   .watching-badge {
     font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--amber-ink); background: var(--amber-wash);
@@ -804,9 +803,10 @@
     // that's a real information-density choice for Citizen, unrelated to
     // which text leads the card.
     const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(label)} · Congress ${esc(bill.congress)} · updated ${fmtDate(bill.updateDate)}</div>`;
+    const statusTag = bill.status ? `<span class="tag status-tag">${esc(bill.status)}</span>` : '';
     return `
       <div class="card">
-        <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">Federal</span></div>
+        <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="card-tags">${statusTag}<span class="tag">Federal</span></span></div>
         ${metaHtml}
         <details class="title-details">
           <summary>${esc(label)} &mdash; official bill name</summary>
@@ -956,6 +956,12 @@
     try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
     return idx === -1;
   }
+  // Live bill data for whatever's currently watched, keyed the same as
+  // WATCH_UPDATES — populated alongside it so renderWatchingZone() can
+  // show a watched bill with the exact same synopsis/status/collapsed-
+  // title treatment the main lists use, not just its frozen title
+  // snapshot from whenever it was first watched.
+  let WATCH_LIVE = {};
   // kind/keyFn default to federal (calendar.js's own fetch) — bootState()
   // passes 'state'/watchKeyForState so a watched state bill gets the same
   // real return-visit diffing, not just federal.
@@ -970,28 +976,94 @@
       if (w.kind !== kind) return;
       const b = byKey[w.key];
       if (!b) return;
+      WATCH_LIVE[w.key] = b;
       const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
       if (latest && w.lastSeenActionDate && latest !== w.lastSeenActionDate) WATCH_UPDATES[w.key] = true;
     });
   }
+
+  // Progressive enhancement for watched cards, mirroring
+  // enhancePlainSummaries() exactly — but a watched bill can also be
+  // showing in the main federal/state list at the same time, so this
+  // targets its own watch-specific DOM id (avoiding a duplicate-id
+  // collision) while still keying the plainSummarize cache off the
+  // bill's own natural id, so it's still only ever one AI call per bill
+  // per browser, shared with the main list.
+  function enhanceWatchSummaries(entries) {
+    if (!window.CivixDigest || !entries.length) return;
+    entries.forEach(({ w, live, isState }) => {
+      const rawId = isState ? (live.identifier || '') : billSummaryId(live);
+      if (!rawId) return;
+      const domId = 'watch-body-' + slug(w.key);
+      if (!document.getElementById(domId)) return;
+      window.CivixDigest.plainSummarize(rawId, live.title, live.latestAction ? live.latestAction.text : '')
+        .then(plain => {
+          const el = document.getElementById(domId);
+          if (!el) return;
+          el.textContent = plain || (live.latestAction ? live.latestAction.text : 'No recorded action yet.');
+        });
+    });
+  }
+
+  // A watched bill only has live data once whichever fetch covers its
+  // jurisdiction has actually run this visit AND it's still within that
+  // fetch's window (federal/state each only pull the most recent ~100
+  // bills, sorted by activity) — an older watched bill can fall out of
+  // that window entirely. Without live data this falls back to the plain
+  // snapshot taken when it was first watched, same as this card always
+  // showed before it got the full take-action-card treatment. 'general'
+  // watches (a citizen's own typed priority, no bill behind it) always
+  // use that fallback — there's no bill data to have.
+  function watchCardHtml(w) {
+    const updatedBadge = WATCH_UPDATES[w.key] ? `<span class="watching-badge">Updated since you started watching</span>` : '';
+    const digBtn = `<a class="btn" href="${esc(digUrl(w.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
+    const unwatchBtn = `<button type="button" class="btn" data-unwatch="${esc(w.key)}">Stop watching</button>`;
+    const live = (w.kind === 'federal' || w.kind === 'state') ? WATCH_LIVE[w.key] : null;
+
+    if (live) {
+      const bodyId = 'watch-body-' + esc(slug(w.key));
+      const officialTitle = live.url
+        ? `<a href="${esc(live.url)}" target="_blank" rel="noopener">${esc(live.title)}</a>`
+        : esc(live.title);
+      const label = w.kind === 'federal'
+        ? ((live.type || '').toUpperCase() + ' ' + (live.number || '')).trim()
+        : (live.identifier || '');
+      const statusTag = w.kind === 'federal' && live.status ? `<span class="tag status-tag">${esc(live.status)}</span>` : '';
+      return `
+        <div class="card">
+          <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="card-tags">${statusTag}<span class="tag">${w.kind === 'federal' ? 'Federal' : 'State'}</span></span></div>
+          <details class="title-details">
+            <summary>${esc(label)} &mdash; official bill name</summary>
+            <div class="card-title">${officialTitle}</div>
+          </details>
+          ${updatedBadge}
+          <div class="card-cta-row">${digBtn}${unwatchBtn}</div>
+        </div>`;
+    }
+
+    return `
+      <div class="card">
+        <div class="card-top"><span class="card-synopsis">${esc(w.title)}</span></div>
+        ${updatedBadge}
+        <div class="card-cta-row">
+          ${w.url ? `<a class="btn" href="${esc(w.url)}" target="_blank" rel="noopener">View &#8599;</a>` : ''}
+          ${digBtn}${unwatchBtn}
+        </div>
+      </div>`;
+  }
+
   function renderWatchingZone() {
     const zone = document.getElementById('watching-zone');
     if (!zone) return;
     const list = loadWatchlist();
     if (!list.length) { zone.innerHTML = ''; return; }
     zone.innerHTML = `<p class="focus-label">Watching (${list.length})</p>` +
-      list.map(w => `
-        <div class="watching-card">
-          <div>
-            <div class="watching-title">${esc(w.title)}</div>
-            ${WATCH_UPDATES[w.key] ? `<span class="watching-badge">Updated since you started watching</span>` : ''}
-          </div>
-          <div class="action-row">
-            ${w.url ? `<a class="btn" href="${esc(w.url)}" target="_blank" rel="noopener">View &#8599;</a>` : ''}
-            <button type="button" class="btn" data-unwatch="${esc(w.key)}">Stop watching</button>
-          </div>
-        </div>`).join('') +
+      list.map(watchCardHtml).join('') +
       `<p class="watch-note">CiViX checks these for updates when you visit this page — real-time alerts aren't built yet.</p>`;
+    const liveEntries = list
+      .filter(w => (w.kind === 'federal' || w.kind === 'state') && WATCH_LIVE[w.key])
+      .map(w => ({ w, live: WATCH_LIVE[w.key], isState: w.kind === 'state' }));
+    enhanceWatchSummaries(liveEntries);
   }
 
   // ---- "Add to calendar" stub — CiViX has no rally/event data source
@@ -2357,8 +2429,9 @@ BODY: <the email body, a few short paragraphs>`;
     // (renderCard()/renderStateCard()) — this is the very first thing on
     // the page, so it's the most important place to get this right.
     const hasOfficialTitle = e.kind === 'federal' || e.kind === 'state' || e.kind === 'municipal';
+    const statusTag = e.kind === 'federal' && e.bill && e.bill.status ? `<span class="tag status-tag">${esc(e.bill.status)}</span>` : '';
     const headtextHtml = hasOfficialTitle
-      ? `<div class="card-top"><span class="card-synopsis">${esc(e.summary || 'No summary available yet.')}</span><span class="tag">${kindLabel}</span></div>
+      ? `<div class="card-top"><span class="card-synopsis">${esc(e.summary || 'No summary available yet.')}</span><span class="card-tags">${statusTag}<span class="tag">${kindLabel}</span></span></div>
          <details class="title-details">
            <summary>${esc(e.label || '')} &mdash; official bill name</summary>
            <div class="card-title">${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</div>

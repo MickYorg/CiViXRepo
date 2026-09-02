@@ -526,7 +526,50 @@ see "Deliberately not yet done" below for why.
   against `/api/calendar`'s own recent-activity fetch, which the page
   already runs on every load: if a watched bill's `latestAction` date
   has moved since it was added to the watchlist, a "🔔 Updated since you
-  started watching" badge shows in the panel. Every piece of copy says
+  started watching" badge shows in the panel. **2 Sep 2026**: the panel
+  used to just show a frozen title snapshot from whenever an item was
+  first watched (literally `"HR 1234: <raw official title>"`, no plain
+  language at all) in its own bespoke `.watching-card` layout — the
+  citizen asked for "common name of bills, with all the same look and
+  feel of the new take-action cards." `checkWatchlistUpdates()` now also
+  populates a `WATCH_LIVE` map (bill data from whichever fetch —
+  federal/state — currently covers that watched item) alongside the
+  existing update-diffing it already did, and `watchCardHtml()` renders
+  a real synopsis-leads/official-name-collapsed card, identical in
+  structure to `renderCard()`/`renderStateCard()`, when live data is
+  available. Falls back to the old plain-title-snapshot card (still
+  restyled to the shared `.card` look, just without the synopsis/collapse
+  machinery) when it isn't — either a `general` watch (no bill behind it
+  to begin with) or a federal/state watched bill that's aged out of its
+  fetch's ~100-bill recent-activity window this visit. `enhanceWatchSummaries()`
+  mirrors `enhancePlainSummaries()` exactly but targets a
+  `watch-body-<key>` DOM id instead of `body-<billId>`, since a bill can
+  be both watched and separately visible in the main list at the same
+  time — same element id in both places would collide. The
+  `plainSummarize()` cache key stays the bill's own natural id either
+  way, so a bill still only ever costs one AI call per browser total, not
+  one for the main list and a second for its watch card.
+
+  **Bill status, also 2 Sep 2026** — the citizen asked to pull the bill's
+  actual status from congress.gov and show it on take-action cards and
+  watch cards alike. congress.gov's list endpoint has no categorical
+  status/stage field, only `latestAction.text` free text — calling the
+  per-bill *detail* endpoint for a real one would mean up to 100 extra
+  congress.gov requests every hourly cache refresh. `functions/api/
+  calendar.js`'s new `deriveStatus()` instead pattern-matches
+  `latestAction.text` against congress.gov's own bill-tracker stage names
+  (Introduced → In Committee → Passed House/Senate → To President →
+  Became Law, Vetoed as a branch), most-advanced-first since
+  `latestAction` only ever reflects the single most recent action. Framed
+  in its own code comment as a heuristic read of the latest action, not a
+  guaranteed-authoritative field. Federal-only — deliberately not
+  extended to state (OpenStates) or municipal (Legistar) in this pass,
+  since the citizen named congress.gov specifically and neither of those
+  sources was investigated for an equivalent field; a real gray
+  `.status-tag` chip shows next to the jurisdiction tag wherever a
+  federal bill's card renders (`renderCard()`, `focusEntryHtml()`,
+  `watchCardHtml()`).
+  Every piece of copy says
   "flags changes when you visit," never "alerted" or "sent" — the gap
   between what's real (persisted list + return-visit diffing) and what's
   still aspirational (real-time push) is deliberate and stated plainly,
