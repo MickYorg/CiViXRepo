@@ -85,7 +85,7 @@
     color: var(--paper);
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
-    transition: background 0.25s ease, color 0.25s ease, opacity 0.5s ease;
+    transition: background 0.25s ease, color 0.25s ease, opacity 1s ease;
     /* Belt-and-suspenders: a measured .del/.ins span is pinned to its own
        natural pixel width (see measure() in the script), so a long enough
        phrase at the font-size floor can still exceed a very narrow
@@ -977,7 +977,7 @@
   function goToBuilder() {
     try { localStorage.setItem('civix-mode', splashMode); } catch (e) {}
     document.body.classList.add('is-leaving');
-    window.setTimeout(() => { window.location.href = 'builder.html'; }, 500);
+    window.setTimeout(() => { window.location.href = 'builder.html'; }, 1000);
   }
   cta.addEventListener('click', goToBuilder);
   document.getElementById('cta-sticky').addEventListener('click', goToBuilder);

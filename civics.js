@@ -61,10 +61,11 @@
         seenFacts: Array.isArray(s.seenFacts) ? s.seenFacts : [],
         seenDecks: Array.isArray(s.seenDecks) ? s.seenDecks : [],
         lastShownAt: s.lastShownAt || 0,
-        reactions: Array.isArray(s.reactions) ? s.reactions : []
+        reactions: Array.isArray(s.reactions) ? s.reactions : [],
+        coins: typeof s.coins === 'number' ? s.coins : 0
       };
     } catch (e) {
-      return { seenFacts: [], seenDecks: [], lastShownAt: 0, reactions: [] };
+      return { seenFacts: [], seenDecks: [], lastShownAt: 0, reactions: [], coins: 0 };
     }
   }
   function saveState(s) {
@@ -90,8 +91,8 @@
     var tag = document.createElement('style');
     tag.textContent = [
       '.cx-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;',
-      'padding:20px;background:rgba(8,11,20,0.6);backdrop-filter:blur(2px);animation:cx-fade-in .3s ease both;}',
-      '.cx-overlay.cx-out{animation:cx-fade-out 1s ease both;}',
+      'padding:20px;background:rgba(8,11,20,0.6);backdrop-filter:blur(2px);animation:cx-fade-in .5s ease both;}',
+      '.cx-overlay.cx-out{animation:cx-fade-out 1.8s ease both;}',
       '@keyframes cx-fade-in{from{opacity:0}to{opacity:1}}',
       '@keyframes cx-fade-out{from{opacity:1}to{opacity:0}}',
       '.cx-card{--ci:#0A0F1C;--cr:#121A2C;--cp:#ECEAE2;--cpd:#8792A8;--ca:#E0A93F;--cai:#E0A93F;--caw:rgba(224,169,63,.14);',
@@ -99,7 +100,16 @@
       'padding:26px 24px 22px;font-family:Newsreader,Georgia,serif;box-shadow:0 24px 70px rgba(0,0,0,.5);',
       'animation:cx-pop-in .4s cubic-bezier(.2,.9,.3,1.2) both;max-height:88vh;overflow-y:auto;}',
       '@keyframes cx-pop-in{from{transform:scale(.93) translateY(10px);opacity:0}to{transform:none;opacity:1}}',
-      '@media (prefers-color-scheme:dark){.cx-card{--ci:#FBFAF7;--cr:#FFFFFF;--cp:#14192B;--cpd:#636B80;--cai:#8F6111;--caw:rgba(224,169,63,.2)}}',
+      // Follows the host page's own theme toggle (data-theme, same
+      // attribute/localStorage key index.html/builder.html/take-action.html
+      // all use), not the OS's prefers-color-scheme — those can disagree
+      // (citizen manually picked light while their OS is set to dark), and
+      // this used to follow the OS setting only, with the light/dark color
+      // pairs actually backwards from what prefers-color-scheme:dark should
+      // show. dig/index.html never sets data-theme (it's a fixed dark UI by
+      // design, see its own color-scheme:dark comment), so this rule simply
+      // never matches there and the default (dark) colors above apply.
+      ':root[data-theme="light"] .cx-card{--ci:#FBFAF7;--cr:#FFFFFF;--cp:#14192B;--cpd:#636B80;--cai:#8F6111;--caw:rgba(224,169,63,.2)}',
       '.cx-kicker{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;color:var(--cai);margin-bottom:10px;}',
       '.cx-title{font-size:19px;font-weight:600;margin:0 0 10px;line-height:1.3;}',
       '.cx-body{font-size:15px;line-height:1.55;color:var(--cp);margin:0 0 20px;}',
@@ -122,6 +132,7 @@
       '.cx-matched-name{font-family:"IBM Plex Mono",ui-monospace,monospace;color:var(--cai);}',
       '.cx-quiz-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;}',
       '.cx-score{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;color:var(--cpd);}',
+      '.cx-coin-total{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;color:var(--cai);margin-top:3px;}',
       '.cx-reveal-row{border-bottom:1px solid var(--caw);padding:10px 0;}',
       '.cx-reveal-row:last-child{border-bottom:none;}',
       '.cx-reveal-quote{font-size:14px;line-height:1.45;}',
@@ -153,10 +164,14 @@
   // Idempotent on purpose — a fact card's auto-dismiss timer and its
   // manual "Got it"/backdrop-click can both fire; the second call should
   // just no-op rather than double-animate or clear an already-cleared
-  // timer. The fade-out is a full second (not a snap-cut) so it visibly
-  // dissolves and eases the citizen's eye back into whatever they were
-  // doing underneath, rather than the card just vanishing.
-  var DISMISS_ANIM_MS = 1000;
+  // timer. 1.8s (not a snap-cut, and longer than this used to be) so it
+  // visibly, gradually dissolves — the citizen should be able to tell
+  // it's going away on its own, nothing to click, rather than wondering
+  // if it's stuck or vanishing too fast to register. Kept in sync with
+  // the cx-fade-out keyframe duration in injectStyle() above — the two
+  // have to match or the overlay either lingers empty or gets yanked out
+  // mid-fade.
+  var DISMISS_ANIM_MS = 1800;
   function dismiss(overlay) {
     if (overlay.dataset.dismissed) return;
     overlay.dataset.dismissed = '1';
@@ -172,6 +187,10 @@
   // interactive and inviting a reaction after reveal, not just a fact to
   // skim.
   var AUTO_DISMISS_MS = 3800;
+
+  // Awarded per correctly-matched quote on a quiz reveal — see reveal()'s
+  // own comment on why the amount is arbitrary for now.
+  var COIN_PER_CORRECT = 5;
 
   function renderFact(item) {
     injectStyle();
@@ -275,8 +294,22 @@
         );
       }).join('');
       namesEl.innerHTML = '';
+
+      // CiViX Coin: no spend anywhere yet ("we'll figure out where to use
+      // it later") — this is just the earn side, tracked honestly from
+      // day one so a balance is already accruing once there's something
+      // to spend it on. COIN_PER_CORRECT is an arbitrary early amount,
+      // easy to retune later since every read goes through getCoins().
+      var coinsEarned = correctCount * COIN_PER_CORRECT;
+      state.coins = (state.coins || 0) + coinsEarned;
+      saveState(state);
+
       actionsEl.innerHTML =
-        '<div class="cx-score">' + correctCount + ' / ' + quotes.length + ' matched</div>' +
+        '<div class="cx-score-block">' +
+          '<div class="cx-score">' + correctCount + ' / ' + quotes.length + ' matched' +
+            (coinsEarned ? ' &middot; +' + coinsEarned + ' \u{1FA99} CiViX Coin' : '') + '</div>' +
+          (coinsEarned ? '<div class="cx-coin-total">\u{1FA99} ' + state.coins + ' total</div>' : '') +
+        '</div>' +
         '<div class="cx-row">' +
           '<a class="cx-more" href="' + civix101Href() + '">More at CiViX 101 &#8594;</a>' +
           '<button type="button" class="cx-btn cx-btn-primary" data-act="done">Continue</button>' +
@@ -298,6 +331,12 @@
     }
 
     overlay.addEventListener('click', function (e) {
+      // Clicking the backdrop itself (not any button/chip inside the
+      // card) dismisses regardless of quiz state — mid-match or already
+      // revealed, same as the fact card's own backdrop-click already
+      // does. Distinct from "Skip," which jumps straight to the reveal
+      // rather than closing the whole thing.
+      if (e.target === overlay) { dismiss(overlay); return; }
       if (revealed) {
         if (e.target.closest('[data-act="done"]')) dismiss(overlay);
         return;
@@ -389,6 +428,10 @@
     playFact: playFact,
     playDeck: playDeck,
     facts: FACTS.map(function (f) { return { id: f.id, title: f.title, body: f.body }; }),
-    decks: DECKS.map(function (d) { return { id: d.id, count: d.quotes.length }; })
+    decks: DECKS.map(function (d) { return { id: d.id, count: d.quotes.length }; }),
+    // No spend anywhere yet — a public read so any future page/feature
+    // can show or use the balance without needing its own copy of
+    // civix-civics' storage logic.
+    getCoins: function () { return loadState().coins || 0; }
   };
 })();

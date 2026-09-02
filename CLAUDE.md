@@ -510,6 +510,44 @@ see "Deliberately not yet done" below for why.
   States" is one modern campaign's name for triggering it, noted as such
   rather than treated as the official term, to keep the card neutral),
   faithless elector, gerrymander, and cloture.
+
+  **2 Sep 2026, four fixes/additions in one pass:**
+  - **Theme bug fixed** — the popup's light/dark color pair was gated on
+    `@media (prefers-color-scheme:dark)` (the OS setting) instead of the
+    site's own `data-theme` toggle, and the two color sets were paired
+    backwards against that condition to begin with. Now keyed off
+    `:root[data-theme="light"] .cx-card` — matches index.html/
+    builder.html/take-action.html's own toggle exactly. `dig/index.html`
+    never sets `data-theme` (it's a fixed dark UI by design), so this
+    rule simply never matches there and the default dark colors apply,
+    same as always.
+  - **Fades lengthened** — the citizen asked for "longer, more gradual"
+    dissolves generally, "so the user knows it's going away on its own."
+    `DISMISS_ANIM_MS` 1000ms → 1800ms (kept in sync with the `cx-fade-out`
+    keyframe duration, which has to match or the overlay lingers/gets cut
+    mid-fade), `cx-fade-in` 0.3s → 0.5s. The same request also bumped
+    every page-level dissolve built earlier the same day: `index.html`/
+    `builder.html`/`take-action.html`'s shared `opacity` transition
+    0.5s → 1s, `goToBuilder()`/`goToTakeAction()`'s matching navigation
+    delay 500ms → 1000ms, and the welcome card's own inline fade
+    1s → 1.6s (with its paired `startHeadlineMode()` delay bumped to
+    match). `AUTO_DISMISS_MS`/`WELCOME_AUTO_ADVANCE_MS`/
+    `DONE_AUTO_ADVANCE_MS` (the *wait* before a fade starts) are
+    untouched — only the fade animations themselves got longer.
+  - **Backdrop-click dismiss added to the quiz card** — the fact card
+    already closed on a backdrop click; the quiz card didn't (clicking
+    outside it did nothing). Added the same `e.target === overlay` check
+    at the top of the quiz's own click handler, working the same whether
+    mid-match or already revealed — distinct from "Skip," which jumps to
+    the reveal rather than closing the whole card.
+  - **CiViX Coin, the first version** — the citizen asked to start
+    tracking a reward for correct quiz answers now, deferring what it's
+    actually spendable on ("we'll figure out where to use it later").
+    `civix-civics`' persisted state gained a `coins` field; `reveal()`
+    awards `COIN_PER_CORRECT` (5, arbitrary/tunable) per correctly-matched
+    quote, shown inline on the score line plus a running total, both only
+    when nonzero. `CivicsEngine.getCoins()` is the public read — earn-only
+    for now, no spend path exists anywhere in the app yet, by design.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.

@@ -73,7 +73,7 @@
     color: var(--paper);
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
-    transition: opacity 0.5s ease;
+    transition: opacity 1s ease;
   }
   /* Starts invisible so arriving here (from the splash's own fade-out, or
      any other entry point) reads as a dissolve-in rather than a hard cut —
@@ -2683,7 +2683,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // one dissolve treatment regardless of what triggered the hand-off.
   function goToTakeAction() {
     document.body.classList.add('is-leaving');
-    window.setTimeout(() => { window.location.href = 'take-action.html'; }, 500);
+    window.setTimeout(() => { window.location.href = 'take-action.html'; }, 1000);
   }
 
   // A citizen with nothing set yet gets the short version — the archetype
@@ -3368,10 +3368,10 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       welcomeAutoAdvanceTimer = window.setTimeout(() => {
         const welcomeEl = document.getElementById('citizen-welcome-card');
         if (welcomeEl) {
-          welcomeEl.style.transition = 'opacity 1s ease';
+          welcomeEl.style.transition = 'opacity 1.6s ease';
           welcomeEl.style.opacity = '0';
         }
-        window.setTimeout(() => startHeadlineMode(), 1000);
+        window.setTimeout(() => startHeadlineMode(), 1600);
       }, WELCOME_AUTO_ADVANCE_MS);
       return;
     }
