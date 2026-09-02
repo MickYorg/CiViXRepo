@@ -2961,6 +2961,25 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
 
   // Shared by both the pre-warmed fast path and the live pipeline's own
   // tail below — same card shape either way.
+  // The two posture traits (see TRAITS above) used to only surface via
+  // the archetype quiz — now secondary since headlines lead — so a
+  // citizen going straight through the headline deck never got asked at
+  // all, and the action-boosting TRAIT_ACTION_HINTS drives never kicked
+  // in for them. Asked once, ever, same "already decided, don't ask
+  // again" gate jurisdictionLeanCard() uses. Spaced roughly a third and
+  // two-thirds through however many headlines came back, rather than
+  // bunched at the front or tacked on the end, so they read as part of
+  // the flow instead of a separate quiz-shaped detour.
+  function sprinklePostureCards(headlineCards) {
+    const already = P.traits.indexOf('direct-action') !== -1 || P.traits.indexOf('incrementalist') !== -1;
+    if (already || !headlineCards.length) return headlineCards.slice();
+    const posture = buildTraitCards(TRAITS.filter(([id]) => id === 'direct-action' || id === 'incrementalist'));
+    const result = headlineCards.slice();
+    result.splice(Math.min(result.length, Math.ceil(result.length / 3)), 0, posture[0]);
+    result.splice(Math.min(result.length, Math.ceil((result.length * 2) / 3) + 1), 0, posture[1]);
+    return result;
+  }
+
   function buildHeadlineDeckFrom(cards) {
     const headlineCards = cards.map(c => ({
       type: 'headline',
@@ -2970,7 +2989,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       photo: c.photo
     }));
     deck = [
-      ...headlineCards,
+      ...sprinklePostureCards(headlineCards),
       ...(P.place.zip ? [] : [{ type: 'zip' }]),
       ...jurisdictionLeanCard(),
       { type: 'more-priorities' },

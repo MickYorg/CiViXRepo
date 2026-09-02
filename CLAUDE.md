@@ -163,7 +163,16 @@ see "Deliberately not yet done" below for why.
   instead `TRAIT_ACTION_HINTS` + `actionBoost()` (mirroring
   `categoryBoost()`) move the ACTION cards they imply to the front of the
   action deck — Direct action promotes attend/testify/share, Incrementalist
-  promotes call/email/comment. As of 31 Aug 2026 the whole
+  promotes call/email/comment. **2 Sep 2026**: these two only ever
+  surfaced via the archetype quiz, now the secondary path — a citizen
+  going straight through the headline deck (the primary path) never got
+  asked at all, so `TRAIT_ACTION_HINTS` never had anything to act on for
+  them. `sprinklePostureCards()` now inserts both into the headline deck
+  too, spaced roughly a third and two-thirds through however many
+  headlines came back rather than bunched together, and gated the same
+  "ask once, ever" way `jurisdictionLeanCard()` already was — a citizen
+  who's already set either trait (headline deck or quiz, doesn't matter
+  which) doesn't get asked again on a later topping-up visit. As of 31 Aug 2026 the whole
   headline pipeline (fetch -> boildown -> photo) is also pre-warmed:
   `functions/api/headlines-batch.js` builds a ready 5-card batch server-
   side (reusing `/api/dig-check` and `/api/headline-image` via internal
