@@ -373,6 +373,13 @@
     transition: color 0.15s ease;
   }
   .mode-stop.is-on { color: var(--amber-ink); }
+  /* Still fully clickable (not disabled/pointer-events:none) — a click
+     opens the mode-gate card below rather than switching directly. Only
+     ever applied to Activist/Pro, and only for a brand-new citizen with
+     no manifesto yet; index.html sets this once at load (see
+     hasManifesto), it's not reactive on this page since nothing here
+     changes the profile itself. */
+  .mode-stop.is-locked { opacity: 0.45; }
   .mode-emoji { font-size: 14px; line-height: 1; }
   .mode-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -380,6 +387,45 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+
+  /* ---- Mode gate: an informational speed bump, not a real lock yet ----
+     Clicking a greyed Activist/Pro stop while brand-new opens this
+     instead of switching directly. "Continue anyway" always works today
+     — there's no real gating logic behind it, just the explanation and a
+     deliberate extra tap, per the citizen's own framing ("for now let
+     users click thru, eventually it will trigger additional steps"). */
+  .mode-gate-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(7, 11, 21, 0.86);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .mode-gate-overlay[hidden] { display: none; }
+  .mode-gate-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px 26px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+  }
+  .mode-gate-emoji { font-size: 32px; margin-bottom: 10px; }
+  .mode-gate-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .mode-gate-body { font-size: 13.5px; color: var(--paper-dim); line-height: 1.55; margin-bottom: 18px; }
+  .mode-gate-btn {
+    appearance: none; width: 100%; border-radius: 7px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 500; font-size: 12px; letter-spacing: 0.03em;
+    padding: 12px 20px; cursor: pointer; margin-bottom: 8px;
+    transition: filter 0.16s ease;
+  }
+  .mode-gate-btn:last-child { margin-bottom: 0; }
+  .mode-gate-btn-primary { background: var(--amber); border: none; color: var(--btn-ink); }
+  .mode-gate-btn-primary:hover { filter: brightness(1.06); }
+  .mode-gate-btn-quiet { background: none; border: 1px solid var(--line); color: var(--paper-dim); }
+  .mode-gate-btn-quiet:hover { border-color: var(--paper-dim); }
 
   .cta {
     appearance: none;
@@ -563,6 +609,16 @@
     </button>
   </div>
 </header>
+
+<div class="mode-gate-overlay" id="mode-gate-overlay" hidden>
+  <div class="mode-gate-card">
+    <div class="mode-gate-emoji">&#x1F512;</div>
+    <div class="mode-gate-title">Activist &amp; Pro build on a manifesto that's already started</div>
+    <p class="mode-gate-body">Citizen mode is the fast on-ramp — swipe through a few real headlines or issues first, and Activist/Pro will have real priorities to work with instead of a blank form.</p>
+    <button type="button" class="mode-gate-btn mode-gate-btn-primary" id="mode-gate-continue">Continue anyway &#8594;</button>
+    <button type="button" class="mode-gate-btn mode-gate-btn-quiet" id="mode-gate-stay">Stay in Citizen mode</button>
+  </div>
+</div>
 
 <div class="wrap">
   <main class="stage" id="stage">
@@ -876,6 +932,7 @@
     document.querySelectorAll('.mode-stop').forEach(btn => {
       const on = btn.dataset.mode === splashMode;
       btn.classList.toggle('is-on', on);
+      btn.classList.toggle('is-locked', !hasManifesto && btn.dataset.mode !== 'citizen');
       btn.setAttribute('aria-checked', String(on));
       if (on) {
         modeThumb.style.left = btn.offsetLeft + 'px';
@@ -883,9 +940,34 @@
       }
     });
   }
+
+  // A brand-new citizen (no manifesto yet) is defaulted and greyed into
+  // Citizen mode for Activist/Pro — clicking either doesn't switch
+  // directly, it opens an informational card first. "Continue anyway"
+  // always works today; there's no real gating logic behind it yet, see
+  // the .mode-gate-overlay CSS comment above for why.
+  const modeGateOverlay = document.getElementById('mode-gate-overlay');
+  let modeGatePending = null;
+  function openModeGate(mode) {
+    modeGatePending = mode;
+    modeGateOverlay.hidden = false;
+  }
+  function closeModeGate() {
+    modeGatePending = null;
+    modeGateOverlay.hidden = true;
+  }
+  document.getElementById('mode-gate-continue').addEventListener('click', () => {
+    const mode = modeGatePending;
+    closeModeGate();
+    if (mode) { splashMode = mode; applySplashMode(); }
+  });
+  document.getElementById('mode-gate-stay').addEventListener('click', closeModeGate);
+
   document.querySelectorAll('.mode-stop').forEach(btn => {
     btn.addEventListener('click', () => {
-      splashMode = btn.dataset.mode;
+      const mode = btn.dataset.mode;
+      if (!hasManifesto && mode !== 'citizen') { openModeGate(mode); return; }
+      splashMode = mode;
       applySplashMode();
       if (window.CivicsEngine) window.CivicsEngine.maybeShow();
     });

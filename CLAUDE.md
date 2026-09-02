@@ -171,6 +171,31 @@ see "Deliberately not yet done" below for why.
   builder.html no longer calls `digest.js`/`buildTopDigest()` at all —
   that reveal now lives solely on take-action.html — so builder.html
   dropped its `<script src="digest.js">` include too.
+
+  **Mode gate, 2 Sep 2026** — the citizen asked for a brand-new visitor
+  (no manifesto yet) to be defaulted and locked into Citizen mode, with
+  Activist/Pro greyed out in the mode-track and gated behind an
+  informational card on click, explicitly scoped as an interim step:
+  "for now let users click thru, eventually it will trigger additional
+  steps." Both `index.html` (splash) and `builder.html` got matching
+  `.mode-gate-overlay` markup/CSS (duplicated, not shared — no build
+  system today) — a small card explaining Activist/Pro build on a
+  manifesto that's already started, with **"Continue anyway"** (always
+  switches, no real gating logic behind it yet — that's the deliberately
+  deferred "additional steps") and **"Stay in Citizen mode"** (dismiss).
+  index.html's lock is a one-shot check at load (`!hasManifesto`, same
+  heuristic it already used) since nothing on that page mutates the
+  profile itself. builder.html's version (`isBrandNew()`, the same
+  5-field emptiness check `loadMode()` already used to pick a default
+  mode) is evaluated live inside `positionModeThumb()` — already the
+  function toggling `.is-on`/positioning the thumb on every mode change,
+  resize, and initial load — so a citizen who swipes in real priorities
+  while still on Citizen mode has the lock visually clear without
+  needing to switch modes first. Not made fully reactive to every
+  in-session swipe (that would mean hooking into `save()`, called on
+  nearly every keystroke) — the gate re-evaluates fresh at click time
+  regardless, so the only cost of that gap is the button occasionally
+  looking locked a beat longer than it functionally is.
 - `take-action.html` — **renamed from `calendar.html` 2 Sep 2026** (file,
   browser tab `<title>`, `<h1>`, and every internal link/href/comment
   across `index.html`/`builder.html`/`digest.js` moved with it in the

@@ -188,6 +188,13 @@
     transition: color 0.15s ease;
   }
   .mode-stop.is-on { color: var(--amber-ink); }
+  /* Still fully clickable (not disabled) — a click opens the mode-gate
+     card below instead of switching directly. Only applied to
+     Activist/Pro, only for a brand-new manifesto (see isBrandNew()),
+     recomputed live each time positionModeThumb() runs (mode changes,
+     resize, initial load) — reactive to real P data, unlike index.html's
+     one-shot version of this same lock. */
+  .mode-stop.is-locked { opacity: 0.45; }
   .mode-emoji { font-size: 14px; line-height: 1; }
   .mode-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -195,6 +202,36 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+
+  /* ---- Mode gate: an informational speed bump, not a real lock yet ----
+     Same mode-gate-overlay concept as index.html's own copy (duplicated,
+     not shared — no build system today) — clicking a greyed Activist/Pro
+     stop opens this instead of switching directly. "Continue anyway"
+     always works; there's no real gating logic behind it, per the
+     citizen's own framing ("for now let users click thru, eventually it
+     will trigger additional steps"). */
+  .mode-gate-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(7, 11, 21, 0.86);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .mode-gate-overlay[hidden] { display: none; }
+  .mode-gate-card {
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px 26px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+  }
+  .mode-gate-emoji { font-size: 32px; margin-bottom: 10px; }
+  .mode-gate-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .mode-gate-body { font-size: 13.5px; color: var(--paper-dim); line-height: 1.55; margin-bottom: 18px; }
+  .mode-gate-card .btn { display: block; width: 100%; margin-bottom: 8px; }
+  .mode-gate-card .btn:last-child { margin-bottom: 0; }
 
   /* ---- Guided (Activist) stepper — a fixed footer bar that drives
      which one of the existing §01-06 sections is open. Reuses every
@@ -919,6 +956,16 @@
     </button>
   </div>
 </header>
+
+<div class="mode-gate-overlay" id="mode-gate-overlay" hidden>
+  <div class="mode-gate-card">
+    <div class="mode-gate-emoji">&#x1F512;</div>
+    <div class="mode-gate-title">Activist &amp; Pro build on a manifesto that's already started</div>
+    <p class="mode-gate-body">Citizen mode is the fast on-ramp — swipe through a few real headlines or issues first, and Activist/Pro will have real priorities to work with instead of a blank form.</p>
+    <button type="button" class="btn btn-primary" id="mode-gate-continue">Continue anyway &#8594;</button>
+    <button type="button" class="btn btn-quiet" id="mode-gate-stay">Stay in Citizen mode</button>
+  </div>
+</div>
 
 <div class="citizen-shell" id="citizen-shell" hidden>
   <div class="citizen-progress"><div class="citizen-progress-bar" id="citizen-progress-bar"></div></div>
@@ -2480,6 +2527,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   let MODE = loadMode();
   function saveMode(m) { try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
 
+  // Same 5-field emptiness check loadMode() already uses to decide the
+  // default mode — reused here to decide whether Activist/Pro are greyed
+  // and gated. Live, not cached: a brand-new citizen who swipes in real
+  // priorities while still on Citizen mode stops being "brand new"
+  // without needing to switch modes first.
+  function isBrandNew() {
+    return !(P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip);
+  }
+
   function setMode(m) {
     if (MODE_ORDER.indexOf(m) === -1) return;
     MODE = m;
@@ -2487,15 +2543,42 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     applyMode();
   }
 
+  // A brand-new citizen doesn't switch to Activist/Pro directly — an
+  // informational card opens first (see .mode-gate-overlay CSS comment
+  // for why "Continue anyway" always works today). Switching to Citizen,
+  // or already being past brand-new, is never gated.
+  const modeGateOverlay = document.getElementById('mode-gate-overlay');
+  let modeGatePending = null;
+  function openModeGate(m) {
+    modeGatePending = m;
+    modeGateOverlay.hidden = false;
+  }
+  function closeModeGate() {
+    modeGatePending = null;
+    modeGateOverlay.hidden = true;
+  }
+  function attemptModeSwitch(m) {
+    if (m !== 'citizen' && m !== MODE && isBrandNew()) { openModeGate(m); return; }
+    setMode(m);
+  }
+  document.getElementById('mode-gate-continue').addEventListener('click', () => {
+    const m = modeGatePending;
+    closeModeGate();
+    if (m) setMode(m);
+  });
+  document.getElementById('mode-gate-stay').addEventListener('click', closeModeGate);
+
   // Split out from applyMode() so resize can reposition the thumb without
   // re-triggering startCitizenMode() — that used to wipe an in-progress
   // swipe deck (or the archetype quiz) on every resize/rotation, since
   // applyMode() was the resize handler too and always called it.
   function positionModeThumb() {
     const modeThumb = document.getElementById('mode-thumb');
+    const brandNew = isBrandNew();
     document.querySelectorAll('.mode-stop').forEach(btn => {
       const on = btn.dataset.mode === MODE;
       btn.classList.toggle('is-on', on);
+      btn.classList.toggle('is-locked', brandNew && btn.dataset.mode !== 'citizen');
       btn.setAttribute('aria-checked', String(on));
       if (on) {
         modeThumb.style.left = btn.offsetLeft + 'px';
@@ -2523,7 +2606,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   }
 
   document.querySelectorAll('.mode-stop').forEach(btn => {
-    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    btn.addEventListener('click', () => attemptModeSwitch(btn.dataset.mode));
   });
 
   // ---- Activist: guided stepper over the real §01-06 sections -------
