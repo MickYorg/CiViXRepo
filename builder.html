@@ -73,7 +73,12 @@
     color: var(--paper);
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
+    transition: opacity 0.5s ease;
   }
+  /* Starts invisible so arriving here (from the splash's own fade-out, or
+     any other entry point) reads as a dissolve-in rather than a hard cut —
+     removed by the boot script just below, right after first paint. */
+  body.is-entering { opacity: 0; }
 
   .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
 
@@ -233,7 +238,7 @@
     font-size: 10.5px;
     letter-spacing: 0.02em;
     color: var(--paper-dim);
-    margin: 10px 0 0;
+    margin: 10px 0 26px;
   }
   .citizen-stage { position: relative; min-height: 420px; }
   .citizen-card-slot { position: relative; }
@@ -918,7 +923,7 @@
   :focus-visible { outline: 2px solid var(--amber-ink); outline-offset: 2px; }
 </style>
 </head>
-<body data-pane="build">
+<body data-pane="build" class="is-entering">
 
 <header class="topbar">
   <a class="mark" href="index.html" style="text-decoration:none;color:inherit;">C<em>i</em>V<em>i</em>X</a>
@@ -1136,6 +1141,14 @@
 <script>
 (function () {
   'use strict';
+
+  // Fade in from the splash's own fade-out (see index.html's goToBuilder())
+  // rather than snapping straight to full opacity — double rAF so the
+  // browser has actually painted the opacity:0 starting state before the
+  // class removal kicks off the transition.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('is-entering');
+  }));
 
   const root = document.documentElement;
   const KEY = 'civix-profile';
@@ -2594,6 +2607,12 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   let deckIndex = 0;
   let chosenCategories = [];
   let quizTally = null;
+  // Auto-leads a citizen who's just sitting on the welcome card into the
+  // headline deck — same 3.8s read-then-act window civics.js's fact popups
+  // use, so it's a timing a citizen's already been trained on elsewhere in
+  // the app, not a new arbitrary delay.
+  let welcomeAutoAdvanceTimer = null;
+  const WELCOME_AUTO_ADVANCE_MS = 3800;
 
   // A citizen with nothing set yet gets the short version — the archetype
   // quiz instead of the full swipe grind (see below). Anyone topping up an
@@ -3292,6 +3311,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   }
 
   function renderCitizenCard() {
+    clearTimeout(welcomeAutoAdvanceTimer);
     let card = deck[deckIndex];
     if (card && card.type === 'categories-marker') {
       deck.splice(deckIndex, 1, ...buildCategoryCards());
@@ -3317,15 +3337,26 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         ? 'Swipe through 5 real headlines and tell us what matters — about a minute. Private and secure the whole way — it all stays on this device, never shared or sold.'
         : 'Swipe through today’s headlines to sharpen what’s already here — a couple of minutes, private and secure the whole way.';
       slot.innerHTML = `
-        <div class="citizen-card citizen-card-static">
+        <div class="citizen-card citizen-card-static" id="citizen-welcome-card">
           <div class="citizen-emoji">👋</div>
           <div class="citizen-title">${firstPass ? 'Let’s build your CiViX manifesto' : 'Let’s refine your CiViX manifesto'}</div>
           <p class="citizen-blurb">${blurb}</p>
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines">Swipe today's headlines &#8594;</button>
           <button type="button" class="btn btn-quiet citizen-cta" id="citizen-advance">${firstPass ? 'Or take the 30-second quiz instead' : 'Or use trait &amp; issue cards instead'} &#8594;</button>
         </div>`;
-      document.getElementById('citizen-advance').addEventListener('click', () => advanceCitizen());
-      document.getElementById('citizen-headlines').addEventListener('click', () => startHeadlineMode());
+      document.getElementById('citizen-advance').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); advanceCitizen(); });
+      document.getElementById('citizen-headlines').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); startHeadlineMode(); });
+      // Nobody's picked a path after a read-then-act beat — dissolve the
+      // card and lead into headlines ourselves, same fade treatment as the
+      // splash's own hand-off into this page.
+      welcomeAutoAdvanceTimer = window.setTimeout(() => {
+        const welcomeEl = document.getElementById('citizen-welcome-card');
+        if (welcomeEl) {
+          welcomeEl.style.transition = 'opacity 1s ease';
+          welcomeEl.style.opacity = '0';
+        }
+        window.setTimeout(() => startHeadlineMode(), 1000);
+      }, WELCOME_AUTO_ADVANCE_MS);
       return;
     }
 

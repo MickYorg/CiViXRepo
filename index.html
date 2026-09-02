@@ -85,13 +85,17 @@
     color: var(--paper);
     font-family: 'Newsreader', Georgia, serif;
     -webkit-text-size-adjust: 100%;
-    transition: background 0.25s ease, color 0.25s ease;
+    transition: background 0.25s ease, color 0.25s ease, opacity 0.5s ease;
     /* Belt-and-suspenders: a measured .del/.ins span is pinned to its own
        natural pixel width (see measure() in the script), so a long enough
        phrase at the font-size floor can still exceed a very narrow
        viewport. This stops that from becoming a horizontal scrollbar. */
     overflow-x: hidden;
   }
+  /* Dissolve out before handing off to builder.html, instead of the hard
+     cut a plain location.href swap reads as — goToBuilder() adds this and
+     delays the actual navigation to let it play. */
+  body.is-leaving { opacity: 0; }
 
   /* ---- Header bar: raised strip, hairline underneath (PTP) ---- */
   .topbar {
@@ -890,7 +894,8 @@
 
   function goToBuilder() {
     try { localStorage.setItem('civix-mode', splashMode); } catch (e) {}
-    window.location.href = 'builder.html';
+    document.body.classList.add('is-leaving');
+    window.setTimeout(() => { window.location.href = 'builder.html'; }, 500);
   }
   cta.addEventListener('click', goToBuilder);
   document.getElementById('cta-sticky').addEventListener('click', goToBuilder);
