@@ -1499,7 +1499,8 @@
     backlog: [],       // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
     jurisdictionLean: null,  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in take-action.html
     watching: [],      // { key, kind, title, ... } — take-action.html's watchlist, see toggleWatch()/checkWatchlistUpdates() there
-    identity: null     // { name, address, email } — collected by take-action.html's state action modal, consent-gated, local-only; see CLAUDE.md's "real state email send" note for why this exists and what it's used for
+    identity: null,    // { name, address, email } — collected by take-action.html's state action modal, consent-gated, local-only; see CLAUDE.md's "real state email send" note for why this exists and what it's used for
+    statsReported: false // set once this profile crosses from empty to real content — see maybeReportManifestoStarted()
   };
 
   let P = load();
@@ -1513,9 +1514,29 @@
     return fresh;   // the address is issued by the worker — see ensureDrop()
   }
 
+  // Anonymous, aggregate-only usage stats (2 Sep 2026) — same privacy
+  // contract dig-stats.js already established for DIG: nothing here is
+  // tied to a visitor, session, IP, or device, just a running count of
+  // how many profiles have ever crossed from empty to having real
+  // content. statsReported lives on P itself (not a separate localStorage
+  // key) so it persists with the profile and this only ever fires once,
+  // forever, per manifesto — same "ask/count once" pattern already used
+  // for jurisdictionLeanCard().
+  function maybeReportManifestoStarted() {
+    if (P.statsReported) return;
+    if (!(P.issues.length || P.sources.length || P.actions.length || P.traits.length || P.place.zip)) return;
+    P.statsReported = true;
+    fetch('/api/platform-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'manifesto' })
+    }).catch(() => {});
+  }
+
   let saveTimer = null;
   function save() {
     P.updated = Date.now();
+    maybeReportManifestoStarted();
     try { localStorage.setItem(KEY, JSON.stringify(P)); } catch (e) {}
     const flag = document.getElementById('saved-flag');
     flag.classList.add('is-on');

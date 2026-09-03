@@ -160,6 +160,63 @@
     font-weight: 500;
   }
 
+  /* ---- Sample/Real toggle — same pill-track visual language as the
+     Citizen/Activist/Pro mode picker elsewhere in the app. ---- */
+  .view-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+  .view-toggle-thumb {
+    position: absolute;
+    top: 4px; bottom: 4px;
+    background: var(--amber-wash);
+    border: 1px solid var(--amber);
+    border-radius: 999px;
+    transition: left 0.22s cubic-bezier(.2,.8,.2,1), width 0.22s cubic-bezier(.2,.8,.2,1);
+    pointer-events: none;
+  }
+  .view-toggle button {
+    position: relative;
+    z-index: 1;
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 7px 14px;
+    cursor: pointer;
+    border-radius: 999px;
+    color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    transition: color 0.15s ease;
+  }
+  .view-toggle button.is-on { color: var(--amber-ink); }
+
+  .real-empty {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--paper-dim);
+    line-height: 1.6;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 16px 18px;
+  }
+  .level-bar-track {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ink-sunk, var(--ink));
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .level-bar-fill { height: 100%; background: var(--amber); border-radius: 3px; }
+
   .section-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -283,40 +340,57 @@
   <h1>Analytics</h1>
   <p class="dek">Aggregate impact across everyone using CiViX — not just your own numbers.</p>
 
-  <div class="wip">
-    <span>&#9888;</span>
-    <span><strong>Work in progress —</strong> Analytics isn't built yet. Everything below is sample content standing in for what this module will eventually pull in from your manifesto, sources, and inbox. Thanks for poking around — check back as CiViX takes shape.</span>
+  <div class="view-toggle" id="view-toggle" role="radiogroup" aria-label="Sample or real data">
+    <div class="view-toggle-thumb" id="view-toggle-thumb"></div>
+    <button type="button" class="is-on" data-view="real" role="radio" aria-checked="true">Real data</button>
+    <button type="button" data-view="sample" role="radio" aria-checked="false">Sample data</button>
   </div>
 
-<div class="stat-grid">
-    <div class="stat"><div class="stat-num">12,400</div><div class="stat-label">Actions taken</div></div>
-    <div class="stat"><div class="stat-num">3,180</div><div class="stat-label">Active manifestos</div></div>
-    <div class="stat"><div class="stat-num">41</div><div class="stat-label">Bills tracked</div></div>
-    <div class="stat"><div class="stat-num">6</div><div class="stat-label">Confirmed wins</div></div>
-</div>
-<p class="section-label">Most active topic</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Native American Sovereignty & Trust Modernization Act</span><span class="tag">Federal</span></div>
-    <div class="card-meta">1,860 actions logged · Top topic this quarter</div>
-    <div class="card-body">The single most-acted-on item on CiViX so far — the committee markup this fall followed a sustained six-week push from citizens on this exact manifesto topic.</div>
-  </div>
-<p class="section-label">Engagement by level</p>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Federal</span><span class="tag">38%</span></div>
-    <div class="card-meta">—</div>
-    <div class="card-body">Share of total actions taken at the federal level.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">State</span><span class="tag">35%</span></div>
-    <div class="card-meta">—</div>
-    <div class="card-body">Share of total actions taken at the state level.</div>
-  </div>
-  <div class="card">
-    <div class="card-top"><span class="card-title">Municipal</span><span class="tag">27%</span></div>
-    <div class="card-meta">—</div>
-    <div class="card-body">Share of total actions taken at the municipal level.</div>
+  <div id="real-view">
+    <div class="wip" id="real-status" hidden>
+      <span>&#9888;</span>
+      <span><strong>No real usage yet —</strong> nothing has been anonymously logged since this went live. Nothing is fabricated in its place — check back once citizens have actually used the app, or flip to sample data to see what this module will look like once numbers exist.</span>
+    </div>
+    <div class="stat-grid" id="real-stat-grid"></div>
+    <div id="real-topics"></div>
+    <div id="real-levels"></div>
   </div>
 
+  <div id="sample-view" hidden>
+    <div class="wip">
+      <span>&#9888;</span>
+      <span><strong>Sample data —</strong> everything below is invented, standing in for what this page looks like once real usage exists. Flip back to "Real data" to see actual anonymous, aggregate counts.</span>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num">12,400</div><div class="stat-label">Actions taken</div></div>
+      <div class="stat"><div class="stat-num">3,180</div><div class="stat-label">Active manifestos</div></div>
+      <div class="stat"><div class="stat-num">41</div><div class="stat-label">Bills tracked</div></div>
+      <div class="stat"><div class="stat-num">6</div><div class="stat-label">Confirmed wins</div></div>
+    </div>
+    <p class="section-label">Most active topic</p>
+    <div class="card">
+      <div class="card-top"><span class="card-title">Native American Sovereignty &amp; Trust Modernization Act</span><span class="tag">Federal</span></div>
+      <div class="card-meta">1,860 actions logged &middot; Top topic this quarter</div>
+      <div class="card-body">The single most-acted-on item on CiViX so far — the committee markup this fall followed a sustained six-week push from citizens on this exact manifesto topic.</div>
+    </div>
+    <p class="section-label">Engagement by level</p>
+    <div class="card">
+      <div class="card-top"><span class="card-title">Federal</span><span class="tag">38%</span></div>
+      <div class="card-meta">—</div>
+      <div class="card-body">Share of total actions taken at the federal level.</div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="card-title">State</span><span class="tag">35%</span></div>
+      <div class="card-meta">—</div>
+      <div class="card-body">Share of total actions taken at the state level.</div>
+    </div>
+    <div class="card">
+      <div class="card-top"><span class="card-title">Municipal</span><span class="tag">27%</span></div>
+      <div class="card-meta">—</div>
+      <div class="card-body">Share of total actions taken at the municipal level.</div>
+    </div>
+  </div>
 
   <a class="home-link" href="index.html">&#8592; Return to CiViX home</a>
 </div>
@@ -336,6 +410,100 @@
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
+})();
+</script>
+
+<script>
+(function () {
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  var LEVEL_LABELS = { federal: 'Federal', state: 'State', municipal: 'Municipal', general: 'General' };
+  var toggle = document.getElementById('view-toggle');
+  var thumb = document.getElementById('view-toggle-thumb');
+  var realView = document.getElementById('real-view');
+  var sampleView = document.getElementById('sample-view');
+  var realFetched = false;
+
+  function positionThumb(btn) {
+    thumb.style.left = btn.offsetLeft + 'px';
+    thumb.style.width = btn.offsetWidth + 'px';
+  }
+
+  function applyView(view) {
+    Array.prototype.forEach.call(toggle.querySelectorAll('button'), function (btn) {
+      var on = btn.dataset.view === view;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-checked', String(on));
+      if (on) positionThumb(btn);
+    });
+    realView.hidden = view !== 'real';
+    sampleView.hidden = view !== 'sample';
+    if (view === 'real' && !realFetched) loadRealStats();
+  }
+
+  Array.prototype.forEach.call(toggle.querySelectorAll('button'), function (btn) {
+    btn.addEventListener('click', function () {
+      try { localStorage.setItem('civix-analytics-view', btn.dataset.view); } catch (e) {}
+      applyView(btn.dataset.view);
+    });
+  });
+
+  // Real numbers, nothing invented: an empty platform shows an honest
+  // "no data yet" note (still visible below the stat grid, which just
+  // renders zeroes) rather than falling back to fabricated figures —
+  // that fallback is exactly what the sample-data toggle is for instead.
+  function renderReal(data) {
+    var statusEl = document.getElementById('real-status');
+    var gridEl = document.getElementById('real-stat-grid');
+    var topicsEl = document.getElementById('real-topics');
+    var levelsEl = document.getElementById('real-levels');
+
+    var hasData = (data.manifestos || 0) > 0 || (data.actionsTotal || 0) > 0;
+    statusEl.hidden = hasData;
+
+    gridEl.innerHTML =
+      '<div class="stat"><div class="stat-num">' + (data.actionsTotal || 0).toLocaleString() + '</div><div class="stat-label">Actions taken</div></div>' +
+      '<div class="stat"><div class="stat-num">' + (data.manifestos || 0).toLocaleString() + '</div><div class="stat-label">Manifestos started</div></div>';
+
+    topicsEl.innerHTML = (data.topTopics && data.topTopics.length)
+      ? '<p class="section-label">Most active topics</p>' + data.topTopics.map(function (t) {
+          return '<div class="card"><div class="card-top"><span class="card-title">' + esc(t.name) + '</span></div>' +
+            '<div class="card-body">' + t.count.toLocaleString() + ' action' + (t.count === 1 ? '' : 's') + ' logged</div></div>';
+        }).join('')
+      : '';
+
+    var levels = data.levels || {};
+    var total = Object.keys(levels).reduce(function (sum, k) { return sum + (levels[k] || 0); }, 0);
+    levelsEl.innerHTML = total > 0
+      ? '<p class="section-label">Engagement by level</p>' + Object.keys(LEVEL_LABELS).filter(function (k) { return levels[k]; }).map(function (k) {
+          var pct = Math.round((levels[k] / total) * 100);
+          return '<div class="card"><div class="card-top"><span class="card-title">' + LEVEL_LABELS[k] + '</span><span class="tag">' + pct + '%</span></div>' +
+            '<div class="level-bar-track"><div class="level-bar-fill" style="width:' + pct + '%"></div></div></div>';
+        }).join('')
+      : '';
+  }
+
+  function loadRealStats() {
+    realFetched = true;
+    fetch('/api/platform-stats')
+      .then(function (r) { return r.json(); })
+      .then(renderReal)
+      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [] }); });
+  }
+
+  var stored = null;
+  try { stored = localStorage.getItem('civix-analytics-view'); } catch (e) {}
+  applyView(stored === 'sample' ? 'sample' : 'real');
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      var onBtn = toggle.querySelector('.is-on');
+      if (onBtn) positionThumb(onBtn);
+    });
+  }
 })();
 </script>
 </body>

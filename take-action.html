@@ -1427,6 +1427,22 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
   }
 
+  // Anonymous, aggregate-only usage stats (2 Sep 2026) — same privacy
+  // contract dig-stats.js already established for DIG: nothing here is
+  // tied to a visitor, session, IP, or device, just a running count.
+  // Fired once per completed action (a real send, or a drafted call/email
+  // actually copied) — not on modal-open, which bumpJurisdictionLean()
+  // above already tracks locally for a different purpose. topics reuses
+  // whatever matched-priority names digest.js's own matching already
+  // produced for that bill/entry, not a separate taxonomy.
+  function reportAction(level, topics) {
+    fetch('/api/platform-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'action', level, topics: topics || [] })
+    }).catch(() => {});
+  }
+
   function openActionModalFor(bill, hits) {
     ACTIVE = {
       bill, hits,
@@ -1846,6 +1862,7 @@ BODY: <the email body, a few short paragraphs>`;
       if (STATE_ACTIVE !== active) return;
       active.sendResult = { status: 'sent', sentTo: data.sentTo || rep.name, at: new Date().toLocaleTimeString() };
       renderStateActionCard();
+      reportAction('state', active.hits);
     } catch (e) {
       if (STATE_ACTIVE !== active) return;
       active.sendResult = { status: 'error', error: e.message || 'request failed' };
@@ -2028,15 +2045,25 @@ BODY: <the email body, a few short paragraphs>`;
       return;
     }
 
-    if (t.closest('[data-copy-call]') && ACTIVE) { copy(ACTIVE.drafts[ACTIVE.lean].call.text || '', t.closest('[data-copy-call]')); return; }
+    if (t.closest('[data-copy-call]') && ACTIVE) {
+      copy(ACTIVE.drafts[ACTIVE.lean].call.text || '', t.closest('[data-copy-call]'));
+      reportAction('federal', ACTIVE.hits);
+      return;
+    }
     if (t.closest('[data-copy-email]') && ACTIVE) {
       const draft = ACTIVE.drafts[ACTIVE.lean];
       copy((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), t.closest('[data-copy-email]'));
+      reportAction('federal', ACTIVE.hits);
       return;
     }
-    if (t.closest('[data-copy-general-call]') && GENERAL_ACTIVE) { copy(GENERAL_ACTIVE.call.text || '', t.closest('[data-copy-general-call]')); return; }
+    if (t.closest('[data-copy-general-call]') && GENERAL_ACTIVE) {
+      copy(GENERAL_ACTIVE.call.text || '', t.closest('[data-copy-general-call]'));
+      reportAction('general', GENERAL_ACTIVE.hits);
+      return;
+    }
     if (t.closest('[data-copy-general-email]') && GENERAL_ACTIVE) {
       copy((GENERAL_ACTIVE.email.subject || '') + '\n\n' + (GENERAL_ACTIVE.email.body || ''), t.closest('[data-copy-general-email]'));
+      reportAction('general', GENERAL_ACTIVE.hits);
       return;
     }
     if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }
@@ -2045,13 +2072,19 @@ BODY: <the email body, a few short paragraphs>`;
     if (sendIt && ACTIVE) {
       const rep = ACTIVE.reps && ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
       const draft = ACTIVE.drafts[ACTIVE.lean];
-      if (rep && rep.url) fireOff((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), rep.url, sendIt);
+      if (rep && rep.url) {
+        fireOff((draft.email.subject || '') + '\n\n' + (draft.email.body || ''), rep.url, sendIt);
+        reportAction('federal', ACTIVE.hits);
+      }
       return;
     }
     const sendGeneral = t.closest('[data-send-general]');
     if (sendGeneral && GENERAL_ACTIVE) {
       const rep = GENERAL_ACTIVE.reps && GENERAL_ACTIVE.reps.find(r => r.id === GENERAL_ACTIVE.selectedRepId);
-      if (rep && rep.url) fireOff((GENERAL_ACTIVE.email.subject || '') + '\n\n' + (GENERAL_ACTIVE.email.body || ''), rep.url, sendGeneral);
+      if (rep && rep.url) {
+        fireOff((GENERAL_ACTIVE.email.subject || '') + '\n\n' + (GENERAL_ACTIVE.email.body || ''), rep.url, sendGeneral);
+        reportAction('general', GENERAL_ACTIVE.hits);
+      }
       return;
     }
 
@@ -2110,6 +2143,7 @@ BODY: <the email body, a few short paragraphs>`;
     if (t.closest('[data-copy-state]') && STATE_ACTIVE) {
       const d = STATE_ACTIVE.draft;
       copy((d.subject || '') + '\n\n' + (d.body || ''), t.closest('[data-copy-state]'));
+      reportAction('state', STATE_ACTIVE.hits);
       return;
     }
     if (t.closest('[data-save-identity]') && STATE_ACTIVE) {

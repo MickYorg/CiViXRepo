@@ -615,6 +615,45 @@ see "Deliberately not yet done" below for why.
 - `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
   an AI stance-checker across news/commentary sources. Real backend: daily
   spend cap, per-IP rate limit, anonymous usage stats.
+
+  **Anonymous aggregate platform stats, 2 Sep 2026** — the citizen asked
+  for real usage numbers, "as long as they are anonymous," to sit
+  alongside the mocked-up results pages rather than replace them outright
+  — this followed a full holistic platform review that flagged
+  `analytics.html`/`civix-track.html` as 100% fabricated content with no
+  backend behind either. New `functions/api/platform-stats.js` extends
+  `dig-stats.js`'s own already-proven contract (KV counter maps, nothing
+  tied to a visitor/session/IP/device, fails open) to the rest of the
+  app: `manifestos` (profiles that have ever crossed from empty to real
+  content, fired once via a `P.statsReported` flag persisted on the
+  profile itself — same "count once, ever" pattern
+  `jurisdictionLeanCard()` already used), `levels` (completed actions —
+  a real send, or a drafted call/email actually copied — by
+  federal/state/municipal/general), and `topics` (which matched
+  priority/issue names those actions were actually about — reusing
+  `ACTIVE.hits`/`GENERAL_ACTIVE.hits`/`STATE_ACTIVE.hits`, the exact
+  topic names `digest.js`'s own matching already produces, not a
+  separate taxonomy — the citizen's own ask to "use the existing
+  matching logic"). Instrumented at every real terminal action in
+  take-action.html: federal `data-send-it`/`data-copy-call`/
+  `data-copy-email`, general's equivalents, state's `data-copy-state`
+  and the confirmed-success branch of `sendStateEmail()` — deliberately
+  *not* on modal-open (`bumpJurisdictionLean()` already tracks that,
+  locally, for a different purpose) and *not* on watch-adds (a weaker
+  signal than actually taking action).
+
+  `analytics.html` got a real/sample toggle — the same pill-track visual
+  language as the Citizen/Activist/Pro mode picker, "a pretty standard
+  and expected design element" per the citizen's own framing — defaulting
+  to **Real data**, which shows honest zeroes and a "no real usage yet"
+  note rather than any fabricated placeholder once there's nothing to
+  show; the old mocked content is still there, fully intact, one tap away
+  behind **Sample data**, now explicitly labeled as sample rather than
+  presented as if it were live. `civix-track.html` is *personal*, not
+  aggregate — its real numbers belong on the citizen's own device
+  (`P.actions`, the watchlist, DIG history), not a server call — and was
+  deliberately left out of this pass; it needs a different mechanism, not
+  this one.
 - `send-to-civix.html` / `inbox.html` + `manifest.webmanifest` + `sw.js` —
   "Send to CiViX", an installable PWA share-target backed by a real
   Cloudflare Worker (`civix-capture.mycivix.workers.dev`, not in this
@@ -816,7 +855,10 @@ see "Deliberately not yet done" below for why.
   only by actually going through the real flow.
 
 **Placeholders (styled to match, no real functionality):**
-- `connect.html`, `civil-dis.html`, `civix-track.html`, `analytics.html`
+- `connect.html`, `civil-dis.html`, `civix-track.html`
+- `analytics.html` — **partially real as of 2 Sep 2026**, see the
+  "Anonymous aggregate stats" entry above; the sample content is still
+  there behind a toggle, honestly labeled, not deleted.
 
 **Not in this repo at all:**
 - PolTraPro (poltrapro.com) — separate product, own domain, linked from the
