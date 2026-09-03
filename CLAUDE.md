@@ -484,7 +484,28 @@ see "Deliberately not yet done" below for why.
   also left out). A ZIP outside the list gets an honest "not covered yet"
   message instead of fake sample content. Grow `CITY_CLIENTS` in
   `municipal.js` one verified city at a time. No Take Action button yet,
-  same reasoning as State. Legistar has no "public comment open" flag and
+  same reasoning as State used to be. **Two real bugs fixed 2 Sep 2026,
+  both from municipal reusing `renderStateCard()`/the focus zone's shared
+  CTA logic without being fully accounted for once state grew a real
+  action flow**: (1) the detailed municipal list's card was calling
+  `renderStateCard()` with the pre-`idx`-parameter argument count — once
+  state's real Take Action button added `idx` as a new positional
+  parameter, municipal's calls silently shifted `mode` into `idx` and
+  `'Municipal'` into `mode`, so every municipal card showed a **State**
+  tag chip instead of Municipal and its "Take action" button quietly did
+  nothing when clicked (indexing into `STATE_CURRENT` with a mode string).
+  (2) The focus zone's own CTA ternary had no branch for `kind ===
+  'municipal'` — it fell through to `e.actionHref`, which for a municipal
+  entry is `take-action.html?focus=`, the *exact* URL a citizen arriving
+  via a `?focus=` deep link is already on. Clicking "Take a look" just
+  reloaded the same focus zone showing the same broken link again — a
+  real infinite loop, the identical class of dead-end state's own
+  fallback caused until 31 Aug 2026 (see below), just never fixed for
+  municipal because nobody had hit it yet. Both fixed with a real,
+  honest destination instead of a button that looked live: `renderStateCard()`
+  now shows "View on your city's site ↗" (linking `bill.url`, the real
+  Legistar detail page) whenever `tag === 'Municipal'`, in both the
+  detailed list and the focus zone. Legistar has no "public comment open" flag and
   no direct public URL field on a Matter (constructed from the known
   `{client}.legistar.com/LegislationDetail.aspx?ID=...` pattern instead).
   As of 31 Aug 2026, `municipal.js` also pulls Legistar's `Events`

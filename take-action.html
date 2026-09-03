@@ -2193,7 +2193,13 @@ BODY: <the email body, a few short paragraphs>`;
   function renderStateCard(bill, hits, idx, mode, tag) {
     tag = tag || 'State';
     const bodyId = 'body-' + esc(slug(bill.identifier || ''));
-    const takeActionBtn = `<button type="button" class="take-action" data-take-state-action="${idx}">Take action &#8594;</button>`;
+    // Municipal has no real Take Action flow (no legislator/rep data
+    // source for city government the way OpenStates covers state) — a
+    // real "View on your city's site" link instead of a button that
+    // looks live but silently does nothing when clicked.
+    const takeActionBtn = tag === 'Municipal'
+      ? (bill.url ? `<a class="btn" href="${esc(bill.url)}" target="_blank" rel="noopener">View on your city's site &#8599;</a>` : '')
+      : `<button type="button" class="take-action" data-take-state-action="${idx}">Take action &#8594;</button>`;
 
     const officialTitle = bill.url
       ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
@@ -2394,13 +2400,13 @@ BODY: <the email body, a few short paragraphs>`;
     } else if (s.kind === 'no-issues') {
       statusEl.innerHTML = `Showing the most recently updated items in ${esc(s.city)}'s legislative system. <a href="builder.html">Declare some priorities</a> to see this narrowed to what you actually care about.`;
       shown = s.bills.slice(0, caps.fallback);
-      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode, 'Municipal')).join('');
+      listEl.innerHTML = shown.map((b, i) => renderStateCard(b, [], i, mode, 'Municipal')).join('');
     } else if (s.kind === 'focused') {
       const focused = s.matched.filter(m => m.hits.some(h => slug(h) === FOCUS_SLUG));
       if (focused.length) {
         statusEl.textContent = `Showing ${focused.length} ${s.city} item${focused.length === 1 ? '' : 's'} matched to "${s.focusIssue.name}".`;
         shown = focused.map(m => m.bill);
-        listEl.innerHTML = focused.map(m => renderStateCard(m.bill, m.hits, mode, 'Municipal')).join('');
+        listEl.innerHTML = focused.map((m, i) => renderStateCard(m.bill, m.hits, i, mode, 'Municipal')).join('');
       } else {
         statusEl.textContent = `No ${s.city} items matched to "${s.focusIssue.name}" yet.`;
         listEl.innerHTML = '';
@@ -2408,12 +2414,12 @@ BODY: <the email body, a few short paragraphs>`;
     } else if (s.kind === 'no-match') {
       statusEl.textContent = `Checked ${s.bills.length} recently updated ${s.city} items — none matched your declared priorities yet. Showing the most recent activity instead.`;
       shown = s.bills.slice(0, caps.fallback);
-      listEl.innerHTML = shown.map(b => renderStateCard(b, [], mode, 'Municipal')).join('');
+      listEl.innerHTML = shown.map((b, i) => renderStateCard(b, [], i, mode, 'Municipal')).join('');
     } else if (s.kind === 'matched') {
       statusEl.textContent = `Matched ${s.matched.length} of ${s.bills.length} recently updated ${s.city} items against your manifesto, as of ${fmtDate(new Date(s.fetchedAt).toISOString())}.`;
       const matchedSlice = s.matched.slice(0, caps.matched);
       shown = matchedSlice.map(m => m.bill);
-      listEl.innerHTML = matchedSlice.map(m => renderStateCard(m.bill, m.hits, mode, 'Municipal')).join('');
+      listEl.innerHTML = matchedSlice.map((m, i) => renderStateCard(m.bill, m.hits, i, mode, 'Municipal')).join('');
     }
     enhancePlainSummaries(shown, true);
     renderMunicipalEvents(s.events, s.city);
@@ -2459,19 +2465,25 @@ BODY: <the email body, a few short paragraphs>`;
     // shared billEntry()); 'general' (a citizen's own high-conviction
     // priority with no matching bill — see digest.js's buildTopDigest)
     // opens the topic-only advocacy modal instead, no bill needed.
-    // Municipal/docket don't have a modal flow yet, same limitation as
-    // the detailed lists below — their link falls through to
-    // take-action.html?focus=, which just expands "See everything" (this
-    // used to also be state's fallback until 31 Aug 2026's Take Action
-    // work landed without updating this switch — that left state stuck
-    // reloading this same focus zone on click, a real dead-end loop).
+    // Municipal has no modal flow yet (no legislator/rep data source for
+    // city government) — 2 Sep 2026: this used to fall through to
+    // e.actionHref, which for a municipal entry is 'take-action.html?focus=',
+    // the exact same URL a citizen arriving via a ?focus= deep link is
+    // already on. Clicking it just reloaded this same focus zone showing
+    // the same broken link again — the identical dead-end loop state's
+    // own fallback caused until 31 Aug 2026's Take Action work landed
+    // (see that history below) — this time for municipal, never fixed
+    // because nobody had hit it yet. Fixed the same way: a real link
+    // instead of one back to here — the item's own source page.
     const cta = e.kind === 'federal' && e.bill
       ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
       : e.kind === 'state' && e.bill
         ? `<button type="button" class="take-action" data-focus-state-action="${rank}">Take action now &#8594;</button>`
         : e.kind === 'general'
           ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
-          : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+          : e.kind === 'municipal' && e.url
+            ? `<a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener">View on your city's site &#8599;</a>`
+            : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
     const digBtn = `<a class="btn" href="${esc(digUrl(e.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
 
     // 'general'/'docket' titles are already plain-language (a citizen's own
