@@ -2933,7 +2933,10 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       ...(opts.skipPostureSprinkle ? headlineCards : sprinklePostureCards(headlineCards)),
       ...(P.place.zip ? [] : [{ type: 'zip' }]),
       ...jurisdictionLeanCard(),
-      { type: 'more-priorities' },
+      // opts.skipMorePriorities (see the 'topics-add' card) skips this —
+      // that card already asked "anything on your mind?" once, up front;
+      // asking again here with an empty box read as broken, not thorough.
+      ...(opts.skipMorePriorities ? [] : [{ type: 'more-priorities' }]),
       { type: 'done' }
     ];
     deckIndex = 0;
@@ -3532,15 +3535,21 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     // "anything to add" -> headlines flow (see startCitizenMode()'s
     // firstPass branch), specifically so a citizen's own typed topics can
     // bias which headlines get pulled next (headlineQuery() folds these
-    // straight in, same as it already does for top-weighted issues) — a
-    // different purpose from the 'more-priorities' card at the end of
-    // every deck, which is a closing catch-all for whatever swiping
-    // missed, so both stay in their own decks rather than merging into
-    // one. Delimiter-splitting (comma, semicolon, slash, or a new line —
-    // Enter in the field does the same thing, Shift+Enter for an actual
-    // new line while still typing) lets a citizen paste or type several
-    // things in one go; each becomes its own chip, classified
-    // independently and removable before committing.
+    // straight in, same as it already does for top-weighted issues).
+    // Originally meant to sit alongside the 'more-priorities' card at the
+    // end of every deck rather than replace it, on the theory that one
+    // biases headlines and the other catches whatever swiping missed —
+    // in practice that meant asking "anything on your mind?" twice in one
+    // sitting, the second time with an empty box and no memory of the
+    // first answer, which read as broken rather than thorough. Both
+    // startHeadlineMode() calls below now pass skipMorePriorities: true
+    // (see buildHeadlineDeckFrom()) so this card is the one and only
+    // "anything on your mind?" moment for this flow. Delimiter-splitting
+    // (comma, semicolon, slash, or a new line — Enter in the field does
+    // the same thing, Shift+Enter for an actual new line while still
+    // typing) lets a citizen paste or type several things in one go; each
+    // becomes its own chip, classified independently and removable
+    // before committing.
     if (card.type === 'topics-add') {
       controls.style.display = 'none';
       if (!card.chips) card.chips = [];
@@ -3618,10 +3627,10 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           added++;
         });
         if (added) { save(); if (window.CivicsEngine) window.CivicsEngine.maybeShow(); }
-        startHeadlineMode({ skipPostureSprinkle: true });
+        startHeadlineMode({ skipPostureSprinkle: true, skipMorePriorities: true });
       };
       document.getElementById('topics-add-continue').addEventListener('click', commitAndContinue);
-      document.getElementById('topics-add-skip').addEventListener('click', () => startHeadlineMode({ skipPostureSprinkle: true }));
+      document.getElementById('topics-add-skip').addEventListener('click', () => startHeadlineMode({ skipPostureSprinkle: true, skipMorePriorities: true }));
       return;
     }
 
