@@ -463,6 +463,28 @@
   .field.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; }
   .citizen-freeform { resize: vertical; min-height: 68px; margin-bottom: 12px; }
   .citizen-freeform-send { margin: 16px 0 10px; }
+  /* Chips for the 'topics-add' card's delimiter-split freeform topics —
+     each one shows its classified topic (or, on a failed classification,
+     a manual picker) plus a remove button, before anything gets committed. */
+  .topics-add-chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; margin: 2px 0 16px; }
+  .topics-add-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--ink-sunk); border: 1px solid var(--line); color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    padding: 6px 6px 6px 11px; border-radius: 20px;
+  }
+  .topics-add-chip em { font-style: normal; color: var(--amber-ink); }
+  .topics-add-chip.is-error { border-color: var(--strike); }
+  .topics-add-chip select {
+    background: var(--ink); border: 1px solid var(--line); color: var(--paper);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px;
+    border-radius: 6px; padding: 2px 4px; max-width: 34vw;
+  }
+  .topics-add-chip-remove {
+    appearance: none; border: none; background: none; color: var(--paper-dim);
+    cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px;
+  }
+  .topics-add-chip-remove:hover { color: var(--strike); }
   /* Scrolls internally rather than blowing out the whole card/page height —
      the full catalog is ~40 chips across 9 categories. */
   .freeform-picker { width: 100%; text-align: left; max-height: 320px; overflow-y: auto; margin: 4px 0 18px; }
@@ -1207,28 +1229,38 @@
   const ACTION_EMOJI = { email: '✉️', call: '☎️', comment: '📝', testify: '🎤', attend: '🏛️', share: '📣' };
 
   // ---- Citizen-mode swipe deck content ------------------------------------
-  // Community-role tags a citizen can swipe onto their manifesto. They're
-  // purely local flavor with one real job: TRAIT_HINTS uses them to move
-  // the most relevant issue categories to the front of the deck, so the
-  // "predictive" framing has an actual effect instead of being decorative.
+  // Community-role tags a citizen can swipe onto their manifesto. Two real
+  // jobs: TRAIT_HINTS moves the most relevant issue categories (and, as of
+  // 4 Sep 2026, headline search terms — see headlineQuery()) to the front
+  // for a swiped-in trait, and each trait's 5th element (a photoQuery) gets
+  // it a real Unsplash photo instead of a bare emoji (see
+  // prefetchTraitPhotos()). Card order is also swipe order — this deck now
+  // LEADS Citizen mode's whole first-time flow (see startCitizenMode()'s
+  // firstPass branch), not just backing an inference step, which is why
+  // relationship-status traits (single/married) were added: a real "who
+  // are you" opener for that sequence, not just more TRAIT_HINTS fodder.
   const TRAITS = [
-    ['renter', 'Renter', '🏠', 'You rent your home.'],
-    ['homeowner', 'Homeowner', '🏡', 'You own your home.'],
-    ['parent', 'Parent or guardian', '👶', 'You’re raising a kid.'],
-    ['student', 'Student', '🎓', 'You’re in school right now.'],
-    ['small-biz', 'Small-business owner', '🧾', 'You run or co-run a small business.'],
-    ['union', 'Union member', '✊', 'You belong to a union.'],
-    ['veteran', 'Veteran', '🎖️', 'You served in the military.'],
-    ['retired', 'Retired', '🌤️', 'You’re retired.'],
-    ['caregiver', 'Caregiver', '🤝', 'You care for a family member.'],
-    ['newcomer', 'New to the area', '📦', 'You moved here recently.'],
+    ['single', 'Single', '🧍', 'You’re not married or partnered right now.', 'young adult city life'],
+    ['married', 'Married or partnered', '💍', 'You’re married or in a long-term partnership.', 'married couple home'],
+    ['renter', 'Renter', '🏠', 'You rent your home.', 'apartment building renters'],
+    ['homeowner', 'Homeowner', '🏡', 'You own your home.', 'homeowner family house'],
+    ['parent', 'Parent or guardian', '👶', 'You’re raising a kid.', 'parent child home'],
+    ['student', 'Student', '🎓', 'You’re in school right now.', 'college student campus'],
+    ['small-biz', 'Small-business owner', '🧾', 'You run or co-run a small business.', 'small business owner storefront'],
+    ['union', 'Union member', '✊', 'You belong to a union.', 'union workers rally'],
+    ['veteran', 'Veteran', '🎖️', 'You served in the military.', 'military veteran portrait'],
+    ['retired', 'Retired', '🌤️', 'You’re retired.', 'retired couple relaxing'],
+    ['caregiver', 'Caregiver', '🤝', 'You care for a family member.', 'caregiver helping elderly'],
+    ['newcomer', 'New to the area', '📦', 'You moved here recently.', 'moving boxes new home'],
     // Posture traits — a different axis entirely from the circumstance
     // traits above (what you ARE vs. how you think change happens).
-    // TRAIT_HINTS doesn't cover these on purpose: theory of change isn't
-    // correlated with any particular issue category, it's orthogonal —
-    // TRAIT_ACTION_HINTS below is where they actually do something.
-    ['direct-action', 'Direct action', '🪧', '“We’re never going to vote our way out of this” — you want to be in the streets, not just the ballot box.'],
-    ['incrementalist', 'Incrementalist', '🪜', '“Don’t let the perfect be the enemy of the good” — you’d rather bank a real win than hold out for the ideal one.']
+    // TRAIT_HINTS doesn't cover these on purpose (nor single/married,
+    // above): theory of change and relationship status aren't correlated
+    // with any particular issue category, they're orthogonal —
+    // TRAIT_ACTION_HINTS below is where the posture traits actually do
+    // something instead.
+    ['direct-action', 'Direct action', '🪧', '“We’re never going to vote our way out of this” — you want to be in the streets, not just the ballot box.', 'street protest march'],
+    ['incrementalist', 'Incrementalist', '🪜', '“Don’t let the perfect be the enemy of the good” — you’d rather bank a real win than hold out for the ideal one.', 'city council meeting']
   ];
   const TRAIT_HINTS = {
     renter: ['Tenant rights', 'Housing affordability'],
@@ -1302,186 +1334,6 @@
     'Rural access': 'Services and infrastructure outside the cities.'
   };
 
-  // ---- Citizen-mode archetype quiz -----------------------------------
-  // Replaces the trait/category/issue swipe grind for first-time citizens
-  // (see startCitizenMode): a handful of tap-choice questions infer an
-  // archetype instead of asking the citizen to build their manifesto item
-  // by item, where almost everything sounds agreeable in isolation and
-  // nothing ends up feeling like a real priority. Two independent axes —
-  // "values" (loosely Moral-Foundations-flavored: care/liberty/order) and
-  // "engagement" (loosely civic-participation-flavored: watchful/
-  // individual/organizer) — score which archetype fits best; confirming
-  // one seeds real, differentiated weights (1-3, the same scale the rest
-  // of the manifesto uses) instead of the flat weight: 2 every swipe-right
-  // produces today.
-  const ARCHETYPES = [
-    {
-      id: 'watchdog', name: 'The Watchdog', emoji: '🔍',
-      reflectionLine: 'You keep receipts. Nothing unfair gets past you unnoticed.',
-      valueCluster: 'care', engagementStyle: 'watchful',
-      seedTraits: ['caregiver'],
-      seedIssues: [
-        { name: 'Government transparency', weight: 3 },
-        { name: 'Healthcare access', weight: 3 },
-        { name: 'Drug pricing', weight: 2 }
-      ],
-      seedActions: ['comment', 'email', 'share']
-    },
-    {
-      id: 'caretaker', name: 'The Caretaker', emoji: '🫶',
-      reflectionLine: 'You show up for the people who need it most.',
-      valueCluster: 'care', engagementStyle: 'individual',
-      seedTraits: ['caregiver', 'parent'],
-      seedIssues: [
-        { name: 'Healthcare access', weight: 3 },
-        { name: 'Mental health', weight: 3 },
-        { name: 'Childcare', weight: 2 }
-      ],
-      seedActions: ['call', 'email']
-    },
-    {
-      id: 'connector', name: 'The Connector', emoji: '🤝',
-      reflectionLine: 'You bring people together around what’s fair — the one who gets the phone tree going.',
-      valueCluster: 'care', engagementStyle: 'organizer',
-      seedTraits: ['union', 'caregiver'],
-      seedIssues: [
-        { name: 'Wages and labor', weight: 3 },
-        { name: 'Healthcare access', weight: 3 },
-        { name: 'Housing affordability', weight: 2 }
-      ],
-      seedActions: ['attend', 'share', 'email']
-    },
-    {
-      id: 'skeptic', name: 'The Skeptic', emoji: '🧐',
-      reflectionLine: 'You question everything before you trust it, and you’re rarely wrong.',
-      valueCluster: 'liberty', engagementStyle: 'watchful',
-      seedTraits: ['small-biz'],
-      seedIssues: [
-        { name: 'Government transparency', weight: 3 },
-        { name: 'Data privacy', weight: 3 },
-        { name: 'Taxes', weight: 2 }
-      ],
-      seedActions: ['comment', 'share']
-    },
-    {
-      id: 'rugged-individualist', name: 'The Rugged Individualist', emoji: '🪵',
-      reflectionLine: 'You handle things yourself, and your neighbors know it — the one they look to as a leader.',
-      valueCluster: 'liberty', engagementStyle: 'individual',
-      seedTraits: ['homeowner', 'veteran'],
-      seedIssues: [
-        { name: 'Small business', weight: 3 },
-        { name: 'Taxes', weight: 3 },
-        { name: 'Zoning and development', weight: 2 }
-      ],
-      seedActions: ['call', 'email']
-    },
-    {
-      id: 'firebrand', name: 'The Firebrand', emoji: '🔥',
-      reflectionLine: 'You don’t wait for permission — you rally people to push back.',
-      valueCluster: 'liberty', engagementStyle: 'organizer',
-      seedTraits: ['small-biz'],
-      seedIssues: [
-        { name: 'Government transparency', weight: 3 },
-        { name: 'Campaign finance', weight: 3 },
-        { name: 'Voting access', weight: 2 }
-      ],
-      seedActions: ['attend', 'share', 'testify']
-    },
-    {
-      id: 'historian', name: 'The Historian', emoji: '📜',
-      reflectionLine: 'You remember how we got here, and you make sure nobody forgets.',
-      valueCluster: 'order', engagementStyle: 'watchful',
-      seedTraits: ['retired', 'veteran'],
-      seedIssues: [
-        { name: 'Government transparency', weight: 3 },
-        { name: 'Courts', weight: 3 },
-        { name: 'Public lands', weight: 2 }
-      ],
-      seedActions: ['comment', 'share']
-    },
-    {
-      id: 'steward', name: 'The Steward', emoji: '🌳',
-      reflectionLine: 'You protect what your community built — one conversation, one vote, one meeting at a time.',
-      valueCluster: 'order', engagementStyle: 'individual',
-      seedTraits: ['homeowner', 'retired'],
-      seedIssues: [
-        { name: 'Zoning and development', weight: 3 },
-        { name: 'Public schools', weight: 3 },
-        { name: 'Roads and bridges', weight: 2 }
-      ],
-      seedActions: ['attend', 'email']
-    },
-    {
-      id: 'anchor', name: 'The Anchor', emoji: '⚓',
-      reflectionLine: 'People orbit around you — you hold the neighborhood together.',
-      valueCluster: 'order', engagementStyle: 'organizer',
-      seedTraits: ['parent', 'homeowner'],
-      seedIssues: [
-        { name: 'Public schools', weight: 3 },
-        { name: 'Housing affordability', weight: 3 },
-        { name: 'Transit', weight: 2 }
-      ],
-      seedActions: ['attend', 'share', 'email']
-    }
-  ];
-
-  const QUIZ_QUESTIONS = [
-    {
-      axis: 'values',
-      prompt: 'Something’s not right in your town. What bugs you most?',
-      options: [
-        { label: 'People are getting hurt by this.', bucket: 'care' },
-        { label: 'Nobody with power asked us first.', bucket: 'liberty' },
-        { label: 'This isn’t how our community is supposed to work.', bucket: 'order' }
-      ]
-    },
-    {
-      axis: 'values',
-      prompt: 'Pick the headline that would ruin your morning.',
-      options: [
-        { label: 'Families losing coverage after benefit cuts', bucket: 'care' },
-        { label: 'New permit required for something you’ve always just done', bucket: 'liberty' },
-        { label: 'A local institution shuts its doors for good', bucket: 'order' }
-      ]
-    },
-    {
-      axis: 'values',
-      prompt: 'Which sounds most like you?',
-      options: [
-        { label: 'I’ll take the hit myself before I let someone else take it.', bucket: 'care' },
-        { label: 'Let me handle it — I don’t need someone else’s rules for that.', bucket: 'liberty' },
-        { label: 'We’ve always figured this out together, and we will again.', bucket: 'order' }
-      ]
-    },
-    {
-      axis: 'engagement',
-      prompt: 'When something needs to change, you’re most likely to…',
-      options: [
-        { label: 'Read everything I can get my hands on first.', bucket: 'watchful' },
-        { label: 'Just go do something about it myself.', bucket: 'individual' },
-        { label: 'Get everyone I know involved.', bucket: 'organizer' }
-      ]
-    },
-    {
-      axis: 'engagement',
-      prompt: 'A neighbor asks for help getting the word out. You…',
-      options: [
-        { label: 'Quietly keep tabs and share what I find when it matters.', bucket: 'watchful' },
-        { label: 'Show up myself and make my voice heard directly.', bucket: 'individual' },
-        { label: 'Start a group chat and rally the block.', bucket: 'organizer' }
-      ]
-    },
-    {
-      axis: 'engagement',
-      prompt: 'Your idea of “doing something” is…',
-      options: [
-        { label: 'Knowing more than everyone else in the room.', bucket: 'watchful' },
-        { label: 'One well-placed call or letter.', bucket: 'individual' },
-        { label: 'A room full of people who agree with you.', bucket: 'organizer' }
-      ]
-    }
-  ];
-
   const BLANK = {
     version: 1,
     rev: 0,
@@ -1495,7 +1347,6 @@
     time: '',
     log: [],           // { at, kind: 'add'|'del', text }
     updated: null,
-    archetype: '',     // id of the matched Citizen-mode quiz archetype, once confirmed
     backlog: [],       // { topic, talkingPoint, parentTitle, at } — "it's complicated" facets deferred for a later round, see deferToBacklog()
     jurisdictionLean: null,  // { municipal, state, federal } weights, set once by the 'jurisdiction-lean' card, refined afterward by bumpJurisdictionLean() in take-action.html
     watching: [],      // { key, kind, title, ... } — take-action.html's watchlist, see toggleWatch()/checkWatchlistUpdates() there
@@ -2602,8 +2453,8 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
 
   // Split out from applyMode() so resize can reposition the thumb without
   // re-triggering startCitizenMode() — that used to wipe an in-progress
-  // swipe deck (or the archetype quiz) on every resize/rotation, since
-  // applyMode() was the resize handler too and always called it.
+  // swipe deck on every resize/rotation, since applyMode() was the resize
+  // handler too and always called it.
   function positionModeThumb() {
     const modeThumb = document.getElementById('mode-thumb');
     const brandNew = isBrandNew();
@@ -2692,7 +2543,6 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   let deck = [];
   let deckIndex = 0;
   let chosenCategories = [];
-  let quizTally = null;
   // Auto-leads a citizen who's just sitting on the welcome card into the
   // headline deck — same 3.8s read-then-act window civics.js's fact popups
   // use, so it's a timing a citizen's already been trained on elsewhere in
@@ -2715,14 +2565,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     window.setTimeout(() => { window.location.href = 'take-action.html'; }, 1000);
   }
 
-  // A citizen with nothing set yet gets the short version — the archetype
-  // quiz instead of the full swipe grind (see below). Anyone topping up an
-  // existing manifesto gets the full remaining set, since they've already
-  // opted into going deeper than a 30-second guess.
+  // A citizen with nothing set yet gets the short version — archetype/trait
+  // cards leading straight into headlines (see startCitizenMode()) instead
+  // of the full trait/category/issue/action swipe grind below. Anyone
+  // topping up an existing manifesto gets the full remaining set, since
+  // they've already opted into going deeper than that first minute.
   let firstPass = true;
 
   function buildTraitCards(pool) {
-    return pool.map(([id, title, emoji, blurb]) => ({ type: 'trait', id, title, emoji, blurb }));
+    return pool.map(([id, title, emoji, blurb, photoQuery]) => ({ type: 'trait', id, title, emoji, blurb, photoQuery }));
   }
   // Same idea as categoryBoost() below, for TRAIT_ACTION_HINTS instead of
   // TRAIT_HINTS — a swiped-in posture trait moves the action types it
@@ -2747,15 +2598,24 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     const traitPool = TRAITS.filter(t => P.traits.indexOf(t[0]) === -1);
     const actionPool = ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1);
     if (firstPass) {
-      quizTally = { values: { care: 0, liberty: 0, order: 0 }, engagement: { watchful: 0, individual: 0, organizer: 0 } };
+      // 4 Sep 2026: archetype/trait cards -> ZIP -> "anything to add" ->
+      // straight into today's headlines -> top-3, replacing the old
+      // 30-second archetype-quiz path outright rather than living
+      // alongside it — real trait signal up front feeding real headlines
+      // to react to, instead of choosing one path or the other.
+      // headlineQuery() folds P.traits in via TRAIT_HINTS once this runs,
+      // and the 'topics-add' card hands off via startHeadlineMode({
+      // skipPostureSprinkle: true }) since the posture traits (direct-
+      // action/incrementalist) were already offered as part of traitCards
+      // below — see sprinklePostureCards()'s own comment for why that flag
+      // exists.
+      const traitCards = buildTraitCards(traitPool);
+      prefetchTraitPhotos(traitCards);
       deck = [
         { type: 'welcome' },
-        ...QUIZ_QUESTIONS.map(q => ({ type: 'quiz-question', ...q })),
-        { type: 'archetype-reveal' },
+        ...traitCards,
         { type: 'zip' },
-        ...jurisdictionLeanCard(),
-        { type: 'more-priorities' },
-        { type: 'done' }
+        { type: 'topics-add' }
       ];
     } else {
       deck = [
@@ -2775,15 +2635,17 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     renderCitizenCard();
   }
 
-  // ---- Citizen mode: headline swipe (alternate to the archetype quiz) --
-  // "Today's headlines" instead of trait/category cards: pull a handful of
-  // real news headlines, boil each down (via /api/dig-check) to a topic on
-  // CiViX's own issue taxonomy, a one-line plain-language talking point,
-  // and a search query for a real stock photo (via /api/headline-image,
-  // Unsplash), then run the exact same swipe-right-to-adopt mechanics the
-  // rest of Citizen mode already uses. A swiped-in topic becomes a priority
-  // the same way picking a chip off an 'issue-picker' card does, so it
-  // flows into the same zip -> done -> Take Action hand-off for free.
+  // ---- Citizen mode: headline swipe --------------------------------------
+  // "Today's headlines," the tail end of the archetype-cards -> ZIP ->
+  // "anything to add" -> headlines flow (see startCitizenMode()): pull a
+  // handful of real news headlines, boil each down (via /api/dig-check) to
+  // a topic on CiViX's own issue taxonomy, a one-line plain-language
+  // talking point, and a search query for a real stock photo (via
+  // /api/headline-image, Unsplash), then run the exact same
+  // swipe-right-to-adopt mechanics the rest of Citizen mode already uses.
+  // A swiped-in topic becomes a priority the same way picking a chip off
+  // an 'issue-picker' card does, so it flows into the same zip -> done ->
+  // Take Action hand-off for free.
   const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
 
   function hashStr(s) {
@@ -2834,11 +2696,22 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     }
   }
 
-  // Classifies whatever a citizen typed on the 'more-priorities' card onto
-  // CiViX's fixed issue taxonomy, same reasoning as boildownHeadline() —
-  // keeps a freeform priority matchable against digest.js's SYNONYMS
-  // instead of drifting into ad hoc phrasing. Uncached on purpose: this
-  // is a one-off typed thought, not a recurring lookup like a headline.
+  // Splits freeform typed text into separate topic strings on a comma,
+  // semicolon, slash, or new line — lets a citizen paste or type several
+  // things in one go ("rent control, the new transit line; drug prices")
+  // instead of one topic per pass. Used by the 'topics-add' card (see
+  // renderCitizenCard()), which classifies and adds each resulting piece
+  // as its own priority via classifyFreeformPriority() below.
+  function splitFreeformTopics(text) {
+    return text.split(/[,;\/\n]+/).map(s => s.trim()).filter(Boolean);
+  }
+
+  // Classifies whatever a citizen typed on the 'more-priorities' or
+  // 'topics-add' card onto CiViX's fixed issue taxonomy, same reasoning as
+  // boildownHeadline() — keeps a freeform priority matchable against
+  // digest.js's SYNONYMS instead of drifting into ad hoc phrasing.
+  // Uncached on purpose: this is a one-off typed thought, not a recurring
+  // lookup like a headline.
   async function classifyFreeformPriority(text) {
     const prompt = `A citizen typed this into a civic-engagement manifesto builder, as something on their mind right now:
 
@@ -2951,6 +2824,33 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     }
   }
 
+  // Real Unsplash photos for the trait/archetype cards that now lead
+  // Citizen mode (see startCitizenMode()'s firstPass branch) instead of
+  // the bare emoji they used to show — reuses the same /api/headline-image
+  // endpoint and its KV cache the headline pipeline already has (keyed by
+  // search query, so a trait's fixed query is cheap and effectively
+  // permanent there), plus its own localStorage cache since a trait's
+  // photo never changes and there's no reason to ask again every session.
+  // Fire-and-forget: a trait card renders immediately with its emoji, then
+  // hot-swaps in the photo — if it's still the active card once one
+  // arrives — same progressive-enhancement approach headline cards
+  // already use while their own photo is still loading.
+  const TRAIT_PHOTO_CACHE_KEY = 'civix-trait-photo-cache';
+  function prefetchTraitPhotos(traitCards) {
+    const cache = loadJSON(TRAIT_PHOTO_CACHE_KEY, {});
+    traitCards.forEach(c => {
+      if (!c.photoQuery) return;
+      if (cache[c.id]) { c.photo = cache[c.id]; return; }
+      fetchHeadlinePhoto(c.photoQuery).then(photo => {
+        if (!photo) return;
+        c.photo = photo;
+        cache[c.id] = photo;
+        saveJSON(TRAIT_PHOTO_CACHE_KEY, cache);
+        if (deck[deckIndex] === c) renderCitizenCard();
+      });
+    });
+  }
+
   // quiet:true paints the loading card without the civics wait-filler —
   // used for the initial paint while the fast-path pre-warmed-batch check
   // is still in flight, so a warm hit (the common case) never flashes a
@@ -2976,25 +2876,40 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
 
   // Top 2 priorities (if any exist yet) bias the search — the "eventually
   // the manifesto should influence the headlines" step, without waiting on
-  // a full personalization pass. A brand-new citizen with no issues yet
-  // just gets the general national feed.
+  // a full personalization pass. As of 4 Sep 2026, swiped-in traits
+  // contribute too, via TRAIT_HINTS (the same map categoryBoost() uses to
+  // reorder the trait/category deck): the archetype-cards-first flow (see
+  // startCitizenMode()) means a brand-new citizen now has real trait
+  // signal before headlines are ever fetched, so it'd be wasted not to use
+  // it too — "use the archetype to focus the news pulls." A brand-new
+  // citizen with neither yet just gets the general feed.
   function headlineQuery() {
-    const top = P.issues.slice().sort((a, b) => b.weight - a.weight).slice(0, 2);
-    if (!top.length) return '';
-    return top.map(i => `"${i.name}"`).join(' OR ');
+    const top = P.issues.slice().sort((a, b) => b.weight - a.weight).slice(0, 2).map(i => i.name);
+    const traitHinted = [];
+    P.traits.forEach(t => {
+      (TRAIT_HINTS[t] || []).forEach(name => { if (traitHinted.indexOf(name) === -1) traitHinted.push(name); });
+    });
+    const names = top.concat(traitHinted.filter(n => top.indexOf(n) === -1).slice(0, 2));
+    if (!names.length) return '';
+    return names.map(n => `"${n}"`).join(' OR ');
   }
 
   // Shared by both the pre-warmed fast path and the live pipeline's own
   // tail below — same card shape either way.
   // The two posture traits (see TRAITS above) used to only surface via
-  // the archetype quiz — now secondary since headlines lead — so a
-  // citizen going straight through the headline deck never got asked at
-  // all, and the action-boosting TRAIT_ACTION_HINTS drives never kicked
-  // in for them. Asked once, ever, same "already decided, don't ask
-  // again" gate jurisdictionLeanCard() uses. Spaced roughly a third and
-  // two-thirds through however many headlines came back, rather than
-  // bunched at the front or tacked on the end, so they read as part of
-  // the flow instead of a separate quiz-shaped detour.
+  // the old archetype quiz — then via this sprinkle, once headlines led
+  // the default flow — so a citizen going straight through the headline
+  // deck never got asked at all, and the action-boosting
+  // TRAIT_ACTION_HINTS drives never kicked in for them. Asked once, ever,
+  // same "already decided, don't ask again" gate jurisdictionLeanCard()
+  // uses. Spaced roughly a third and two-thirds through however many
+  // headlines came back, rather than bunched at the front or tacked on
+  // the end, so they read as part of the flow instead of a separate
+  // quiz-shaped detour. opts.skipPostureSprinkle (see startHeadlineMode())
+  // skips this entirely for the new archetype-cards-first flow, where the
+  // trait deck already offered both posture cards up front — asking again
+  // here would be a repeat, not a first ask, regardless of whether the
+  // citizen adopted or skipped them the first time.
   function sprinklePostureCards(headlineCards) {
     const already = P.traits.indexOf('direct-action') !== -1 || P.traits.indexOf('incrementalist') !== -1;
     if (already || !headlineCards.length) return headlineCards.slice();
@@ -3005,7 +2920,8 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     return result;
   }
 
-  function buildHeadlineDeckFrom(cards) {
+  function buildHeadlineDeckFrom(cards, opts) {
+    opts = opts || {};
     const headlineCards = cards.map(c => ({
       type: 'headline',
       article: c.article,
@@ -3014,7 +2930,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       photo: c.photo
     }));
     deck = [
-      ...sprinklePostureCards(headlineCards),
+      ...(opts.skipPostureSprinkle ? headlineCards : sprinklePostureCards(headlineCards)),
       ...(P.place.zip ? [] : [{ type: 'zip' }]),
       ...jurisdictionLeanCard(),
       { type: 'more-priorities' },
@@ -3024,48 +2940,56 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     renderCitizenCard();
   }
 
-  async function startHeadlineMode() {
-    firstPass = false; // done card should reflect real accumulated state, not the 30-second-quiz framing
+  async function startHeadlineMode(opts) {
+    opts = opts || {};
+    firstPass = false; // done card should reflect real accumulated state, not the archetype-cards framing
     deck = [{ type: 'headline-loading' }];
     deckIndex = 0;
     renderHeadlineLoading('One moment…', { quiet: true });
+
+    const biasQuery = headlineQuery();
 
     // Fast path: functions/api/headlines-batch.js pre-warms a ready deck
     // in the background (see index.html's on-load ping and its own
     // stale-while-revalidate refresh) — when one's ready, this skips the
     // whole fetch -> boildown -> photo pipeline below entirely, and (since
     // the paint above was quiet) never shows a wait-filler for a wait
-    // that, from the citizen's side, barely happened.
-    try {
-      const br = await fetch('/api/headlines-batch');
-      const bdata = await br.json();
-      if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
-        buildHeadlineDeckFrom(bdata.cards);
-        return;
+    // that, from the citizen's side, barely happened. But it's a single
+    // shared, unpersonalized cache — only worth trying when there's no
+    // real bias to search with yet; once traits or priorities are set
+    // (true before headlines are even fetched now, via the archetype-
+    // cards-first flow), a live, biased fetch beats a fast generic one.
+    if (!biasQuery) {
+      try {
+        const br = await fetch('/api/headlines-batch');
+        const bdata = await br.json();
+        if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
+          buildHeadlineDeckFrom(bdata.cards, opts);
+          return;
+        }
+      } catch (e) {
+        // fall through to the live pipeline below
       }
-    } catch (e) {
-      // fall through to the live pipeline below
     }
 
-    // No pre-warmed batch available — now it's a genuine wait, so switch
-    // to the full loading treatment (status text + wait-filler).
+    // No pre-warmed batch used — now it's a genuine wait, so switch to the
+    // full loading treatment (status text + wait-filler).
     renderHeadlineLoading();
 
     let articles = [];
     try {
-      const q = headlineQuery();
-      const r = await fetch('/api/headlines?limit=5' + (q ? '&q=' + encodeURIComponent(q) : ''));
+      const r = await fetch('/api/headlines?limit=5' + (biasQuery ? '&q=' + encodeURIComponent(biasQuery) : ''));
       const data = await r.json();
       if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
       articles = data.articles || [];
     } catch (e) {
-      deck = [{ type: 'headline-error', message: e.message }];
+      deck = [{ type: 'headline-error', message: e.message, opts }];
       renderCitizenCard();
       return;
     }
 
     if (!articles.length) {
-      deck = [{ type: 'headline-error', message: 'No headlines available right now.' }];
+      deck = [{ type: 'headline-error', message: 'No headlines available right now.', opts }];
       renderCitizenCard();
       return;
     }
@@ -3078,7 +3002,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     const survivors = boiled.filter(Boolean);
 
     if (!survivors.length) {
-      deck = [{ type: 'headline-error', message: "Couldn't make sense of today's headlines — try again in a bit." }];
+      deck = [{ type: 'headline-error', message: "Couldn't make sense of today's headlines — try again in a bit.", opts }];
       renderCitizenCard();
       return;
     }
@@ -3093,44 +3017,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       topic: s.boildown.topic,
       talkingPoint: s.boildown.talkingPoint,
       photo: s.photo
-    })));
-  }
-
-  // ---- Archetype quiz scoring / application ---------------------------
-  function scoreArchetype(a, tally) {
-    return (tally.values[a.valueCluster] || 0) + (tally.engagement[a.engagementStyle] || 0);
-  }
-
-  function applyArchetype(a) {
-    P.archetype = a.id;
-    a.seedTraits.forEach(id => { if (P.traits.indexOf(id) === -1) P.traits.push(id); });
-    a.seedIssues.forEach(({ name, weight }) => {
-      if (addIssue(name)) { const iss = findIssue(slug(name)); if (iss) iss.weight = weight; }
-    });
-    a.seedActions.forEach(id => { if (P.actions.indexOf(id) === -1) P.actions.push(id); });
-    amend('add', 'Matched archetype: ' + a.name);
-    save();
-    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
-  }
-
-  // Rejecting the archetype twice (original guess, then the runner-up)
-  // drops into the same full trait/category/issue/action deck the
-  // "topping up" path already uses, rather than inventing a third guess —
-  // same splice-in-place precedent renderCitizenCard() uses for
-  // categories-marker/issues-marker.
-  function downgradeToFullDeck() {
-    firstPass = false;
-    const traitPool = TRAITS.filter(t => P.traits.indexOf(t[0]) === -1);
-    const actionPool = ACTIONS.filter(a => P.actions.indexOf(a[0]) === -1);
-    deck.splice(deckIndex, 2, // removes archetype-reveal and the zip card right after it
-      ...buildTraitCards(traitPool),
-      { type: 'categories-marker' },
-      { type: 'encourage' },
-      { type: 'issues-marker' },
-      { type: 'zip' },
-      ...buildActionCards(actionPool)
-    );
-    renderCitizenCard();
+    })), opts);
   }
 
   // Ranks categories by how many of their issues a swiped-in trait hints
@@ -3149,7 +3036,8 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     }).sort((a, b) => categoryBoost(b.issues) - categoryBoost(a.issues));
   }
   // Only reachable from the non-firstPass (topping-up) deck now — the
-  // firstPass deck goes through the archetype quiz instead. One card per
+  // firstPass deck goes straight from archetype/trait cards into headlines
+  // instead (see startCitizenMode()). One card per
   // chosen category, not one per issue: a citizen used to get every issue
   // in a category as its own isolated swipe verdict ("do you care about
   // this? yes/no"), and every one of them reads as reasonable in
@@ -3469,33 +3357,57 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
 
     if (card.type === 'welcome') {
       controls.style.display = 'none';
-      // Headlines leads now — real news to react to is a livelier front
-      // door than trait/category cards, which move to a quieter second
-      // option instead of being the only path in.
-      const blurb = firstPass
-        ? 'Swipe through 5 real headlines and tell us what matters — about a minute. Private and secure the whole way — it all stays on this device, never shared or sold.'
-        : 'Swipe through today’s headlines to sharpen what’s already here — a couple of minutes, private and secure the whole way.';
-      slot.innerHTML = `
-        <div class="citizen-card citizen-card-static" id="citizen-welcome-card">
-          <div class="citizen-emoji">👋</div>
-          <div class="citizen-title">${firstPass ? 'Let’s build your CiViX manifesto' : 'Let’s refine your CiViX manifesto'}</div>
-          <p class="citizen-blurb">${blurb}</p>
-          <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines">Swipe today's headlines &#8594;</button>
-          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-advance">${firstPass ? 'Or take the 30-second quiz instead' : 'Or use trait &amp; issue cards instead'} &#8594;</button>
-        </div>`;
-      document.getElementById('citizen-advance').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); advanceCitizen(); });
-      document.getElementById('citizen-headlines').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); startHeadlineMode(); });
-      // Nobody's picked a path after a read-then-act beat — dissolve the
-      // card and lead into headlines ourselves, same fade treatment as the
-      // splash's own hand-off into this page.
-      welcomeAutoAdvanceTimer = window.setTimeout(() => {
-        const welcomeEl = document.getElementById('citizen-welcome-card');
-        if (welcomeEl) {
-          welcomeEl.style.transition = 'opacity 1.6s ease';
-          welcomeEl.style.opacity = '0';
-        }
-        window.setTimeout(() => startHeadlineMode(), 1600);
-      }, WELCOME_AUTO_ADVANCE_MS);
+      // 4 Sep 2026: a brand-new citizen's default path changed — archetype/
+      // trait cards (with real photos) lead now, then ZIP, then "anything
+      // to add," then straight into headlines biased by all of that,
+      // rather than choosing between trait cards and headlines up front.
+      // Headlines still lead on its own for anyone topping up an existing
+      // manifesto (unchanged) — that choice was never about which is
+      // "better," just which fits a first-time citizen with nothing set
+      // yet vs. one already going deeper.
+      if (firstPass) {
+        slot.innerHTML = `
+          <div class="citizen-card citizen-card-static" id="citizen-welcome-card">
+            <div class="citizen-emoji">👋</div>
+            <div class="citizen-title">Let’s build your CiViX manifesto</div>
+            <p class="citizen-blurb">A few quick things about you, then swipe through 5 real headlines — about a minute. Private and secure the whole way — it all stays on this device, never shared or sold.</p>
+            <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Get started &#8594;</button>
+            <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines">Skip ahead to headlines &#8594;</button>
+          </div>`;
+        document.getElementById('citizen-advance').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); advanceCitizen(); });
+        document.getElementById('citizen-headlines').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); startHeadlineMode(); });
+        // Nobody's picked a path after a read-then-act beat — dissolve the
+        // card and lead into the default path (trait cards first)
+        // ourselves, same fade treatment as the splash's own hand-off
+        // into this page.
+        welcomeAutoAdvanceTimer = window.setTimeout(() => {
+          const welcomeEl = document.getElementById('citizen-welcome-card');
+          if (welcomeEl) {
+            welcomeEl.style.transition = 'opacity 1.6s ease';
+            welcomeEl.style.opacity = '0';
+          }
+          window.setTimeout(() => advanceCitizen(), 1600);
+        }, WELCOME_AUTO_ADVANCE_MS);
+      } else {
+        slot.innerHTML = `
+          <div class="citizen-card citizen-card-static" id="citizen-welcome-card">
+            <div class="citizen-emoji">👋</div>
+            <div class="citizen-title">Let’s refine your CiViX manifesto</div>
+            <p class="citizen-blurb">Swipe through today’s headlines to sharpen what’s already here — a couple of minutes, private and secure the whole way.</p>
+            <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines">Swipe today's headlines &#8594;</button>
+            <button type="button" class="btn btn-quiet citizen-cta" id="citizen-advance">Or use trait &amp; issue cards instead &#8594;</button>
+          </div>`;
+        document.getElementById('citizen-advance').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); advanceCitizen(); });
+        document.getElementById('citizen-headlines').addEventListener('click', () => { clearTimeout(welcomeAutoAdvanceTimer); startHeadlineMode(); });
+        welcomeAutoAdvanceTimer = window.setTimeout(() => {
+          const welcomeEl = document.getElementById('citizen-welcome-card');
+          if (welcomeEl) {
+            welcomeEl.style.transition = 'opacity 1.6s ease';
+            welcomeEl.style.opacity = '0';
+          }
+          window.setTimeout(() => startHeadlineMode(), 1600);
+        }, WELCOME_AUTO_ADVANCE_MS);
+      }
       return;
     }
 
@@ -3512,9 +3424,9 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           <div class="citizen-title">Couldn't load today's headlines</div>
           <p class="citizen-blurb">${esc(card.message || 'Something went wrong.')}</p>
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-headlines-retry">Try again &#8594;</button>
-          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines-back">Back to the quiz instead</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="citizen-headlines-back">Start over instead</button>
         </div>`;
-      document.getElementById('citizen-headlines-retry').addEventListener('click', () => startHeadlineMode());
+      document.getElementById('citizen-headlines-retry').addEventListener('click', () => startHeadlineMode(card.opts));
       document.getElementById('citizen-headlines-back').addEventListener('click', () => startCitizenMode());
       return;
     }
@@ -3562,6 +3474,27 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       return;
     }
 
+    // Real Unsplash photo when prefetchTraitPhotos() has landed one (see
+    // startCitizenMode()'s firstPass branch, which kicks that off before
+    // this card is ever the active one) — same img/fallback/credit
+    // treatment as a headline card, just with the trait's own emoji as the
+    // fallback instead of a generic icon.
+    if (card.type === 'trait') {
+      controls.style.display = 'flex';
+      const p = card.photo;
+      slot.innerHTML = `
+        <div class="citizen-card citizen-headline-card" id="citizen-active-card">
+          ${p
+            ? `<img class="citizen-headline-img" src="${esc(p.image)}" alt="">`
+            : `<div class="citizen-headline-img citizen-headline-img-fallback">${card.emoji}</div>`}
+          ${p ? `<p class="citizen-photo-credit">Photo: <a href="${esc(p.photographerUrl)}" target="_blank" rel="noopener">${esc(p.photographerName)}</a> / <a href="${esc(p.photoUrl)}" target="_blank" rel="noopener">Unsplash</a></p>` : ''}
+          <div class="citizen-title">${esc(card.title)}</div>
+          <p class="citizen-blurb">${esc(card.blurb)}</p>
+        </div>`;
+      wireSwipeGestures(document.getElementById('citizen-active-card'));
+      return;
+    }
+
     if (card.type === 'encourage') {
       controls.style.display = 'none';
       slot.innerHTML = `
@@ -3575,59 +3508,12 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       return;
     }
 
-    if (card.type === 'quiz-question') {
-      controls.style.display = 'none';
-      slot.innerHTML = `
-        <div class="citizen-card citizen-card-static">
-          <div class="citizen-emoji">🤔</div>
-          <div class="citizen-title">${esc(card.prompt)}</div>
-          <div class="citizen-quiz-options">
-            ${card.options.map((opt, i) => `<button type="button" class="btn citizen-quiz-opt" data-quiz-opt="${i}">${esc(opt.label)}</button>`).join('')}
-          </div>
-        </div>`;
-      card.options.forEach((opt, i) => {
-        document.querySelector(`[data-quiz-opt="${i}"]`).addEventListener('click', () => {
-          quizTally[card.axis][opt.bucket]++;
-          advanceCitizen();
-        });
-      });
-      return;
-    }
-
-    if (card.type === 'archetype-reveal') {
-      controls.style.display = 'none';
-      if (!card.candidates) {
-        card.candidates = ARCHETYPES.slice().sort((a, b) => scoreArchetype(b, quizTally) - scoreArchetype(a, quizTally));
-        card.rank = 0;
-      }
-      const archetype = card.candidates[card.rank];
-      slot.innerHTML = `
-        <div class="citizen-card citizen-card-static">
-          <div class="citizen-emoji">${archetype.emoji}</div>
-          <div class="citizen-title">${esc(archetype.name)}</div>
-          <p class="citizen-blurb">${esc(archetype.reflectionLine)}</p>
-          <div class="citizen-done-row">
-            <button type="button" class="btn btn-primary citizen-cta" id="archetype-yes">Yes, that’s me &#8594;</button>
-            <button type="button" class="btn btn-quiet citizen-cta" id="archetype-no">Not quite</button>
-          </div>
-        </div>`;
-      document.getElementById('archetype-yes').addEventListener('click', () => {
-        applyArchetype(archetype);
-        advanceCitizen();
-      });
-      document.getElementById('archetype-no').addEventListener('click', () => {
-        if (card.rank === 0) { card.rank = 1; renderCitizenCard(); }
-        else downgradeToFullDeck();
-      });
-      return;
-    }
-
     if (card.type === 'zip') {
       controls.style.display = 'none';
       slot.innerHTML = `
         <div class="citizen-card citizen-card-static">
           <div class="citizen-emoji">📍</div>
-          <div class="citizen-title">Last thing — your ZIP?</div>
+          <div class="citizen-title">Your ZIP?</div>
           <p class="citizen-blurb">So we can match your council, legislature, and delegation. CiViX never asks for your name or address.</p>
           <input class="field mono citizen-zip-field" id="citizen-zip" type="text" inputmode="numeric" maxlength="5" placeholder="ZIP code" value="${esc(P.place.zip || '')}">
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-advance">Continue &#8594;</button>
@@ -3639,6 +3525,103 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         save();
         advanceCitizen();
       });
+      return;
+    }
+
+    // New 4 Sep 2026 — front-loaded into the archetype-cards -> ZIP ->
+    // "anything to add" -> headlines flow (see startCitizenMode()'s
+    // firstPass branch), specifically so a citizen's own typed topics can
+    // bias which headlines get pulled next (headlineQuery() folds these
+    // straight in, same as it already does for top-weighted issues) — a
+    // different purpose from the 'more-priorities' card at the end of
+    // every deck, which is a closing catch-all for whatever swiping
+    // missed, so both stay in their own decks rather than merging into
+    // one. Delimiter-splitting (comma, semicolon, slash, or a new line —
+    // Enter in the field does the same thing, Shift+Enter for an actual
+    // new line while still typing) lets a citizen paste or type several
+    // things in one go; each becomes its own chip, classified
+    // independently and removable before committing.
+    if (card.type === 'topics-add') {
+      controls.style.display = 'none';
+      if (!card.chips) card.chips = [];
+      const renderChips = () => {
+        const list = document.getElementById('topics-add-chips');
+        if (!list) return;
+        list.innerHTML = card.chips.map((c, i) => `
+          <span class="topics-add-chip${c.status === 'error' ? ' is-error' : ''}">
+            ${esc(c.text)}
+            ${c.status === 'pending' ? '<em>&hellip;</em>' : ''}
+            ${c.status === 'done' ? `<em>&rarr; ${esc(c.topic)}</em>` : ''}
+            ${c.status === 'error' ? `<select data-chip-topic="${i}"><option value="">Pick a topic&hellip;</option>${ALL_ISSUE_NAMES.map(n => `<option value="${esc(n)}"${c.topic === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
+            <button type="button" class="topics-add-chip-remove" data-remove-chip="${i}" aria-label="Remove">&times;</button>
+          </span>`).join('');
+        list.querySelectorAll('[data-remove-chip]').forEach(btn => {
+          btn.addEventListener('click', () => { card.chips.splice(Number(btn.dataset.removeChip), 1); renderChips(); });
+        });
+        list.querySelectorAll('[data-chip-topic]').forEach(sel => {
+          sel.addEventListener('change', () => {
+            const chip = card.chips[Number(sel.dataset.chipTopic)];
+            if (chip) { chip.topic = sel.value || null; chip.status = sel.value ? 'done' : 'error'; }
+          });
+        });
+      };
+      const addChips = (raw) => {
+        splitFreeformTopics(raw).forEach(text => {
+          const chip = { text, topic: null, status: 'pending' };
+          card.chips.push(chip);
+          classifyFreeformPriority(text).then(topic => {
+            chip.topic = topic;
+            chip.status = topic ? 'done' : 'error';
+            renderChips();
+          });
+        });
+        renderChips();
+      };
+      slot.innerHTML = `
+        <div class="citizen-card citizen-card-static">
+          <div class="citizen-emoji">📝</div>
+          <div class="citizen-title">Anything specific on your mind?</div>
+          <p class="citizen-blurb">Type as many as you want — a comma, semicolon, slash, or new line starts a new one. CiViX uses these, plus what you just picked, to choose today's headlines.</p>
+          <textarea class="field citizen-freeform" id="topics-add-field" rows="3" placeholder="e.g. rent control, the new transit line, drug prices"></textarea>
+          <button type="button" class="btn citizen-cta" id="topics-add-parse">+ Add topic(s)</button>
+          <div class="topics-add-chips" id="topics-add-chips"></div>
+          <button type="button" class="btn btn-primary citizen-cta" id="topics-add-continue">Continue &#8594;</button>
+          <button type="button" class="btn btn-quiet citizen-cta" id="topics-add-skip">Skip for now &#8594;</button>
+        </div>`;
+      renderChips();
+      document.getElementById('topics-add-parse').addEventListener('click', () => {
+        const field = document.getElementById('topics-add-field');
+        if (field.value.trim()) addChips(field.value);
+        field.value = '';
+      });
+      document.getElementById('topics-add-field').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('topics-add-parse').click();
+        }
+      });
+      const commitAndContinue = async () => {
+        const field = document.getElementById('topics-add-field');
+        if (field.value.trim()) { addChips(field.value); field.value = ''; }
+        const btn = document.getElementById('topics-add-continue');
+        btn.textContent = 'Adding…';
+        btn.disabled = true;
+        await Promise.all(card.chips.filter(c => c.status === 'pending').map(c =>
+          classifyFreeformPriority(c.text).then(topic => { c.topic = topic; c.status = topic ? 'done' : 'error'; })
+        ));
+        let added = 0;
+        card.chips.forEach(c => {
+          if (!c.topic) return; // couldn't classify and nobody picked one by hand — skipped, not guessed
+          addIssue(c.topic);
+          const iss = findIssue(slug(c.topic));
+          if (iss) { iss.weight = 3; iss.stance = c.text; }
+          added++;
+        });
+        if (added) { save(); if (window.CivicsEngine) window.CivicsEngine.maybeShow(); }
+        startHeadlineMode({ skipPostureSprinkle: true });
+      };
+      document.getElementById('topics-add-continue').addEventListener('click', commitAndContinue);
+      document.getElementById('topics-add-skip').addEventListener('click', () => startHeadlineMode({ skipPostureSprinkle: true }));
       return;
     }
 
@@ -3890,8 +3873,8 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   // which can be off against fallback-font metrics on first call, or
   // stale after a resize/rotation — re-run in both cases. Deliberately
   // positionModeThumb(), not applyMode() — the latter also calls
-  // startCitizenMode(), which would wipe an in-progress swipe deck or
-  // archetype quiz every time this fires.
+  // startCitizenMode(), which would wipe an in-progress swipe deck every
+  // time this fires.
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(positionModeThumb);
   let modeResizeTimer = null;
   window.addEventListener('resize', () => {
