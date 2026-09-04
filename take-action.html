@@ -118,7 +118,7 @@
   :root[data-theme="light"] .icon-sun { display: none; }
 
   .wrap {
-    max-width: 760px;
+    max-width: 900px;
     margin: 0 auto;
     padding: clamp(28px, 5vw, 56px) clamp(18px, 5vw, 48px) clamp(60px, 8vw, 100px);
   }
@@ -186,22 +186,33 @@
      first thing on the page now, not something buried below the
      municipal/state/federal lists. .card-title/.tag/.match-tag are
      reused inside for visual consistency with the detailed lists below. */
-  .focus-zone { margin-bottom: 8px; }
+  /* 4 Sep 2026: this used to be a plain block of full-width stacked
+     cards, which on anything wider than a phone left dead space on both
+     sides of the (previously narrower) .wrap column and forced three
+     short cards into a long single-file scroll for no real reason — a
+     citizen flagged both. A grid that auto-fits as many ~260px columns
+     as the viewport allows uses that width instead: 3 columns on a
+     typical laptop/desktop, collapsing to 1 on a phone automatically,
+     no separate breakpoint needed. */
+  .focus-zone { margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
   .focus-label {
+    grid-column: 1 / -1;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--amber-ink);
-    margin: 0 0 14px;
+    margin: 0 0 4px;
   }
   .focus-card {
     border: 1px solid var(--line);
     border-radius: 10px;
     padding: 16px 18px;
-    margin-bottom: 10px;
     background: var(--ink-raised);
+    display: flex;
+    flex-direction: column;
   }
+  .focus-card .card-cta-row { margin-top: auto; padding-top: 10px; }
   .focus-card[data-rank="0"] { border-color: var(--amber); background: var(--amber-wash); }
   .focus-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
   .focus-rank {

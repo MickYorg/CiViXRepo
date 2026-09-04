@@ -88,10 +88,24 @@ export async function onRequestPost({ request, env }) {
     return json({ error: { message: `Daily budget of $${dailyBudget} reached — resets at UTC midnight.` } }, 402);
   }
 
-  const prompt = `Rewrite this piece of legislative activity as ONE plain-language sentence a busy person with no policy background could understand in five seconds — what it actually does or what just happened, not legal procedure. No markdown, no quotes, under 25 words.
+  // 4 Sep 2026: the earlier prompt ("what it actually does OR what just
+  // happened") gave the model an easy out to just paraphrase the latest
+  // procedural action — the only genuinely fresh input it had — which
+  // read as a status update ("was just sent to committee for review"),
+  // not a summary a citizen could react to. A real bill summary isn't
+  // fetched here (that's a separate per-bill congress.gov/OpenStates call
+  // this endpoint doesn't make), but the bill's own title is real
+  // substantive text, not filler — official titles describe what a bill
+  // would actually do, just in dense legalese. Leaning on the title for
+  // subject matter and explicitly ruling out procedural framing (a
+  // citizen-facing status indicator already covers "what stage is it
+  // at," separately from this text — see deriveStatus() in
+  // functions/api/calendar.js) gets closer to a real description instead
+  // of a narrower rewrite of the same status line.
+  const prompt = `Rewrite this bill in plain language a busy person with no policy background could understand in five seconds — what it would actually DO or change, based on its title (which describes the real subject matter, just in legalese). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that, so this text would just be redundant with it. One to two sentences, no markdown, no quotes, under 40 words total.
 
 Bill: ${title}
-Latest action: ${actionText || 'No recorded action yet.'}`;
+(background only, not to be described procedurally) Latest action: ${actionText || 'No recorded action yet.'}`;
 
   let anthropicRes;
   try {
