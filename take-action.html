@@ -2009,7 +2009,15 @@ BODY: <the email body, a few short paragraphs>`;
     const focusGeneralAction = t.closest('[data-focus-general-action]');
     if (focusGeneralAction) {
       const entry = FOCUS_ENTRIES[Number(focusGeneralAction.dataset.focusGeneralAction)];
-      if (entry) openGeneralAdvocacyModal(entry.title, entry.summary, entry.hits);
+      // digest.js lays these two kinds out differently: a 'general' entry's
+      // title IS the short topic name (e.hits/i.name) and its summary is
+      // the citizen's own typed stance; a 'docket' entry's title is the
+      // raw captured text itself (what was actually filed) and e.label is
+      // the short topic classifyDocketItem() inferred — so the (topic,
+      // stance) pairing needs to swap accordingly, not reuse the same
+      // two fields regardless of kind.
+      if (entry && entry.kind === 'docket') openGeneralAdvocacyModal(entry.label || entry.title, entry.title, entry.hits);
+      else if (entry) openGeneralAdvocacyModal(entry.title, entry.summary, entry.hits);
       return;
     }
 
@@ -2475,15 +2483,24 @@ BODY: <the email body, a few short paragraphs>`;
     // (see that history below) — this time for municipal, never fixed
     // because nobody had hit it yet. Fixed the same way: a real link
     // instead of one back to here — the item's own source page.
+    // 4 Sep 2026: a 'docket' entry (something captured via Send to CiViX
+    // or the Inbox, then matched to a declared priority — see digest.js's
+    // buildTopDigest()) used to fall all the way through to a plain
+    // "Open in your docket" link, the same URL it was captured from —
+    // not a real next step, just a way back to where it already was. It
+    // gets matched against the citizen's own priorities exactly like a
+    // 'general' entry does, so it gets the same real CTA now: the general
+    // advocacy modal (rep lookup, drafted call/email), not just a
+    // round-trip back to the filing.
     const cta = e.kind === 'federal' && e.bill
       ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
       : e.kind === 'state' && e.bill
         ? `<button type="button" class="take-action" data-focus-state-action="${rank}">Take action now &#8594;</button>`
-        : e.kind === 'general'
+        : e.kind === 'general' || e.kind === 'docket'
           ? `<button type="button" class="take-action" data-focus-general-action="${rank}">Start making noise &#8594;</button>`
           : e.kind === 'municipal' && e.url
             ? `<a class="btn" href="${esc(e.url)}" target="_blank" rel="noopener">View on your city's site &#8599;</a>`
-            : `<a class="btn" href="${esc(e.actionHref)}">${e.kind === 'docket' ? 'Open in your docket' : 'Take a look'} &#8594;</a>`;
+            : `<a class="btn" href="${esc(e.actionHref)}">Take a look &#8594;</a>`;
     const digBtn = `<a class="btn" href="${esc(digUrl(e.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
 
     // 'general'/'docket' titles are already plain-language (a citizen's own
@@ -2512,7 +2529,7 @@ BODY: <the email body, a few short paragraphs>`;
             ${headtextHtml}
           </div>
         </div>
-        ${hasOfficialTitle ? '' : `<p class="focus-summary">${esc(e.summary || 'No summary available yet.')}</p>`}
+        ${hasOfficialTitle ? '' : (e.summary ? `<p class="focus-summary">${esc(e.summary)}</p>` : '')}
         <div class="card-cta-row">${cta}${digBtn}</div>
       </div>`;
   }

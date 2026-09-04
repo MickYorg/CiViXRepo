@@ -376,6 +376,34 @@ see "Deliberately not yet done" below for why.
   (`data-focus-general-action`) or via `?general=<issue-name>` (what
   builder.html's digest links to, since it can't call take-action.html's
   JS across pages).
+
+  **Docket entries get the same real CTA, 4 Sep 2026** — a `kind:
+  'docket'` digest entry (something captured via Send to CiViX or the
+  Inbox, then AI-classified and matched against a declared priority —
+  see `classifyDocketItem()`/`fetchDocketItems()` in digest.js) used to
+  fall through to a plain "Open in your docket" link pointing right back
+  at `send-to-civix.html#token` — not a real next step, just a bounce
+  back to where it was already filed, which is what prompted the
+  citizen's own "how is this a take-action item?" question after seeing
+  one rank into the top-3 with an empty "No summary available yet."
+  line. It's matched against the citizen's own priorities exactly like a
+  `general` entry already is, so `focusEntryHtml()`'s CTA now routes
+  `docket` through the same `data-focus-general-action` button ("Start
+  making noise") and `openGeneralAdvocacyModal()`. The two kinds lay
+  their fields out differently, though, so the click handler swaps which
+  field feeds which modal argument rather than reusing `general`'s
+  mapping verbatim: a `general` entry's `title` IS the short topic name
+  and its `summary` is the citizen's typed stance, while a `docket`
+  entry's `title` is the raw captured text itself (what was actually
+  filed — no bare topic string to show) and its `label` is the short
+  topic `classifyDocketItem()` inferred, so the modal opens with
+  `(entry.label, entry.title, entry.hits)` for docket instead. Also
+  fixed the same pass: the focus zone's "No summary available yet."
+  filler under a `general`/`docket` card now only renders when there's
+  real summary text — previously a docket item with an empty capture
+  note showed that line unconditionally, directly beneath a title that
+  already *was* the plain content, which read as broken rather than
+  merely empty.
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title
