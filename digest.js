@@ -64,10 +64,26 @@
     return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
+  // 4 Sep 2026: matching used to run only against the fixed taxonomy name
+  // and its hand-authored SYNONYMS — real, specific-enough asks a citizen
+  // actually types ("release the Epstein files," "defund Flock
+  // surveillance," "country of origin beef labeling") get force-classified
+  // onto one of ~40 broad buckets (see builder.html's
+  // classifyFreeformPriority()) whose SYNONYMS were written for the
+  // bucket in general, not for whatever specific proper nouns a citizen
+  // actually cares about — so a bill titled "American Beef Labeling Act"
+  // or "Epstein Files Transparency Act" could sit right in the fetched
+  // pool and never match, because "beef"/"labeling"/"Epstein" appear
+  // nowhere in trade-and-tariffs' or government-transparency's synonym
+  // lists. issue.stance (the citizen's own typed words, preserved by
+  // builder.html's mergeStance() even when several distinct priorities
+  // share one bucket) is real signal specifically for this — same >=4-char
+  // heuristic already applied to the topic name itself.
   function keywordsFor(issue) {
     const extra = SYNONYMS[issue.id] || [];
     const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    return [issue.name.toLowerCase()].concat(extra, nameWords);
+    const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return [issue.name.toLowerCase()].concat(extra, nameWords, stanceWords);
   }
 
   // Scores one haystack of text against a citizen's issues — the per-item

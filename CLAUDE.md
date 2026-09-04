@@ -42,7 +42,20 @@ see "Deliberately not yet done" below for why.
   itself uses so Replay's `reset()` cancels a pending auto-advance for
   free. Also pings `/api/headlines-batch` fire-and-forget on every load
   purely to keep builder.html's headline-swipe deck pre-warmed (see
-  below) — never reads the response.
+  below) — never reads the response. **4 Sep 2026**: the mobile sticky
+  CTA bar (added 27 Aug, above) never hid itself once the amendment
+  sequence resolved and the page's own in-flow "Build your manifesto"
+  button (inside `.resolve`) faded in — a citizen who scrolled past that
+  point saw two identical buttons on screen at once, flagged as reading
+  "amateurish." `:root.is-resolved .cta-sticky` now fades the sticky bar
+  out (same 0.7s as `.resolve` fading in) once the in-flow button takes
+  over, so the sticky bar's only job is covering the few seconds before
+  that button exists, not competing with it afterward. Also bumped
+  several mono-label text sizes that floored at 8.5–9.5px on mobile
+  (`.mark-sub`, `.sec`, `.principles`, `.mode-label`) up to a 9.5–10.5px
+  floor — same complaint, "font on mobile seems small" — while leaving
+  the headline (`.line`) and pitch copy, already comfortably sized,
+  untouched.
 - `builder.html` — the "build your profile" flow (ZIP, issues/weights,
   positions, trusted sources, action authority). Its Inbox (§ 01) now has
   DIG's full focus-mode treatment: open a filed item, it's auto-placed
@@ -404,6 +417,52 @@ see "Deliberately not yet done" below for why.
   note showed that line unconditionally, directly beneath a title that
   already *was* the plain content, which read as broken rather than
   merely empty.
+
+  **Matching a citizen's own specific words, not just the fixed taxonomy,
+  4 Sep 2026** — the citizen typed several concrete priorities ("release
+  the Epstein files," "defund Flock surveillance," country-of-origin beef
+  labeling) and asked why none of them turned up a real matching bill
+  (naming `S.421`, the American Beef Labeling Act, as one they knew was
+  active) even though the topic was clearly a real, deliberate priority.
+  Two compounding bugs, both fixed:
+  - `digest.js`'s `keywordsFor()` only ever matched a bill's title/latest-
+    action text against the fixed taxonomy topic's own name plus its
+    hand-authored `SYNONYMS` entry — written for the bucket in general
+    ("trade-and-tariffs": tariff/trade/import/export), not for whatever
+    specific proper nouns a citizen's own typed priority actually names.
+    "American Beef Labeling Act" contains neither "tariff" nor "trade,"
+    so it could sit right in the fetched federal-bill pool and still
+    never match. `keywordsFor()` now also extracts >=4-character words
+    from `issue.stance` (the citizen's own typed text) the same way it
+    already did from the topic name itself — a heuristic, not a fix for
+    every case (short words like "war" still fall under the length
+    floor), but it's real signal that didn't exist before.
+  - That fix only works if the specific stance text actually survives —
+    it often didn't. Every call site that sets `iss.stance` (
+    `commitFreeformTopic()`, the `topics-add` card's commit loop,
+    swiping a headline/drilldown card onto an already-adopted topic in
+    `resolveCitizenCard()`) used to overwrite it outright on a collision
+    with whatever was there before. Since the taxonomy is a fixed ~40-
+    item list, two genuinely different priorities landing on the same
+    broad bucket is common — a citizen typing 4 distinct asks in one
+    `topics-add` pass, as this citizen did, could easily see 2-3 of them
+    silently clobber each other, with only the last one's text
+    surviving. New shared `mergeStance(existing, incoming)` helper in
+    builder.html appends ("existing text. Also: new text") instead of
+    replacing, used at all three call sites — every specific thing a
+    citizen has said now survives even when the taxonomy forces it to
+    share a bucket with something else.
+  Not fixed in this pass, flagged as a real, harder limitation:
+  `functions/api/calendar.js` only ever fetches the ~100 federal bills
+  congress.gov reports as most-recently *updated* (any metadata touch,
+  not necessarily real legislative action), not a search — a real but
+  currently-dormant bill like S.421 may simply never be in that fetched
+  pool at all on a given day, regardless of how good the keyword match
+  is. Congress.gov's public API doesn't expose a free-text search
+  endpoint the same way its own website's search does, so fixing this
+  properly would mean a different fetch strategy entirely, not a tweak —
+  out of scope here.
+
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title

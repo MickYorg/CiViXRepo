@@ -1519,6 +1519,25 @@
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
     return true;
   }
+  // The issue taxonomy is a fixed ~40-item list — two genuinely different
+  // things a citizen cares about ("release the Epstein files" and "defund
+  // Flock surveillance," say) routinely land on the same broad bucket
+  // (e.g. both classify as "Government transparency" or "Data privacy").
+  // Every call site that sets iss.stance used to just overwrite it
+  // outright on a collision, silently discarding whichever priority got
+  // typed/swiped first — with no visibility, and no way for real bill
+  // matching (digest.js's keywordsFor()) to ever find the lost one, since
+  // matching reads from stance text too (see 4 Sep 2026 note there).
+  // Appending instead keeps every specific thing a citizen has actually
+  // said, even when the coarse taxonomy forces them to share a bucket.
+  function mergeStance(existing, incoming) {
+    const inc = String(incoming || '').trim();
+    if (!inc) return existing || '';
+    const ex = String(existing || '').trim();
+    if (!ex || ex === inc) return inc;
+    return ex + ' Also: ' + inc;
+  }
+
   function removeIssue(id) {
     const i = P.issues.findIndex(x => x.id === id);
     if (i < 0) return;
@@ -2781,7 +2800,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
   function commitFreeformTopic(text, topic) {
     addIssue(topic);
     const iss = findIssue(slug(topic));
-    if (iss) { iss.weight = 3; iss.stance = text; }
+    if (iss) { iss.weight = 3; iss.stance = mergeStance(iss.stance, text); }
     save();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
     renderFreeformDone(topic);
@@ -3076,7 +3095,7 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
       // worth keeping rather than discarding once the topic's adopted.
       addIssue(card.topic);
       const iss = findIssue(slug(card.topic));
-      if (iss) iss.stance = card.talkingPoint || iss.stance;
+      if (iss) iss.stance = mergeStance(iss.stance, card.talkingPoint);
     }
     save();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
@@ -3623,7 +3642,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           if (!c.topic) return; // couldn't classify and nobody picked one by hand — skipped, not guessed
           addIssue(c.topic);
           const iss = findIssue(slug(c.topic));
-          if (iss) { iss.weight = 3; iss.stance = c.text; }
+          if (iss) { iss.weight = 3; iss.stance = mergeStance(iss.stance, c.text); }
           added++;
         });
         if (added) { save(); if (window.CivicsEngine) window.CivicsEngine.maybeShow(); }
