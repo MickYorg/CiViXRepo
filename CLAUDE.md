@@ -582,6 +582,21 @@ see "Deliberately not yet done" below for why.
   mirrors builder.html's Inbox's own `digUrl()`/`?topic=` convention
   exactly) — pre-fills DIG's topic field with the bill/priority title,
   never auto-runs the check, so it's free to offer everywhere.
+
+  **Focus-zone width, 9 Sep 2026 (second pass)** — the citizen flagged
+  the top-3 cards as regressed: on an iPad in landscape they showed as 3
+  thin columns of cramped, hard-to-read text with dead space on both
+  sides of the page. Root cause: `.wrap`'s 900px cap meant a
+  1024-1194px-wide tablet viewport still only got 900px of content, and
+  the focus-zone grid (`auto-fit, minmax(260px, 1fr)`, from an earlier
+  4 Sep 2026 pass — see commit `380c68c`) computed 3 columns inside that
+  narrow width regardless, squeezing each one down to its 260px floor.
+  `.wrap` widened to 1100px and the grid's floor raised to 280px, working
+  together so 3 columns now only form with genuinely comfortable room
+  (~300-360px each), collapsing to fewer/1 column exactly as before on
+  anything narrower. `.dek` and other text elements already cap their
+  own line length in `ch` units independent of `.wrap`, so widening it
+  doesn't affect prose readability — only how much room cards get.
   State section is also real: `functions/api/state-bills.js` resolves the
   profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
   matched bills from OpenStates, the same "one API covers all 50
