@@ -21,11 +21,16 @@ const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2;
 const PRICE_PER_MTOK_INPUT = 2;
 const PRICE_PER_MTOK_OUTPUT = 10;
 
-const FED_MATCH_CAP = 20;
-const FED_BACKFILL_MIN = 8;
-const STATE_MATCH_CAP = 15;
-const MUNI_BILL_MATCH_CAP = 10;
-const MUNI_EVENT_CAP = 10;
+// Trimmed down 9 Sep 2026 (originally 20/8/15/10/10) after a live failure
+// traced to generation latency, not a data-shape bug — a smaller input
+// pool means less for the model to read before it can even start
+// producing the plan, which matters more than max_tokens for total wall
+// time here. Still real, still grounded — just a shorter reading list.
+const FED_MATCH_CAP = 10;
+const FED_BACKFILL_MIN = 5;
+const STATE_MATCH_CAP = 8;
+const MUNI_BILL_MATCH_CAP = 6;
+const MUNI_EVENT_CAP = 5;
 
 // Short, server-side copy of calendar.html's fixed contingency-scenario
 // catalog — id/name/one-line framing only, just enough for the model to
@@ -128,7 +133,7 @@ function billLabel(b) {
 
 function billLine(m) {
   const b = m.bill;
-  const text = ((b.latestAction && b.latestAction.text) || '').slice(0, 140);
+  const text = ((b.latestAction && b.latestAction.text) || '').slice(0, 90);
   const date = (b.latestAction && b.latestAction.date) || 'no date';
   return `- "${b.title}" [${billLabel(b)}] — ${text} (${date})`;
 }
@@ -194,7 +199,7 @@ Return ONLY a JSON object (no markdown fences, no commentary) with this exact sh
   "contingencyFocus": [ 2 to 4 scenario ids from the catalog above, most relevant to this citizen first ]
 }
 
-Produce 5-7 tactical items and 3-5 strategic items, spread across the jurisdictions this citizen has real signal for — weight jurisdictions loosely by jurisdiction lean above, but don't ignore one just because its number is lower. Every item MUST cite at least one issueMatches name that exactly matches one of the citizen's own listed issue names above. Keep every "title" under 12 words and every "rationale" genuinely short — this plan needs to generate quickly, so terse and concrete beats thorough.
+Produce 4-6 tactical items and 3-4 strategic items, spread across the jurisdictions this citizen has real signal for — weight jurisdictions loosely by jurisdiction lean above, but don't ignore one just because its number is lower. Every item MUST cite at least one issueMatches name that exactly matches one of the citizen's own listed issue names above. Keep every "title" under 12 words and every "rationale" genuinely short — this plan needs to generate quickly, so terse and concrete beats thorough.
 
 STRATEGIC-GOAL GUARDRAIL (follow exactly)
 Some citizens will hold the position that current officeholders have failed and should be removed, AND barred from becoming lobbyists/regulators/consultants afterward — a real, existing policy area (revolving-door and cooling-off-period law). Reason about this in general CIVIC-STRATEGY terms only:
