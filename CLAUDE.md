@@ -340,6 +340,29 @@ see "Deliberately not yet done" below for why.
     pays for a live, fresh fetch — biased when there's real signal, and
     at minimum unbiased-but-current when there isn't.
 
+  **Talking points still ambiguous to swipe on, same day** — even with
+  better source headlines, the citizen flagged a talking point like
+  "policymakers shouldn't X, even though students think otherwise" as
+  genuinely unclear to react to: does swiping right mean agreeing with
+  the stated claim, or siding with the students being dismissed in the
+  same sentence? The "opinionated position statement" instruction never
+  actually forbade embedding an opposing party's view in the same
+  sentence — it only asked for "opinionated," which a compound
+  claim-plus-rebuttal technically satisfies while still being useless to
+  swipe on. All three copies of this instruction (`boildownHeadline()`
+  and `buildDrilldownCards()` in builder.html, `boildownPrompt()` in
+  headlines-batch.js — kept in sync by hand, same convention as
+  `issue-taxonomy.js`) now explicitly forbid any "X, even though/despite
+  Z thinks otherwise" construction, with a concrete good/bad example.
+  Not addressed in this pass: `HEADLINE_BOILDOWN_KEY`
+  (`civix-headline-boildown`, builder.html's per-browser localStorage
+  cache) holds old boildowns keyed by article URL with no expiry — if a
+  citizen's browser already cached a bad pre-fix talking point for a
+  headline that resurfaces, they'd see the old phrasing until that
+  article ages out of GNews's results, not a fresh one. Clearing that
+  key would force a re-boildown; not done automatically since it's the
+  citizen's own local data.
+
   Separately, the citizen typed a specific, current topic tied to a
   named bill into "anything else on your mind?" and watched CiViX
   generalize it up into a broad taxonomy bucket, discarding the
