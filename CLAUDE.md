@@ -312,6 +312,51 @@ see "Deliberately not yet done" below for why.
   nearly every keystroke) — the gate re-evaluates fresh at click time
   regardless, so the only cost of that gap is the button occasionally
   looking locked a beat longer than it functionally is.
+
+  **Headline-swipe quality + freeform-topic overriding, 9 Sep 2026** —
+  the citizen described the (now weeks-old, previously the primary path)
+  headline deck as no longer on point: stale headlines, unclear
+  summaries, low-signal topics, "are we refreshing from current news?"
+  Root-caused to two compounding issues, both fixed:
+  - `headlineQuery()` biased its GNews search by quoting CiViX's own
+    taxonomy label as an exact phrase (`"Climate policy"`) — real
+    reporting almost never contains that literal category-speak string
+    even when it's full of on-topic coverage, so a "personalized" search
+    could come back thin or stuck on an old article that happened to
+    contain the phrase. Now builds terms from `CAL_SYNONYMS`'
+    real-world keywords instead (the same map `keywordsForMatch()` above
+    it already uses for congress.gov bill matching) and drops forced
+    quoting on single words, so GNews does normal keyword matching
+    instead of requiring a near-impossible exact phrase.
+  - A citizen actively refining a real manifesto could still fall
+    through to `functions/api/headlines-batch.js`'s shared, generic,
+    at-most-hourly (often much staler in practice — it only refreshes
+    when *something* pings it) batch, whenever `headlineQuery()`
+    happened to compute empty — the exact "old, nowhere near my
+    manifesto" symptom. `startHeadlineMode()` now reserves that fast
+    path for a genuinely first-time citizen with nothing set yet
+    (`wasFirstPass`, captured before the function's own `firstPass =
+    false` line overwrites it); anyone topping up a manifesto always
+    pays for a live, fresh fetch — biased when there's real signal, and
+    at minimum unbiased-but-current when there isn't.
+
+  Separately, the citizen typed a specific, current topic tied to a
+  named bill into "anything else on your mind?" and watched CiViX
+  generalize it up into a broad taxonomy bucket, discarding the
+  specificity — flagged as CiViX overriding rather than listening.
+  `classifyFreeformPriority()` (shared by the 'more-priorities' and
+  'topics-add' cards) used to force everything onto the fixed ~40-item
+  taxonomy unconditionally; it now classifies specificity first — a
+  clear, actionable topic is kept in the citizen's own words (`addIssue()`
+  already accepts any name, not just taxonomy strings), and only
+  something genuinely vague or narrow still rolls up to the closest
+  taxonomy category. `renderFreeformConfirm()` and the topics-add chip
+  display both now show which treatment happened (a specific topic reads
+  "Filed under '{topic}' — just as you put it"; a rolled-up one reads
+  "Closest fit: {topic}" with a note explaining the gap) — same
+  "expose the assumption, make it correctable" shape as the take-action
+  For/Against toggle, rather than presenting a guess and a rollup
+  identically.
 - `take-action.html` — **renamed from `calendar.html` 2 Sep 2026** (file,
   browser tab `<title>`, `<h1>`, and every internal link/href/comment
   across `index.html`/`builder.html`/`digest.js` moved with it in the
