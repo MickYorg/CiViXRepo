@@ -14,61 +14,41 @@ confirmed indirectly by the run of ordinary same-day deploys logged
 between then and now. That note is kept below only as a record of the
 incident, not as an open item.
 
-**Pick up here (2)** — Calendar (`calendar.html`) shipped this session
-but needed real live debugging afterward, and that debugging isn't
-fully closed out. Sequence: `functions/api/strategic-plan.js` + its two
-`_lib` helpers were already sitting in the working tree, fully written
-but uncommitted, from a prior session that stopped before building any
-frontend for them. This session wrote `calendar.html` against that
-existing backend contract, wired it into site nav, fixed a naming
-collision (see the Calendar entry further down), and pushed. The user
-then hit "Could not reach the server" live immediately after. Root
-cause, confirmed via `wrangler pages deployment tail` against
-production: `strategic-plan.js` was returning HTTP 502 for its own
-controlled error responses, but 502/504/521-526 are Cloudflare-reserved
-status codes — the edge always discards the origin's body for those and
-substitutes its own bare "error code: 502" plain-text page, which
-calendar.html's `res.json()` then failed to parse. Fixed (all 502s ->
-500; calendar.html now falls back to the real HTTP status instead of a
-connectivity message when a response isn't JSON) and confirmed live: a
-real request now gets a real, correctly-parsed 500 with this endpoint's
-actual message instead of Cloudflare's stripped page.
-
-That fix surfaced a second, real problem underneath it: the Anthropic
-call itself is slow enough (non-streamed, reasoning over a real fetched
-bill/event pool plus producing a large structured plan) that it doesn't
-reliably finish before *something* in the chain gives up — confirmed
-live that a correct plan CAN generate successfully (~22s, real grounded
-content, verified by eye), but repeated identical requests sometimes
-instead failed around 25s with an abort-shaped error, even after this
-session raised its own AbortController timeout to 45s specifically to
-rule itself out as the cause. That ~25s failure mode's exact mechanism
-is **not confirmed** — Cloudflare's own docs say there's no fixed
-subrequest time limit, so whatever's actually enforcing it wasn't
-identified this session. The response either way was the same: shrink
-the prompt (bill-pool caps roughly halved, quoted latest-action text
-140->90 chars, requested item counts 5-7/3-5 -> 4-6/3-4 tactical/
-strategic) so generation has less to read and less to produce, which
-helps regardless of what the real ceiling turns out to be.
-
-**Not yet confirmed reliable** — this session's own testing hit
-`/api/strategic-plan`'s 12-per-IP-per-day rate limit partway through
-verifying the prompt-shrink fix, so the smaller-prompt version has not
-been confirmed live end-to-end from this session (only reasoned through
-as the right lever, and deployed). **First thing next session**: have
-the user (or a fresh IP) try `mycivix.com/calendar.html` for real with
-an actual manifesto and report whether it now reliably produces a plan.
-If it still fails intermittently, the next real diagnostic step is
-`wrangler pages deployment tail <latest-deployment-id> --project-name
-mycivix` while re-triggering a live request (this session's actual
-method — the Cloudflare dashboard's own logs were never needed) to see
-the real wallTime/status/exceptions for a failing request, and from
-there either shrink the prompt further or investigate whether something
-more specific than "generic platform limit" is actually at play (e.g.
-whether `AbortController` + `setTimeout` truly behaves as expected
-inside a Cloudflare Pages Function's execution model — this session
-never fully explained why a 45s controller seemed to yield ~25s
-failures).
+**Calendar shipped this session and needed real live debugging right
+after — now resolved and confirmed end-to-end.** Sequence:
+`functions/api/strategic-plan.js` + its two `_lib` helpers were already
+sitting in the working tree, fully written but uncommitted, from a
+prior session that stopped before building any frontend for them. This
+session wrote `calendar.html` against that existing backend contract,
+wired it into site nav, fixed a naming collision (see the Calendar
+entry further down), and pushed. Two real bugs surfaced live
+immediately after, both root-caused via `wrangler pages deployment
+tail <deployment-id> --project-name mycivix` against production (the
+real, working way to see a live Pages Function's actual
+wallTime/status/exceptions per request — faster than the dashboard for
+this):
+1. `strategic-plan.js` was returning HTTP 502 for its own controlled
+   error responses, but 502/504/521-526 are Cloudflare-reserved status
+   codes — the edge always discards the origin's body for those and
+   substitutes its own bare "error code: 502" plain-text page, which
+   calendar.html's `res.json()` then failed to parse, surfacing as "Could
+   not reach the server." Fixed: every controlled error path now uses
+   500 instead.
+2. Once real error messages were visible, the actual Anthropic-call
+   latency/sizing became tunable instead of a guessing game: bill-pool
+   caps roughly halved (fed 20->10, state 15->8, municipal bills 10->6,
+   events 10->5) to cut input size, requested item counts trimmed
+   5-7/3-5 -> 4-6/3-4, `max_tokens` raised 4000 -> 6000 (a richer, real
+   8-issue manifesto genuinely needs that much room and was hitting
+   `stop_reason:"max_tokens"` truncation below it), and the server-side
+   timeout raised 25s -> 65s (a real generation for that same rich
+   manifesto took up to ~45s; Cloudflare imposes no fixed subrequest
+   limit, so this only needed to be generous, not clever).
+Confirmed live end-to-end with a realistic 8-issue, multi-jurisdiction
+manifesto: a fresh generation succeeds in ~24s with specific, grounded
+content (e.g. "Testify at CPA affordable housing funds hearing"), and
+an identical repeat request returns from the 24h KV cache in ~0.16s.
+Calendar is genuinely working now, not just deployed.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -713,7 +693,8 @@ see "Deliberately not yet done" below for why.
     per-IP-rate-limit pattern as `dig-check.js`/`plain-summary.js`) to
     produce a structured plan: originally 6-10 `tactical` (near-term)
     items and 4-8 `strategic` (longer-term) items (trimmed same-day to
-    4-6/3-4 — see "Pick up here (2)" above), each citing real manifesto
+    4-6/3-4 — see the Calendar live-debugging note near the top of this
+    file), each citing real manifesto
     issue names, plus a `contingencyFocus` ranking of a fixed 6-scenario
     catalog (economic crash, armed conflict, cyberattack, climate
     disaster, public-health emergency, electoral/constitutional crisis)
@@ -780,14 +761,14 @@ see "Deliberately not yet done" below for why.
     routes correctly and fails cleanly on a missing local
     `ANTHROPIC_API_KEY`. That local pass didn't catch two real bugs that
     only showed up live (a Cloudflare-reserved-status-code body-masking
-    issue, and Anthropic-call latency reliability) — see the "Pick up
-    here (2)" note at the top of this file for the full incident and its
-    current, not-fully-confirmed state. `functions/api/strategic-plan.js`
-    has since been fixed and redeployed multiple times in direct response
-    to live `wrangler pages deployment tail` output (not the Cloudflare
-    dashboard) — that command, pointed at a specific deployment ID from
-    `wrangler pages deployment list --project-name mycivix`, is the real,
-    working way to see a live production Pages Function's actual
+    issue, and Anthropic-call latency/sizing) — both fixed and confirmed
+    resolved end-to-end the same session; see the Calendar live-debugging
+    note near the top of this file for the full incident. Every fix was
+    root-caused via live `wrangler pages deployment tail <deployment-id>
+    --project-name mycivix` output (not the Cloudflare dashboard) — that
+    command, pointed at a specific deployment ID from `wrangler pages
+    deployment list --project-name mycivix`, is the real, working way to
+    see a live production Pages Function's actual
     wallTime/status/exceptions for a specific request, and is faster than
     the dashboard for this kind of debugging.
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
