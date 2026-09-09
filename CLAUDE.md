@@ -5,28 +5,23 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 2 Sep 2026)
+## Current state (as of 9 Sep 2026)
 
-**Pick up here** — mid-session as of this note, paused for later the same
-day. `functions/api/plain-summary.js` (the new shared server-side cache
-for bill plain-language summaries, see its own entry further down) is
-fully written, committed, and pushed (`5ed7a62`, retry-triggered again at
-`a638278`) — but **not yet confirmed live**. Cloudflare Pages' build
-pipeline was stuck twice in a row when last checked: the first build sat
-in its `initialize` stage 9+ minutes with zero progress; an empty-commit
-retry (`a638278`, same fix as the documented `CONGRESS_API_KEY` incident
-below) produced a new deployment that was itself still stuck in `queued`
-3+ minutes later. Two stuck builds back-to-back, on a pipeline that
-deployed everything else that day in under a minute, points to a
-Cloudflare-side platform issue, not anything wrong in the repo. **First
-thing next session**: check `mycivix.com/digest.js` for a `plain-summary`
-reference (confirms the new deploy is live) and `POST
-/api/plain-summary` for a 200 instead of 405 — if still stuck, check
-Cloudflare's own status page and the dashboard at
-`dash.cloudflare.com/094e80416bbb9abcaa87f0c90090247e/pages/view/mycivix`
-before doing anything else (no need to re-push again unless a genuinely
-new build is also stuck). The code itself needs no further changes —
-this is purely a "wait for Cloudflare" situation.
+**Pick up here** — the plain-summary deploy-pipeline stall noted below on
+2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
+this session; `plain-summary.js` has been live and unremarkable since,
+confirmed indirectly by the run of ordinary same-day deploys logged
+between then and now. That note is kept below only as a record of the
+incident, not as an open item.
+
+New this session: **Calendar** (`calendar.html`), a multi-year civic
+strategy page — see its own entry further down for the full build. Landed
+in one pass: `functions/api/strategic-plan.js` + its two `_lib` helpers
+were already sitting in the working tree, fully written but uncommitted,
+from a prior session that stopped before building any frontend for them;
+this session wrote `calendar.html` against that existing backend contract,
+wired it into the site nav, fixed a naming collision it exposed (see
+below), and pushed the whole thing as one commit. Nothing left mid-flight.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -657,6 +652,89 @@ see "Deliberately not yet done" below for why.
   flow — see "State Take Action is real" below) `openStateActionModal()`
   bumps `'state'`. Municipal still has no take-action flow, so nothing
   bumps that level yet.
+- `calendar.html` — **new 9 Sep 2026**, "Calendar": a multi-year civic
+  strategy page, distinct from take-action.html's "what's actionable
+  right now" — this is a map, not a to-do list. Backed by
+  `functions/api/strategic-plan.js` (the actual name reuse is
+  deliberate: `calendar.html` was retired 2 Sep 2026 in favor of
+  "Take Action," and this is a genuinely different feature that earns
+  the name back — see the naming-collision note below).
+  - **Backend, written in a prior session, found sitting complete and
+    uncommitted in the working tree at the start of this one**:
+    `functions/api/strategic-plan.js` makes ONE Claude call per distinct
+    manifesto (content-hashed, 24h KV cache, same daily-`$`-budget and
+    per-IP-rate-limit pattern as `dig-check.js`/`plain-summary.js`) to
+    produce a structured plan: 6-10 `tactical` (near-term) items and
+    4-8 `strategic` (longer-term) items, each citing real manifesto
+    issue names, plus a `contingencyFocus` ranking of a fixed 6-scenario
+    catalog (economic crash, armed conflict, cyberattack, climate
+    disaster, public-health emergency, electoral/constitutional crisis)
+    by relevance to this citizen. Gathers real data first (internal
+    same-origin fetches to `/api/calendar`, `/api/state-bills`,
+    `/api/municipal`, trimmed/ranked against the manifesto by
+    `functions/_lib/bill-matching.js` — a manually-synced server copy of
+    digest.js's own matching heuristic, same convention
+    `issue-taxonomy.js` already documents) and grounds every strategic
+    goal against real, deterministic federal election-calendar facts
+    (`functions/_lib/election-dates.js` — general election dates,
+    Congress numbering/convene dates, inauguration dates, all computed
+    from fixed constitutional/statutory rules, never estimated or
+    fetched) rather than letting the model guess at dates. A explicit
+    prompt guardrail keeps any accountability/removal-themed strategic
+    goal framed around the office/seat/cycle and real civic process,
+    never naming or attacking a real person. The model is NOT trusted
+    to invent the `contingencyFocus` scenarios' own content — only to
+    rank which of a fixed, hand-authored catalog matters most to this
+    citizen (see below).
+  - **Frontend, built this session** against that existing contract:
+    fetches the plan once (POST with `issues`/`traits`/
+    `jurisdictionLean`/`zip`, mirroring the profile shape every other
+    page already sends), then renders it as near-term/long-term card
+    lists plus the real election-facts strip, with a "Refresh strategy"
+    button (`force:true`) for a manual regenerate. The 6 contingency
+    scenarios' full 3-5-item action lists are hand-written directly in
+    `calendar.html` (a manually-synced copy of the backend's own
+    id/name/one-line-framing catalog, same convention as
+    `issue-taxonomy.js`) — civic-process playbooks like "contact your
+    reps before the bill text locks in," never AI-generated, per the
+    backend's own prompt comment that this content lives only in the
+    frontend. Each item's `actionHref` (not part of the model's JSON
+    schema) is built client-side by matching `issueMatches[0]` back to
+    the citizen's own `P.issues` entry and linking
+    `take-action.html?focus=<issue-id>` — the same deep-link convention
+    builder.html's digest links already use. "Effort" and "jurisdiction"
+    are pure client-side chip filters over the one cached plan (no
+    re-fetch); the prior session's backend comment additionally
+    described a "time" and "detail" slider that this pass scoped down to
+    the tactical/long-term section split (already a real time-horizon
+    distinction) and a per-card `<details>` disclosure for
+    rationale/grounding, rather than building two more standalone
+    controls — a deliberate scope call, not an oversight.
+  - **Naming collision found and fixed**: the root `_redirects` file
+    (added 2 Sep 2026 for the calendar.html → take-action.html rename)
+    was silently 301-redirecting this brand-new page away to
+    take-action.html the moment it existed. Confirmed with the user
+    directly rather than guessing: chose to drop the old redirect and
+    let `calendar.html` mean this new feature going forward, over
+    renaming the new page to dodge the collision — `_redirects` deleted
+    (it held nothing else). Anyone with the old bookmark now lands on
+    the real Calendar feature instead of a 404, which reads as a
+    reasonable outcome even though it isn't the take-action.html content
+    that link used to mean.
+  - Wired into site nav both directions: index.html's § 03 "get engaged"
+    row gained a `Calendar` link alongside Take Action/Connect/CiViL DIS,
+    and take-action.html gained a `dek-link` ("Want the bigger picture?")
+    pointing into `calendar.html`, mirroring the one `calendar.html` has
+    pointing back.
+  - Verified via a local `wrangler pages dev` run: every touched page
+    (index/take-action/calendar) serves 200 with the redirect gone, the
+    new nav links resolve, the strategic-plan endpoint routes correctly
+    and fails cleanly on a missing local `ANTHROPIC_API_KEY` (expected
+    outside the real deployment). Not verified against a real Anthropic
+    call or in an actual browser this session — no Chrome extension
+    connection was available, and a live end-to-end plan generation
+    costs real spend, so that's the one thing worth a real citizen (or
+    a next session with browser access) checking once this is live.
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
   facts + quote-matching quizzes), included on every page. As of 31 Aug
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
