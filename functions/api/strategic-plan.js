@@ -353,9 +353,19 @@ export async function onRequestPost({ request, env }) {
         },
         // No web_search tool — this is reasoning over data already fetched
         // above, not a live-lookup task (same posture as plain-summary.js).
+        //
+        // max_tokens raised 3200 -> 6000 after a real citizen's own
+        // (richer, multi-issue) manifesto hit stop_reason:"max_tokens" and
+        // got truncated mid-JSON even with the 4-6/3-4 item cap in the
+        // prompt — a bigger issue list alone can push a compliant response
+        // past 3200 (more issueMatches text, longer groundedRef titles/
+        // urls for real bills). This budget only matters when the model
+        // actually needs it — generation still stops at its own natural
+        // end, so a request that would've finished at 1800 tokens doesn't
+        // get slower for having more headroom available.
         body: JSON.stringify({
           model: 'claude-sonnet-5',
-          max_tokens: 3200,
+          max_tokens: 6000,
           messages: [{ role: 'user', content: prompt }]
         }),
         signal: controller.signal
