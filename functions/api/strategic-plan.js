@@ -345,7 +345,7 @@ export async function onRequestPost({ request, env }) {
         // above, not a live-lookup task (same posture as plain-summary.js).
         body: JSON.stringify({
           model: 'claude-sonnet-5',
-          max_tokens: 2200,
+          max_tokens: 3200,
           messages: [{ role: 'user', content: prompt }]
         }),
         signal: controller.signal
@@ -385,11 +385,20 @@ export async function onRequestPost({ request, env }) {
   const text = (parsed.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
   const stripped = text.replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
 
+  // stop_reason 'max_tokens' means the response was cut off mid-generation
+  // (almost always mid-JSON, so it'll fail to parse below) — surfaced as
+  // its own message rather than the generic "unusable plan" one, since the
+  // fix for that case (raise max_tokens, or ask for fewer items) is a
+  // different fix than for a genuine malformed-JSON response.
+  const truncated = parsed.stop_reason === 'max_tokens';
+
   let plan;
   try {
     plan = JSON.parse(stripped);
   } catch (e) {
-    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 500);
+    return json({ error: { message: truncated
+      ? 'Your plan was too large to finish generating — try again, or narrow your manifesto\'s priorities.'
+      : 'Anthropic returned an unusable plan' } }, 500);
   }
 
   if (!plan || !Array.isArray(plan.tactical) || !Array.isArray(plan.strategic)) {
