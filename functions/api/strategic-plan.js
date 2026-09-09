@@ -330,15 +330,18 @@ export async function onRequestPost({ request, env }) {
   // The Anthropic call itself is also explicitly time-boxed, purely as a
   // backstop against a genuinely hung connection — Cloudflare itself
   // imposes no fixed wall-clock limit on an outbound subrequest here.
-  // Verified live: a real, correct plan for this exact prompt/max_tokens
-  // has taken as long as ~22s to generate (no streaming — the full
-  // response only arrives once generation finishes), so 25s cut it too
-  // close and was aborting otherwise-successful generations. 45s gives
-  // real headroom above the observed range; this only ever costs a
-  // citizen wait time on a cache miss (first citizen ever to see a given
-  // manifesto shape) — every repeat view within 24h hits the KV cache
-  // instead and returns immediately.
-  const ANTHROPIC_TIMEOUT_MS = 45_000;
+  // Verified live twice: a small (1-2 issue) manifesto generated
+  // correctly in ~22s at max_tokens:3200; a real, richer (8-issue)
+  // manifesto ran past 45s at max_tokens:6000 (needed to avoid the
+  // truncation this max_tokens bump itself was fixing — see the request
+  // body's own comment below) and got cut off by this very timeout.
+  // 65s gives real margin above both observed cases. This only ever
+  // costs a citizen wait time on a cache miss (first citizen ever to see
+  // a given manifesto shape) — every repeat view within 24h hits the KV
+  // cache and returns immediately — and calendar.html's own loading
+  // state (plus civics.js's wait-filler) is built to cover a real wait,
+  // not just a spinner that reads as broken past a few seconds.
+  const ANTHROPIC_TIMEOUT_MS = 65_000;
   let anthropicRes;
   try {
     const controller = new AbortController();

@@ -759,7 +759,7 @@
 
   async function fetchPlan(force) {
     if (!PROFILE) return;
-    showStatus(force ? 'Building a fresh strategy…' : 'Loading your strategy…', false);
+    showStatus('Loading your strategy — first-time generation can take up to a minute…', false);
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
     let res;
     try {
