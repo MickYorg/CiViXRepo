@@ -117,8 +117,18 @@
   :root[data-theme="dark"] .icon-moon,
   :root[data-theme="light"] .icon-sun { display: none; }
 
+  /* 9 Sep 2026: 900px was narrow enough that a tablet in landscape (an
+     iPad, say — 1024-1194px wide) sat on real dead space on both sides
+     of this column while the focus-zone grid just below still computed
+     3 columns inside that narrow width, squeezing each one down toward
+     its 260px floor — cramped, wrapping into a "staircase" of tiny
+     fragments a citizen flagged as unreadable. Text elements that need a
+     real reading-width cap (.dek, etc.) already set their own max-width
+     in ch units, independent of this, so widening it doesn't make prose
+     uncomfortably wide — it just gives the grid below (and every
+     full-width card in the detailed lists) more real room to work with. */
   .wrap {
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
     padding: clamp(28px, 5vw, 56px) clamp(18px, 5vw, 48px) clamp(60px, 8vw, 100px);
   }
@@ -201,7 +211,17 @@
      as the viewport allows uses that width instead: 3 columns on a
      typical laptop/desktop, collapsing to 1 on a phone automatically,
      no separate breakpoint needed. */
-  .focus-zone { margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+  /* 9 Sep 2026: 260px was the floor these columns actually hit inside
+     the old, narrower .wrap (see its own comment) — three columns each
+     genuinely stuck at ~260px, cropping every card's synopsis/tags/CTA
+     into a cramped, hard-to-read strip on anything short of a full
+     desktop window. 280px alone wouldn't have fixed it (it would have
+     just dropped to 2 columns inside the old 900px .wrap) — this and
+     the wider .wrap work together: 3 columns now only form when there's
+     genuinely enough room for each to sit around 300-360px, comfortable
+     on a laptop and a tablet in landscape alike, collapsing cleanly to
+     fewer/1 column exactly as before on anything narrower. */
+  .focus-zone { margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
   .focus-label {
     grid-column: 1 / -1;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
