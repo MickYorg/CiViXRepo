@@ -398,11 +398,11 @@ export async function onRequestPost({ request, env }) {
   } catch (e) {
     return json({ error: { message: truncated
       ? 'Your plan was too large to finish generating — try again, or narrow your manifesto\'s priorities.'
-      : 'Anthropic returned an unusable plan' } }, 500);
+      : 'Anthropic returned an unusable plan', debugPreview: stripped.slice(0, 400) } }, 500);
   }
 
   if (!plan || !Array.isArray(plan.tactical) || !Array.isArray(plan.strategic)) {
-    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 500);
+    return json({ error: { message: 'Anthropic returned an unusable plan', debugShape: plan ? Object.keys(plan) : null } }, 500);
   }
 
   const usedIds = new Set();
