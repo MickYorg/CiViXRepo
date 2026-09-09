@@ -334,6 +334,7 @@
   }
   .citizen-send-note p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--paper-dim); }
   .citizen-send-note a { color: var(--amber-ink); }
+  .citizen-freeform-note { font-size: 12.5px; color: var(--paper-dim); line-height: 1.5; margin: -10px 0 16px; max-width: 34ch; }
   /* Headline-swipe cards lead with the generated image and the plain
      talking point — the opposite hierarchy of a trait/issue card, which
      is why this gets its own block instead of reusing .citizen-emoji. */
@@ -2726,9 +2727,20 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   }
 
   // Classifies whatever a citizen typed on the 'more-priorities' or
-  // 'topics-add' card onto CiViX's fixed issue taxonomy, same reasoning as
-  // boildownHeadline() — keeps a freeform priority matchable against
-  // digest.js's SYNONYMS instead of drifting into ad hoc phrasing.
+  // 'topics-add' card. Used to force everything onto CiViX's fixed ~40-
+  // item issue taxonomy unconditionally — fine for a genuinely vague or
+  // niche thought, but a citizen who names something clear and specific
+  // (a bill, a local project, a concrete proposal) had that specificity
+  // silently discarded into a broad bucket, which read as CiViX
+  // overriding them rather than listening (flagged 9 Sep 2026: "I entered
+  // a very specific current topic related to a specific bill... and we
+  // overrode the specific on point topic in an attempt to generalize up
+  // to a higher level policy position"). Now decides which treatment fits
+  // first: a specific, actionable topic is kept in the citizen's own
+  // words (addIssue() already accepts any name, not just taxonomy
+  // strings — see its own comment), and only something genuinely too
+  // vague or narrow to stand on its own rolls up to the closest taxonomy
+  // bucket, same as before. Returns { topic, specific } or null.
   // Uncached on purpose: this is a one-off typed thought, not a recurring
   // lookup like a headline.
   async function classifyFreeformPriority(text) {
@@ -2736,20 +2748,31 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 
 "${text}"
 
-Reply with ONLY this exact string, no quotes, no markdown, no other text — whichever one of these is the closest fit to what they wrote:
-${ALL_ISSUE_NAMES.join(' | ')}`;
+First decide: does this already name something clear, specific, and actionable — a real bill, a named local project, a concrete proposal, a well-scoped issue — that deserves to be its own manifesto priority exactly as they wrote it? Or is it too vague, broad, or offhand to stand on its own, in which case it should roll up to the closest general policy area instead?
+
+Reply with ONLY a JSON object, no markdown fences, no other text:
+{
+  "specific": boolean — true only if what they wrote already names something concrete and actionable enough to stand on its own,
+  "topic": if specific is true, a short label (under 8 words) in the citizen's own words that preserves exactly what they named — do not generalize, broaden, or roll it up; if specific is false, whichever one of these exact strings is the closest fit — ${ALL_ISSUE_NAMES.join(' | ')}
+}`;
     try {
-      const raw = (await digCheckCall(prompt)).trim().replace(/^["']|["']$/g, '');
-      if (ALL_ISSUE_NAMES.indexOf(raw) !== -1) return raw;
+      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.topic !== 'string' || !parsed.topic.trim()) return null;
+      if (parsed.specific) {
+        return { topic: parsed.topic.trim().slice(0, 80), specific: true };
+      }
+      const name = parsed.topic.trim();
+      if (ALL_ISSUE_NAMES.indexOf(name) !== -1) return { topic: name, specific: false };
       // The model occasionally answers with slightly different casing or
       // trailing punctuation than the exact taxonomy string — a forgiving
       // match here is the difference between a typed priority actually
       // landing in the manifesto and it silently vanishing while the card
       // just moves on regardless (the caller had no visibility into a
       // failed classification before this, and neither did the citizen).
-      const lower = raw.toLowerCase();
+      const lower = name.toLowerCase();
       const loose = ALL_ISSUE_NAMES.find(n => n.toLowerCase() === lower);
-      return loose || null;
+      return loose ? { topic: loose, specific: false } : null;
     } catch (e) {
       return null;
     }
@@ -2761,13 +2784,22 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
   // directly rather than adding new deck card types, since none of this
   // needs to be resumable or re-enterable the way real deck cards are.
 
-  function renderFreeformConfirm(text, topic) {
+  // `specific` (from classifyFreeformPriority()) changes both the title
+  // and whether a note appears — surfacing the assumption explicitly
+  // (verbatim vs. rolled up to a broader bucket) rather than presenting
+  // both the same way, so a citizen can tell at a glance whether CiViX
+  // kept their own words or generalized them, and correct it in one tap
+  // if the generalization missed.
+  function renderFreeformConfirm(text, topic, specific) {
     document.getElementById('citizen-controls').style.display = 'none';
+    const title = specific ? `Filed under “${esc(topic)}” — just as you put it` : `Closest fit: ${esc(topic)}`;
+    const note = specific ? '' : `<p class="citizen-freeform-note">That's the nearest general category, not exactly what you typed — your own words are kept either way.</p>`;
     document.getElementById('citizen-card-slot').innerHTML = `
       <div class="citizen-card citizen-card-static">
         <div class="citizen-emoji">🎯</div>
-        <div class="citizen-title">Filed under ${esc(topic)}?</div>
+        <div class="citizen-title">${title}</div>
         <p class="citizen-blurb">“${esc(text)}”</p>
+        ${note}
         <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-confirm">Yes, that's it &#8594;</button>
         <button type="button" class="btn btn-quiet citizen-cta" id="citizen-freeform-repick">Not quite — choose the topic myself</button>
       </div>`;
@@ -2902,15 +2934,35 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
   // signal before headlines are ever fetched, so it'd be wasted not to use
   // it too — "use the archetype to focus the news pulls." A brand-new
   // citizen with neither yet just gets the general feed.
+  // 9 Sep 2026: this used to search for the raw taxonomy label itself as
+  // an exact quoted phrase (e.g. "Climate policy") — real reporting
+  // almost never contains that literal category-speak string even when
+  // it's full of on-topic coverage (it says "emissions," "carbon,"
+  // "climate change"), so a "biased" search could come back thin,
+  // off-target, or stuck serving whatever old article happens to contain
+  // the phrase. Reuses CAL_SYNONYMS' real-world keywords instead — the
+  // same map already proven for congress.gov bill matching just above —
+  // and drops the forced quoting on anything that isn't itself a natural
+  // multi-word phrase, so GNews's own relevance ranking does a normal
+  // keyword search rather than requiring an exact match.
+  function newsQueryTermFor(issue) {
+    const syns = CAL_SYNONYMS[issue.id];
+    const term = (syns && syns[0]) || issue.name;
+    return term.indexOf(' ') !== -1 ? `"${term}"` : term;
+  }
   function headlineQuery() {
-    const top = P.issues.slice().sort((a, b) => b.weight - a.weight).slice(0, 2).map(i => i.name);
+    const top = P.issues.slice().sort((a, b) => b.weight - a.weight).slice(0, 2);
+    const topNames = top.map(i => i.name);
     const traitHinted = [];
     P.traits.forEach(t => {
       (TRAIT_HINTS[t] || []).forEach(name => { if (traitHinted.indexOf(name) === -1) traitHinted.push(name); });
     });
-    const names = top.concat(traitHinted.filter(n => top.indexOf(n) === -1).slice(0, 2));
-    if (!names.length) return '';
-    return names.map(n => `"${n}"`).join(' OR ');
+    const traitIssues = traitHinted.filter(n => topNames.indexOf(n) === -1).slice(0, 2)
+      .map(name => ({ id: slug(name), name }));
+    const issues = top.concat(traitIssues);
+    if (!issues.length) return '';
+    const terms = issues.map(newsQueryTermFor).filter((t, i, arr) => arr.indexOf(t) === i);
+    return terms.join(' OR ');
   }
 
   // Shared by both the pre-warmed fast path and the live pipeline's own
@@ -2964,6 +3016,10 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
 
   async function startHeadlineMode(opts) {
     opts = opts || {};
+    // Captured before the reassignment just below wipes it — this is the
+    // one signal that tells us whether the citizen calling this had a
+    // real manifesto already (see the batch-gating comment further down).
+    const wasFirstPass = firstPass;
     firstPass = false; // done card should reflect real accumulated state, not the archetype-cards framing
     deck = [{ type: 'headline-loading' }];
     deckIndex = 0;
@@ -2977,11 +3033,18 @@ ${ALL_ISSUE_NAMES.join(' | ')}`;
     // whole fetch -> boildown -> photo pipeline below entirely, and (since
     // the paint above was quiet) never shows a wait-filler for a wait
     // that, from the citizen's side, barely happened. But it's a single
-    // shared, unpersonalized cache — only worth trying when there's no
-    // real bias to search with yet; once traits or priorities are set
-    // (true before headlines are even fetched now, via the archetype-
-    // cards-first flow), a live, biased fetch beats a fast generic one.
-    if (!biasQuery) {
+    // shared, unpersonalized cache, refreshed at most once an hour and
+    // only when *something* pings it — on a quiet day it can be far
+    // staler than that. A citizen already refining a real manifesto (not
+    // wasFirstPass) gets sent here specifically to sharpen it against
+    // today's news — a citizen flagged this batch reading old and
+    // off-target on exactly this kind of visit (9 Sep 2026) — so refining
+    // always pays for a live fetch instead, biased when there's real
+    // signal to bias with (the common case) and just plain fresh
+    // (unbiased top-headlines) on the rare edge case where it isn't. Only
+    // a genuinely first-time citizen with nothing set yet still gets the
+    // fast shared path.
+    if (wasFirstPass && !biasQuery) {
       try {
         const br = await fetch('/api/headlines-batch');
         const bdata = await br.json();
@@ -3579,7 +3642,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           <span class="topics-add-chip${c.status === 'error' ? ' is-error' : ''}">
             ${esc(c.text)}
             ${c.status === 'pending' ? '<em>&hellip;</em>' : ''}
-            ${c.status === 'done' ? `<em>&rarr; ${esc(c.topic)}</em>` : ''}
+            ${c.status === 'done' ? `<em title="${c.specific ? 'Kept as you wrote it' : 'Rolled up to the closest general category'}">&rarr; ${c.specific ? '🎯 ' : ''}${esc(c.topic)}</em>` : ''}
             ${c.status === 'error' ? `<select data-chip-topic="${i}"><option value="">Pick a topic&hellip;</option>${ALL_ISSUE_NAMES.map(n => `<option value="${esc(n)}"${c.topic === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
             <button type="button" class="topics-add-chip-remove" data-remove-chip="${i}" aria-label="Remove">&times;</button>
           </span>`).join('');
@@ -3595,11 +3658,12 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       };
       const addChips = (raw) => {
         splitFreeformTopics(raw).forEach(text => {
-          const chip = { text, topic: null, status: 'pending' };
+          const chip = { text, topic: null, specific: false, status: 'pending' };
           card.chips.push(chip);
-          classifyFreeformPriority(text).then(topic => {
-            chip.topic = topic;
-            chip.status = topic ? 'done' : 'error';
+          classifyFreeformPriority(text).then(result => {
+            chip.topic = result ? result.topic : null;
+            chip.specific = !!(result && result.specific);
+            chip.status = result ? 'done' : 'error';
             renderChips();
           });
         });
@@ -3635,7 +3699,11 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         btn.textContent = 'Adding…';
         btn.disabled = true;
         await Promise.all(card.chips.filter(c => c.status === 'pending').map(c =>
-          classifyFreeformPriority(c.text).then(topic => { c.topic = topic; c.status = topic ? 'done' : 'error'; })
+          classifyFreeformPriority(c.text).then(result => {
+            c.topic = result ? result.topic : null;
+            c.specific = !!(result && result.specific);
+            c.status = result ? 'done' : 'error';
+          })
         ));
         let added = 0;
         card.chips.forEach(c => {
@@ -3709,7 +3777,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         btn.textContent = 'Adding…';
         btn.disabled = true;
         field.disabled = true;
-        const topic = await classifyFreeformPriority(text);
+        const result = await classifyFreeformPriority(text);
         if (window.CivicsEngine) window.CivicsEngine.maybeShow();
         // A confident guess still gets a beat to confirm or correct
         // before it's added — previously this landed silently under
@@ -3717,7 +3785,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         // visibility and no way to say "actually, no." A failed
         // classification used to just as silently drop the whole typed
         // thought; now it goes straight to picking the topic by hand.
-        if (topic) renderFreeformConfirm(text, topic);
+        if (result) renderFreeformConfirm(text, result.topic, result.specific);
         else renderFreeformPicker(text);
       });
       document.getElementById('citizen-freeform-skip').addEventListener('click', () => advanceCitizen());
