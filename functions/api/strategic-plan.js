@@ -189,12 +189,12 @@ ${scenarioBlock}
 WHAT TO PRODUCE
 Return ONLY a JSON object (no markdown fences, no commentary) with this exact shape:
 {
-  "tactical": [ { "title": string, "jurisdiction": "municipal"|"state"|"federal", "issueMatches": [exact issue name(s) from above], "effort": "light"|"moderate"|"heavy", "timeframeDays": integer (approx. days from today), "timeframe": short human label like "Next 30 days" or "This legislative session", "grounded": boolean, "groundedRef": null or {"kind":"bill"|"event","title":string,"date":"YYYY-MM-DD or null","url":string}, "rationale": "1-2 sentences" } ],
-  "strategic": [ { "title": string, "jurisdiction": "municipal"|"state"|"federal"|"cross-jurisdiction", "issueMatches": [...], "effort": "light"|"moderate"|"heavy", "horizonMonths": integer (approx. months from today), "horizon": qualitative window e.g. "By the 2026 midterms" or "Over the next two redistricting cycles", "electoral": boolean (true only if grounded in the real election-calendar facts above), "rationale": "2-3 sentences" } ],
+  "tactical": [ { "title": string, "jurisdiction": "municipal"|"state"|"federal", "issueMatches": [exact issue name(s) from above], "effort": "light"|"moderate"|"heavy", "timeframeDays": integer (approx. days from today), "timeframe": short human label like "Next 30 days" or "This legislative session", "grounded": boolean, "groundedRef": null or {"kind":"bill"|"event","title":string,"date":"YYYY-MM-DD or null","url":string}, "rationale": "exactly 1 short sentence" } ],
+  "strategic": [ { "title": string, "jurisdiction": "municipal"|"state"|"federal"|"cross-jurisdiction", "issueMatches": [...], "effort": "light"|"moderate"|"heavy", "horizonMonths": integer (approx. months from today), "horizon": qualitative window e.g. "By the 2026 midterms" or "Over the next two redistricting cycles", "electoral": boolean (true only if grounded in the real election-calendar facts above), "rationale": "1 short sentence" } ],
   "contingencyFocus": [ 2 to 4 scenario ids from the catalog above, most relevant to this citizen first ]
 }
 
-Produce 6-10 tactical items and 4-8 strategic items, spread across the jurisdictions this citizen has real signal for — weight jurisdictions loosely by jurisdiction lean above, but don't ignore one just because its number is lower. Every item MUST cite at least one issueMatches name that exactly matches one of the citizen's own listed issue names above.
+Produce 5-7 tactical items and 3-5 strategic items, spread across the jurisdictions this citizen has real signal for — weight jurisdictions loosely by jurisdiction lean above, but don't ignore one just because its number is lower. Every item MUST cite at least one issueMatches name that exactly matches one of the citizen's own listed issue names above. Keep every "title" under 12 words and every "rationale" genuinely short — this plan needs to generate quickly, so terse and concrete beats thorough.
 
 STRATEGIC-GOAL GUARDRAIL (follow exactly)
 Some citizens will hold the position that current officeholders have failed and should be removed, AND barred from becoming lobbyists/regulators/consultants afterward — a real, existing policy area (revolving-door and cooling-off-period law). Reason about this in general CIVIC-STRATEGY terms only:
@@ -315,33 +315,57 @@ export async function onRequestPost({ request, env }) {
     muniPool, muniEvents, city: muniData.covered ? muniData.city : ''
   });
 
+  // 502/504/521-526 are Cloudflare-reserved "gateway error" status codes —
+  // for those specific codes Cloudflare's edge always discards whatever
+  // body an origin/Worker actually returns and substitutes its own bare
+  // "error code: NNN" plain-text page. Every error path below intentionally
+  // avoids those codes (500 instead) so a citizen's browser actually sees
+  // this endpoint's own JSON error message instead of a stripped one.
+  //
+  // The Anthropic call itself is also explicitly time-boxed: an earlier
+  // version had no timeout, and a slow, non-streamed, max_tokens:2200
+  // generation (rare, but real under load) could run past whatever
+  // outbound-connection ceiling sits between here and api.anthropic.com,
+  // which surfaces client-side as an opaque failure with no useful
+  // message. Aborting explicitly at 25s produces a clear, honest one.
+  const ANTHROPIC_TIMEOUT_MS = 25_000;
   let anthropicRes;
   try {
-    anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      // No web_search tool — this is reasoning over data already fetched
-      // above, not a live-lookup task (same posture as plain-summary.js).
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS);
+    try {
+      anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        // No web_search tool — this is reasoning over data already fetched
+        // above, not a live-lookup task (same posture as plain-summary.js).
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 2200,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (e) {
-    return json({ error: { message: 'Could not reach Anthropic API' } }, 502);
+    const message = e && e.name === 'AbortError'
+      ? 'Building your plan is taking longer than usual — try again in a moment.'
+      : 'Could not reach Anthropic API';
+    return json({ error: { message } }, 500);
   }
 
-  const raw = await anthropicRes.text();
-  let parsed;
+  let raw, parsed;
   try {
+    raw = await anthropicRes.text();
     parsed = JSON.parse(raw);
   } catch (e) {
-    return json({ error: { message: 'Anthropic returned an unparseable response' } }, 502);
+    return json({ error: { message: 'Anthropic returned an unparseable response' } }, 500);
   }
 
   if (kv) {
@@ -355,7 +379,7 @@ export async function onRequestPost({ request, env }) {
 
   if (!anthropicRes.ok) {
     const message = (parsed.error && parsed.error.message) || `Anthropic returned HTTP ${anthropicRes.status}`;
-    return json({ error: { message } }, anthropicRes.status);
+    return json({ error: { message } }, 500);
   }
 
   const text = (parsed.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
@@ -365,11 +389,11 @@ export async function onRequestPost({ request, env }) {
   try {
     plan = JSON.parse(stripped);
   } catch (e) {
-    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 502);
+    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 500);
   }
 
   if (!plan || !Array.isArray(plan.tactical) || !Array.isArray(plan.strategic)) {
-    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 502);
+    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 500);
   }
 
   const usedIds = new Set();

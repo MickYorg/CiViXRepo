@@ -761,7 +761,7 @@
     if (!PROFILE) return;
     showStatus(force ? 'Building a fresh strategy…' : 'Loading your strategy…', false);
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
-    let res, data;
+    let res;
     try {
       res = await fetch('/api/strategic-plan', {
         method: 'POST',
@@ -774,13 +774,29 @@
           force: !!force
         })
       });
-      data = await res.json();
     } catch (e) {
+      // The fetch() call itself failed — a real connectivity problem, not
+      // a server-side error response (those are handled below).
       showStatus('Could not reach the server — check your connection and try again.', true);
       return;
     }
+    // A response that isn't JSON (e.g. an edge/platform-level error page
+    // rather than this endpoint's own controlled error body) shouldn't be
+    // reported as "could not reach the server" — the server was reached,
+    // it just didn't answer the way we expected. Fall back to the raw
+    // HTTP status in that case instead of a misleading connectivity message.
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {}
     if (!res.ok) {
-      showStatus((data.error && data.error.message) || 'Something went wrong building your plan.', true);
+      const message = (data && data.error && data.error.message)
+        || `Something went wrong building your plan (HTTP ${res.status}). Try again in a moment.`;
+      showStatus(message, true);
+      return;
+    }
+    if (!data) {
+      showStatus('The server sent back something unexpected. Try again in a moment.', true);
       return;
     }
     renderPlan(data);
