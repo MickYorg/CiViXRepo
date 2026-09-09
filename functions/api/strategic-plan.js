@@ -322,13 +322,18 @@ export async function onRequestPost({ request, env }) {
   // avoids those codes (500 instead) so a citizen's browser actually sees
   // this endpoint's own JSON error message instead of a stripped one.
   //
-  // The Anthropic call itself is also explicitly time-boxed: an earlier
-  // version had no timeout, and a slow, non-streamed, max_tokens:2200
-  // generation (rare, but real under load) could run past whatever
-  // outbound-connection ceiling sits between here and api.anthropic.com,
-  // which surfaces client-side as an opaque failure with no useful
-  // message. Aborting explicitly at 25s produces a clear, honest one.
-  const ANTHROPIC_TIMEOUT_MS = 25_000;
+  // The Anthropic call itself is also explicitly time-boxed, purely as a
+  // backstop against a genuinely hung connection — Cloudflare itself
+  // imposes no fixed wall-clock limit on an outbound subrequest here.
+  // Verified live: a real, correct plan for this exact prompt/max_tokens
+  // has taken as long as ~22s to generate (no streaming — the full
+  // response only arrives once generation finishes), so 25s cut it too
+  // close and was aborting otherwise-successful generations. 45s gives
+  // real headroom above the observed range; this only ever costs a
+  // citizen wait time on a cache miss (first citizen ever to see a given
+  // manifesto shape) — every repeat view within 24h hits the KV cache
+  // instead and returns immediately.
+  const ANTHROPIC_TIMEOUT_MS = 45_000;
   let anthropicRes;
   try {
     const controller = new AbortController();
@@ -398,11 +403,11 @@ export async function onRequestPost({ request, env }) {
   } catch (e) {
     return json({ error: { message: truncated
       ? 'Your plan was too large to finish generating — try again, or narrow your manifesto\'s priorities.'
-      : 'Anthropic returned an unusable plan', debugPreview: stripped.slice(0, 400) } }, 500);
+      : 'Anthropic returned an unusable plan' } }, 500);
   }
 
   if (!plan || !Array.isArray(plan.tactical) || !Array.isArray(plan.strategic)) {
-    return json({ error: { message: 'Anthropic returned an unusable plan', debugShape: plan ? Object.keys(plan) : null } }, 500);
+    return json({ error: { message: 'Anthropic returned an unusable plan' } }, 500);
   }
 
   const usedIds = new Set();
