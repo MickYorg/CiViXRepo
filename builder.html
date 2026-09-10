@@ -2755,10 +2755,27 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   "specific": boolean — true only if what they wrote already names something concrete and actionable enough to stand on its own,
   "topic": if specific is true, a short label (under 8 words) in the citizen's own words that preserves exactly what they named — do not generalize, broaden, or roll it up; if specific is false, whichever one of these exact strings is the closest fit — ${ALL_ISSUE_NAMES.join(' | ')}
 }`;
+    // 10 Sep 2026: this used to swallow every failure into a bare `null`
+    // — a real rate-limit/budget message from digCheckCall (see its own
+    // throw) was indistinguishable from the model just returning junk,
+    // so a citizen who typed something genuinely clear-cut (an actual
+    // bill, reported live) and got bounced straight to "where does this
+    // belong?" had no way to tell whether CiViX misjudged it or the call
+    // never even succeeded. Failures now return { error } with the real
+    // reason instead of null, so callers can show it instead of a
+    // silent, unexplained punt to the manual picker.
+    let raw;
     try {
-      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed.topic !== 'string' || !parsed.topic.trim()) return null;
+      raw = await digCheckCall(prompt);
+    } catch (e) {
+      return { error: (e && e.message) || 'Could not reach the classifier.' };
+    }
+    try {
+      const cleaned = raw.trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (!parsed || typeof parsed.topic !== 'string' || !parsed.topic.trim()) {
+        return { error: 'Got an unusable response — try rephrasing, or pick the topic yourself.' };
+      }
       if (parsed.specific) {
         return { topic: parsed.topic.trim().slice(0, 80), specific: true };
       }
@@ -2772,9 +2789,9 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       // failed classification before this, and neither did the citizen).
       const lower = name.toLowerCase();
       const loose = ALL_ISSUE_NAMES.find(n => n.toLowerCase() === lower);
-      return loose ? { topic: loose, specific: false } : null;
+      return loose ? { topic: loose, specific: false } : { error: 'Got an unusable response — try rephrasing, or pick the topic yourself.' };
     } catch (e) {
-      return null;
+      return { error: 'Got an unusable response — try rephrasing, or pick the topic yourself.' };
     }
   }
 
@@ -2790,6 +2807,51 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   // both the same way, so a citizen can tell at a glance whether CiViX
   // kept their own words or generalized them, and correct it in one tap
   // if the generalization missed.
+  // Multi-item support for 'more-priorities' (10 Sep 2026): this card
+  // used to classify the whole textarea as one blob, so a citizen who
+  // listed several distinct things in one box (reported live: a specific
+  // bill plus other items) only ever got one — everything else was
+  // silently lost, with no chip list or "N more" signal the way
+  // 'topics-add' already has. Splits on the same delimiters
+  // splitFreeformTopics() already uses and walks through each item one
+  // at a time via the existing confirm-or-pick screens, so every item
+  // gets its own beat instead of the whole entry collapsing into a
+  // single, possibly-garbled classification.
+  let freeformQueue = [];
+
+  function renderFreeformClassifying(text) {
+    document.getElementById('citizen-controls').style.display = 'none';
+    document.getElementById('citizen-card-slot').innerHTML = `
+      <div class="citizen-card citizen-card-static">
+        <div class="citizen-emoji">🔎</div>
+        <div class="citizen-title">Looking at this one…</div>
+        <p class="citizen-blurb">“${esc(text)}”</p>
+      </div>`;
+  }
+
+  async function processFreeformItem(text) {
+    renderFreeformClassifying(text);
+    const result = await classifyFreeformPriority(text);
+    if (window.CivicsEngine) window.CivicsEngine.maybeShow();
+    // A confident guess still gets a beat to confirm or correct before
+    // it's added — previously this landed silently under whichever of
+    // the ~40 taxonomy topics the AI picked, with no visibility and no
+    // way to say "actually, no." A failed classification used to just as
+    // silently drop the whole typed thought with no reason given; now it
+    // goes straight to picking the topic by hand, with the real reason
+    // shown instead of a bare, unexplained picker.
+    if (result.topic) renderFreeformConfirm(text, result.topic, result.specific);
+    else renderFreeformPicker(text, result.error);
+  }
+
+  // The one exit point every path through a freeform item funnels
+  // through (confirmed, hand-picked, or skipped) — keeps processing the
+  // queue until it's empty, then does what a single item always did.
+  function advanceFreeformQueue() {
+    if (freeformQueue.length) processFreeformItem(freeformQueue.shift());
+    else advanceCitizen();
+  }
+
   function renderFreeformConfirm(text, topic, specific) {
     document.getElementById('citizen-controls').style.display = 'none';
     const title = specific ? `Filed under “${esc(topic)}” — just as you put it` : `Closest fit: ${esc(topic)}`;
@@ -2807,13 +2869,21 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     document.getElementById('citizen-freeform-repick').addEventListener('click', () => renderFreeformPicker(text));
   }
 
-  function renderFreeformPicker(text) {
+  // `reason` (from classifyFreeformPriority()'s own { error } — a real
+  // rate-limit/budget message or a parse failure, not a guess) shows why
+  // this landed here automatically, instead of a bare "where does this
+  // belong?" that reads like CiViX just couldn't figure out something
+  // obvious. Absent when reached via "Not quite — choose the topic
+  // myself" — that's a citizen's own correction, not a failure.
+  function renderFreeformPicker(text, reason) {
     document.getElementById('citizen-controls').style.display = 'none';
+    const note = reason ? `<p class="citizen-freeform-note">Couldn't classify this automatically: ${esc(reason)}</p>` : '';
     document.getElementById('citizen-card-slot').innerHTML = `
       <div class="citizen-card citizen-card-static">
         <div class="citizen-emoji">🎯</div>
         <div class="citizen-title">Where does this belong?</div>
         <p class="citizen-blurb">“${esc(text)}”</p>
+        ${note}
         <div class="freeform-picker">
           ${CATALOG.map(([cat, items]) => `
             <div class="cat">
@@ -2826,7 +2896,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     document.getElementById('citizen-card-slot').querySelectorAll('[data-pick]').forEach(btn => {
       btn.addEventListener('click', () => commitFreeformTopic(text, btn.dataset.pick));
     });
-    document.getElementById('citizen-freeform-cancel').addEventListener('click', () => advanceCitizen());
+    document.getElementById('citizen-freeform-cancel').addEventListener('click', () => advanceFreeformQueue());
   }
 
   function commitFreeformTopic(text, topic) {
@@ -2844,14 +2914,17 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   // (take-action.html's own top-3/detailed lists, not this card).
   function renderFreeformDone(topic) {
     document.getElementById('citizen-controls').style.display = 'none';
+    const more = freeformQueue.length
+      ? `<p class="citizen-freeform-note">${freeformQueue.length} more to go through.</p>` : '';
     document.getElementById('citizen-card-slot').innerHTML = `
       <div class="citizen-card citizen-card-static">
         <div class="citizen-emoji">✅</div>
         <div class="citizen-title">Added as a priority</div>
         <p class="citizen-blurb">Filed under <strong>${esc(topic)}</strong>. We'll surface matching actions for it on Take Action.</p>
+        ${more}
         <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-continue">Continue &#8594;</button>
       </div>`;
-    document.getElementById('citizen-freeform-continue').addEventListener('click', () => advanceCitizen());
+    document.getElementById('citizen-freeform-continue').addEventListener('click', () => advanceFreeformQueue());
   }
 
   // Best-effort: a photo is nice-to-have, never a blocker. A failure
@@ -3643,7 +3716,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
             ${esc(c.text)}
             ${c.status === 'pending' ? '<em>&hellip;</em>' : ''}
             ${c.status === 'done' ? `<em title="${c.specific ? 'Kept as you wrote it' : 'Rolled up to the closest general category'}">&rarr; ${c.specific ? '🎯 ' : ''}${esc(c.topic)}</em>` : ''}
-            ${c.status === 'error' ? `<select data-chip-topic="${i}"><option value="">Pick a topic&hellip;</option>${ALL_ISSUE_NAMES.map(n => `<option value="${esc(n)}"${c.topic === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
+            ${c.status === 'error' ? `<select data-chip-topic="${i}" title="${esc(c.error || 'Could not classify this automatically')}"><option value="">Pick a topic&hellip;</option>${ALL_ISSUE_NAMES.map(n => `<option value="${esc(n)}"${c.topic === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>` : ''}
             <button type="button" class="topics-add-chip-remove" data-remove-chip="${i}" aria-label="Remove">&times;</button>
           </span>`).join('');
         list.querySelectorAll('[data-remove-chip]').forEach(btn => {
@@ -3658,12 +3731,13 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       };
       const addChips = (raw) => {
         splitFreeformTopics(raw).forEach(text => {
-          const chip = { text, topic: null, specific: false, status: 'pending' };
+          const chip = { text, topic: null, specific: false, error: '', status: 'pending' };
           card.chips.push(chip);
           classifyFreeformPriority(text).then(result => {
-            chip.topic = result ? result.topic : null;
-            chip.specific = !!(result && result.specific);
-            chip.status = result ? 'done' : 'error';
+            chip.topic = result.topic || null;
+            chip.specific = !!result.specific;
+            chip.error = result.error || '';
+            chip.status = result.topic ? 'done' : 'error';
             renderChips();
           });
         });
@@ -3700,9 +3774,10 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         btn.disabled = true;
         await Promise.all(card.chips.filter(c => c.status === 'pending').map(c =>
           classifyFreeformPriority(c.text).then(result => {
-            c.topic = result ? result.topic : null;
-            c.specific = !!(result && result.specific);
-            c.status = result ? 'done' : 'error';
+            c.topic = result.topic || null;
+            c.specific = !!result.specific;
+            c.error = result.error || '';
+            c.status = result.topic ? 'done' : 'error';
           })
         ));
         let added = 0;
@@ -3760,7 +3835,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         <div class="citizen-card citizen-card-static">
           <div class="citizen-emoji">💬</div>
           <div class="citizen-title">Anything else on your mind?</div>
-          <p class="citizen-blurb">Something hot right now, a cause you care about — tell CiViX before we show you what to do next.</p>
+          <p class="citizen-blurb">Something hot right now, a cause you care about — tell CiViX before we show you what to do next. List as many as you want: a comma, semicolon, slash, or new line starts a new one.</p>
           <textarea class="field citizen-freeform" id="citizen-freeform" rows="3" placeholder="Type what's on your mind…"></textarea>
           <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-add">Add this &#8594;</button>
           <div class="citizen-send-note citizen-freeform-send">
@@ -3773,20 +3848,17 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
         const field = document.getElementById('citizen-freeform');
         const text = field.value.trim();
         if (!text) { advanceCitizen(); return; }
-        const btn = document.getElementById('citizen-freeform-add');
-        btn.textContent = 'Adding…';
-        btn.disabled = true;
-        field.disabled = true;
-        const result = await classifyFreeformPriority(text);
-        if (window.CivicsEngine) window.CivicsEngine.maybeShow();
-        // A confident guess still gets a beat to confirm or correct
-        // before it's added — previously this landed silently under
-        // whichever of the ~40 taxonomy topics the AI picked, with no
-        // visibility and no way to say "actually, no." A failed
-        // classification used to just as silently drop the whole typed
-        // thought; now it goes straight to picking the topic by hand.
-        if (result) renderFreeformConfirm(text, result.topic, result.specific);
-        else renderFreeformPicker(text);
+        // 10 Sep 2026: used to classify the whole textarea as one blob —
+        // several distinct things typed in one box silently collapsed
+        // into a single (sometimes garbled) result, with no way to tell
+        // anything besides the first was ever received. Splits the same
+        // way 'topics-add' already does and processes each one through
+        // its own confirm-or-pick beat (see processFreeformItem() /
+        // advanceFreeformQueue()).
+        const items = splitFreeformTopics(text);
+        if (!items.length) { advanceCitizen(); return; }
+        freeformQueue = items.slice(1);
+        await processFreeformItem(items[0]);
       });
       document.getElementById('citizen-freeform-skip').addEventListener('click', () => advanceCitizen());
       return;
