@@ -33,8 +33,9 @@ export async function onRequestGet({ request, env }) {
 
   const kv = env.DIG_KV;
   const cacheKey = `billsearch:${congress}:${phrase}`;
+  const skipCache = url.searchParams.get('fresh') === '1'; // TEMP debug bypass
 
-  if (kv) {
+  if (kv && !skipCache) {
     try {
       const cached = await kv.get(cacheKey, { type: 'json' });
       if (cached) return json(cached);
