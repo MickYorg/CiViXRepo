@@ -2785,9 +2785,23 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   // words (addIssue() already accepts any name, not just taxonomy
   // strings — see its own comment), and only something genuinely too
   // vague or narrow to stand on its own rolls up to the closest taxonomy
-  // bucket, same as before. Returns { topic, specific } or null.
-  // Uncached on purpose: this is a one-off typed thought, not a recurring
-  // lookup like a headline.
+  // bucket, same as before. Returns { topic, specific, citation } or
+  // { error }. Uncached on purpose: this is a one-off typed thought, not
+  // a recurring lookup like a headline.
+  //
+  // 10 Sep 2026: `citation` added after the citizen pointed out real
+  // people don't talk in bill numbers — "CHIPS Act," "the Patriot Act,"
+  // "Obamacare," "NDAA" is how this actually gets typed, not "H.R.4346."
+  // The model's own broad knowledge can resolve a well-known popular
+  // name to its real citation where digest.js's parseBillCitation()
+  // (a plain regex over what was literally typed) never could — asked
+  // to leave it null rather than guess whenever it isn't genuinely
+  // confident (an ambiguous name like a bare "NDAA" with no year, or
+  // anything that isn't federal legislation at all), since a wrong
+  // citation would fetch a real but *wrong* bill's data with nothing
+  // to signal the mistake. digest.js's buildTopDigest() double-checks
+  // a returned citation against the issue's own words before trusting
+  // it either way — see its own comment.
   async function classifyFreeformPriority(text) {
     const prompt = `A citizen typed this into a civic-engagement manifesto builder, as something on their mind right now:
 
@@ -2795,10 +2809,13 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 
 First decide: does this already name something clear, specific, and actionable — a real bill, a named local project, a concrete proposal, a well-scoped issue — that deserves to be its own manifesto priority exactly as they wrote it? Or is it too vague, broad, or offhand to stand on its own, in which case it should roll up to the closest general policy area instead?
 
+If it's specific AND refers to a real piece of U.S. federal legislation — however they actually referred to it: a formal citation ("H.R.1234", "S.421"), an official title, or how people actually talk ("the CHIPS Act", "Obamacare", "the Patriot Act", "NDAA", "the infrastructure bill") — also identify its real bill type/number/Congress if you're genuinely confident which specific bill this is. Leave citation null if you're not confident, if the name could refer to more than one bill (e.g. a bare "NDAA" with no year — there's a new one almost every Congress), or if it isn't federal legislation at all. A wrong guess here is worse than no guess.
+
 Reply with ONLY a JSON object, no markdown fences, no other text:
 {
   "specific": boolean — true only if what they wrote already names something concrete and actionable enough to stand on its own,
-  "topic": if specific is true, a short label (under 8 words) in the citizen's own words that preserves exactly what they named — do not generalize, broaden, or roll it up; if specific is false, whichever one of these exact strings is the closest fit — ${ALL_ISSUE_NAMES.join(' | ')}
+  "topic": if specific is true, a short label (under 8 words) in the citizen's own words that preserves exactly what they named — do not generalize, broaden, or roll it up; if specific is false, whichever one of these exact strings is the closest fit — ${ALL_ISSUE_NAMES.join(' | ')},
+  "citation": null, or (only when specific is true and you're genuinely confident) {"type": one of "hr"|"s"|"hjres"|"sjres"|"hconres"|"sconres"|"hres"|"sres", "number": "<bill number as a string>", "congress": <the numbered Congress it was introduced in, e.g. 117 for a bill from 2021-2022>}
 }`;
     // 10 Sep 2026: this used to swallow every failure into a bare `null`
     // — a real rate-limit/budget message from digCheckCall (see its own
@@ -2821,7 +2838,13 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
         return { error: 'Got an unusable response — try rephrasing, or pick the topic yourself.' };
       }
       if (parsed.specific) {
-        return { topic: parsed.topic.trim().slice(0, 80), specific: true };
+        const result = { topic: parsed.topic.trim().slice(0, 80), specific: true };
+        const c = parsed.citation;
+        const validTypes = ['hr', 's', 'hjres', 'sjres', 'hconres', 'sconres', 'hres', 'sres'];
+        if (c && validTypes.indexOf(c.type) !== -1 && /^\d{1,6}$/.test(String(c.number)) && Number(c.congress) > 0) {
+          result.citation = { type: c.type, number: String(c.number), congress: Number(c.congress) };
+        }
+        return result;
       }
       const name = parsed.topic.trim();
       if (ALL_ISSUE_NAMES.indexOf(name) !== -1) return { topic: name, specific: false };
@@ -2884,7 +2907,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     // silently drop the whole typed thought with no reason given; now it
     // goes straight to picking the topic by hand, with the real reason
     // shown instead of a bare, unexplained picker.
-    if (result.topic) renderFreeformConfirm(text, result.topic, result.specific);
+    if (result.topic) renderFreeformConfirm(text, result.topic, result.specific, result.citation);
     else renderFreeformPicker(text, result.error);
   }
 
@@ -2896,20 +2919,30 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     else advanceCitizen();
   }
 
-  function renderFreeformConfirm(text, topic, specific) {
+  function renderFreeformConfirm(text, topic, specific, citation) {
     document.getElementById('citizen-controls').style.display = 'none';
     const title = specific ? `Filed under “${esc(topic)}” — just as you put it` : `Closest fit: ${esc(topic)}`;
+    // A resolved citation (see classifyFreeformPriority()'s own comment —
+    // "CHIPS Act," "Obamacare," "the Patriot Act" resolved to a real
+    // bill number) gets its own visible line, same "expose the
+    // assumption" shape as the specific/general note below it — a
+    // citizen should be able to see (and implicitly sanity-check) which
+    // real bill CiViX thinks they mean, not have it happen invisibly.
+    const citationNote = citation
+      ? `<p class="citizen-freeform-note">Matched to ${esc(citation.type.toUpperCase())} ${esc(citation.number)}, ${esc(citation.congress)}th Congress.</p>`
+      : '';
     const note = specific ? '' : `<p class="citizen-freeform-note">That's the nearest general category, not exactly what you typed — your own words are kept either way.</p>`;
     document.getElementById('citizen-card-slot').innerHTML = `
       <div class="citizen-card citizen-card-static">
         <div class="citizen-emoji">🎯</div>
         <div class="citizen-title">${title}</div>
         <p class="citizen-blurb">“${esc(text)}”</p>
+        ${citationNote}
         ${note}
         <button type="button" class="btn btn-primary citizen-cta" id="citizen-freeform-confirm">Yes, that's it &#8594;</button>
         <button type="button" class="btn btn-quiet citizen-cta" id="citizen-freeform-repick">Not quite — choose the topic myself</button>
       </div>`;
-    document.getElementById('citizen-freeform-confirm').addEventListener('click', () => commitFreeformTopic(text, topic));
+    document.getElementById('citizen-freeform-confirm').addEventListener('click', () => commitFreeformTopic(text, topic, citation));
     document.getElementById('citizen-freeform-repick').addEventListener('click', () => renderFreeformPicker(text));
   }
 
@@ -2943,10 +2976,22 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     document.getElementById('citizen-freeform-cancel').addEventListener('click', () => advanceFreeformQueue());
   }
 
-  function commitFreeformTopic(text, topic) {
+  function commitFreeformTopic(text, topic, citation) {
     addIssue(topic);
     const iss = findIssue(slug(topic));
-    if (iss) { iss.weight = 3; iss.stance = mergeStance(iss.stance, text); }
+    if (iss) {
+      iss.weight = 3;
+      iss.stance = mergeStance(iss.stance, text);
+      // Stored so digest.js's buildTopDigest() can fetch this exact bill
+      // directly (functions/api/bill-lookup.js) instead of depending on
+      // it happening to be in the ~100-most-recently-updated pool, or on
+      // parseBillCitation() finding a literal citation in the text —
+      // this is real signal a citizen typing a common name ("CHIPS Act")
+      // would never otherwise produce. Deliberately not cleared on a
+      // later mergeStance() collision — a second stance addition for the
+      // same issue doesn't invalidate an already-resolved citation.
+      if (citation) iss.billCitation = citation;
+    }
     save();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
     renderFreeformDone(topic);
@@ -3775,11 +3820,12 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       };
       const addChips = (raw) => {
         splitFreeformTopics(raw).forEach(text => {
-          const chip = { text, topic: null, specific: false, error: '', status: 'pending' };
+          const chip = { text, topic: null, specific: false, citation: null, error: '', status: 'pending' };
           card.chips.push(chip);
           classifyFreeformPriority(text).then(result => {
             chip.topic = result.topic || null;
             chip.specific = !!result.specific;
+            chip.citation = result.citation || null;
             chip.error = result.error || '';
             chip.status = result.topic ? 'done' : 'error';
             renderChips();
@@ -3820,6 +3866,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           classifyFreeformPriority(c.text).then(result => {
             c.topic = result.topic || null;
             c.specific = !!result.specific;
+            c.citation = result.citation || null;
             c.error = result.error || '';
             c.status = result.topic ? 'done' : 'error';
           })
@@ -3829,7 +3876,11 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           if (!c.topic) return; // couldn't classify and nobody picked one by hand — skipped, not guessed
           addIssue(c.topic);
           const iss = findIssue(slug(c.topic));
-          if (iss) { iss.weight = 3; iss.stance = mergeStance(iss.stance, c.text); }
+          if (iss) {
+            iss.weight = 3;
+            iss.stance = mergeStance(iss.stance, c.text);
+            if (c.citation) iss.billCitation = c.citation; // see commitFreeformTopic()'s own comment
+          }
           added++;
         });
         if (added) { save(); if (window.CivicsEngine) window.CivicsEngine.maybeShow(); }

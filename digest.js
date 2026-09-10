@@ -216,10 +216,15 @@
   // Best-effort direct fetch of one specific, named bill — null on any
   // failure (not found, congress.gov hiccup, missing key) so the caller
   // can fall through to the general-priority path rather than breaking
-  // the whole digest over one lookup.
+  // the whole digest over one lookup. `congress` is only ever present on
+  // an AI-resolved citation (builder.html's classifyFreeformPriority()) —
+  // a citizen-typed literal citation (parseBillCitation() above) has no
+  // way to know which Congress, so bill-lookup.js's own default
+  // (current Congress) applies instead.
   async function lookupBillDirect(citation) {
     try {
-      const r = await fetch(`/api/bill-lookup?type=${encodeURIComponent(citation.type)}&number=${encodeURIComponent(citation.number)}`);
+      const congressParam = citation.congress ? `&congress=${encodeURIComponent(citation.congress)}` : '';
+      const r = await fetch(`/api/bill-lookup?type=${encodeURIComponent(citation.type)}&number=${encodeURIComponent(citation.number)}${congressParam}`);
       if (!r.ok) return null;
       const data = await r.json();
       return (data && data.bill) ? data.bill : null;
@@ -366,12 +371,30 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     // Runs before the jurisdiction-lean block below on purpose, so a
     // bill found this way gets weighted the same as any other federal
     // match rather than skipping that step.
+    // 10 Sep 2026: real people don't talk in bill numbers — "the CHIPS
+    // Act," "Obamacare," "the Patriot Act," "NDAA" is how this actually
+    // gets typed, not "H.R.4346." issue.billCitation (set by builder.html's
+    // classifyFreeformPriority() when the model itself confidently
+    // resolves a popular name to a real citation) is tried first; a
+    // citizen-typed literal citation the regex above can find is the
+    // fallback. Deliberately NOT gated on a keyword-overlap sanity check
+    // against the fetched bill's title — tried that, and it broke the
+    // exact case this exists to fix: verified live that "Obamacare"
+    // correctly resolves to H.R.3590 ("Patient Protection and Affordable
+    // Care Act"), which shares zero words with the popular name a
+    // citizen actually typed, by design — that's what a popular name
+    // *is*. The real safety net here is the citizen-facing confirm
+    // screen (renderFreeformConfirm() shows "Matched to HR 3590, 111th
+    // Congress" before committing) plus bill-lookup.js's own 404 on a
+    // citation that doesn't exist at all — a human catching a wrong
+    // resolution beats a keyword heuristic that would also reject
+    // correct ones.
     if (issues.length) {
       const alreadyMatched = new Set();
       results.forEach(r => (r.hits || []).forEach(h => alreadyMatched.add(h)));
       const citedCandidates = issues.filter(i => i.weight === 3 && i.stance && !alreadyMatched.has(i.name));
       for (const i of citedCandidates) {
-        const citation = parseBillCitation(i.name) || parseBillCitation(i.stance);
+        const citation = i.billCitation || parseBillCitation(i.name) || parseBillCitation(i.stance);
         if (!citation) continue;
         const bill = await lookupBillDirect(citation);
         if (bill) results.push(billEntry('federal', bill, [i.name], i.weight));
