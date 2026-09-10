@@ -4,73 +4,18 @@
 // match against a visitor's profile. Reuses the DIG_KV namespace under a
 // separate key prefix rather than provisioning a new one — this is a low
 // volume, short-TTL cache, not shared state with DIG.
+//
+// Bill-shaping helpers (slim/deriveStatus/publicUrl/etc.) moved to
+// functions/_lib/congress-bill.js 10 Sep 2026 so bill-lookup.js (a direct
+// single-bill fetch for when a citizen names a specific real bill that
+// isn't in this file's own top-100-most-recently-updated window) can
+// reuse them instead of duplicating this logic.
+
+import { slim } from '../_lib/congress-bill.js';
 
 const CACHE_KEY = 'calendar:bills:latest';
 const CACHE_TTL_SECONDS = 60 * 60; // 1 hour: fresh enough for a legislative calendar
 const BILL_LIMIT = 100;
-
-const TYPE_SLUG = {
-  hr: 'house-bill',
-  s: 'senate-bill',
-  hjres: 'house-joint-resolution',
-  sjres: 'senate-joint-resolution',
-  hconres: 'house-concurrent-resolution',
-  sconres: 'senate-concurrent-resolution',
-  hres: 'house-resolution',
-  sres: 'senate-resolution'
-};
-
-function ordinal(n) {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function publicUrl(bill) {
-  const slug = TYPE_SLUG[String(bill.type || '').toLowerCase()];
-  if (!slug || !bill.congress || !bill.number) return null;
-  return `https://www.congress.gov/bill/${ordinal(bill.congress)}-congress/${slug}/${bill.number}`;
-}
-
-// congress.gov's list endpoint (unlike its per-bill detail endpoint) has
-// no categorical "status"/"stage" field — just latestAction.text, free
-// text like "Referred to the Committee on..." or "Became Public Law
-// No. 119-4". Calling the detail endpoint per bill to get a real one
-// would mean up to BILL_LIMIT extra congress.gov requests every cache
-// refresh; instead this pattern-matches the most recent action's own
-// text against congress.gov's own bill-tracker stage names. It's a
-// heuristic read of the latest action, not a guaranteed-authoritative
-// field — order matters here (most-advanced stage checked first) since
-// latestAction only ever reflects the bill's single most recent action.
-const STATUS_PATTERNS = [
-  { status: 'Became Law', re: /became public law|public law no\./i },
-  { status: 'Vetoed', re: /vetoed by (the )?president/i },
-  { status: 'To President', re: /presented to president/i },
-  { status: 'Passed Senate', re: /passed senate|passed\/agreed to in senate/i },
-  { status: 'Passed House', re: /passed house|passed\/agreed to in house/i },
-  { status: 'Reported by Committee', re: /committee reported|reported.*committee/i },
-  { status: 'In Committee', re: /referred to (the )?(committee|subcommittee)/i }
-];
-function deriveStatus(latestActionText) {
-  const text = latestActionText || '';
-  for (const p of STATUS_PATTERNS) {
-    if (p.re.test(text)) return p.status;
-  }
-  return 'Introduced';
-}
-
-function slim(bill) {
-  return {
-    congress: bill.congress,
-    type: bill.type,
-    number: bill.number,
-    title: bill.title || '',
-    latestAction: bill.latestAction ? { date: bill.latestAction.actionDate, text: bill.latestAction.text } : null,
-    status: deriveStatus(bill.latestAction && bill.latestAction.text),
-    updateDate: bill.updateDate || null,
-    url: publicUrl(bill)
-  };
-}
 
 export async function onRequestGet({ env }) {
   const kv = env.DIG_KV;

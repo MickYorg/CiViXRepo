@@ -193,6 +193,41 @@
     return (d.items || []).filter(i => i.state === 'docket');
   }
 
+  // 10 Sep 2026: matches a federal bill citation (H.R./S./H.Res./S.Res./
+  // H.J.Res./S.J.Res./H.Con.Res./S.Con.Res. + a number) in whatever
+  // punctuation/spacing a citizen actually typed ("H.R.9694", "HR 9694",
+  // "hr9694" all match). Longer/more specific type tokens are tried
+  // before their shorter substrings (HJRES before HR, SRES before S) so
+  // e.g. "H.RES.1517" can't accidentally resolve as type "hr". Used by
+  // buildTopDigest() to try a direct congress.gov lookup (see
+  // lookupBillDirect()) before ever falling back to the unconditional
+  // "general priority" scoring further down.
+  const BILL_TYPE_TOKENS = ['HJRES', 'SJRES', 'HCONRES', 'SCONRES', 'HRES', 'SRES', 'HR', 'S'];
+  const BILL_TYPE_MAP = { HJRES: 'hjres', SJRES: 'sjres', HCONRES: 'hconres', SCONRES: 'sconres', HRES: 'hres', SRES: 'sres', HR: 'hr', S: 's' };
+  function parseBillCitation(text) {
+    if (!text) return null;
+    const cleaned = text.toUpperCase().replace(/\./g, '');
+    const re = new RegExp('\\b(' + BILL_TYPE_TOKENS.join('|') + ')\\s*(\\d{1,6})\\b');
+    const m = cleaned.match(re);
+    if (!m) return null;
+    return { type: BILL_TYPE_MAP[m[1]], number: m[2] };
+  }
+
+  // Best-effort direct fetch of one specific, named bill — null on any
+  // failure (not found, congress.gov hiccup, missing key) so the caller
+  // can fall through to the general-priority path rather than breaking
+  // the whole digest over one lookup.
+  async function lookupBillDirect(citation) {
+    try {
+      const r = await fetch(`/api/bill-lookup?type=${encodeURIComponent(citation.type)}&number=${encodeURIComponent(citation.number)}`);
+      if (!r.ok) return null;
+      const data = await r.json();
+      return (data && data.bill) ? data.bill : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---- AI helpers (both hit /api/dig-check, both cached) -----------------
   async function digCheckCall(prompt) {
     const r = await fetch('/api/dig-check', {
@@ -314,6 +349,33 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     }
     if (municipal.status === 'fulfilled' && municipal.value.covered && issues.length) {
       matchBills(municipal.value.bills, issues).forEach(m => results.push(billEntry('municipal', m.bill, m.hits, m.score)));
+    }
+
+    // 10 Sep 2026: before ever falling back to the unconditional "general
+    // priority" scoring further down, try a direct congress.gov lookup
+    // for any high-conviction priority that names a specific, citable
+    // bill. The pools fetched above are each only the ~100 most-
+    // recently-updated items for their jurisdiction — a real, specific
+    // bill a citizen actually named can easily not be in that window on
+    // a given day (confirmed live: H.R.9694 wasn't), which used to mean
+    // it could never be genuinely matched and instead always won the
+    // unconditional fallback below for the wrong reason — not because it
+    // was the most important thing, but because it happened to be
+    // unmatched. A citizen who names an actual bill has already given
+    // exactly what's needed to fetch it directly (see bill-lookup.js).
+    // Runs before the jurisdiction-lean block below on purpose, so a
+    // bill found this way gets weighted the same as any other federal
+    // match rather than skipping that step.
+    if (issues.length) {
+      const alreadyMatched = new Set();
+      results.forEach(r => (r.hits || []).forEach(h => alreadyMatched.add(h)));
+      const citedCandidates = issues.filter(i => i.weight === 3 && i.stance && !alreadyMatched.has(i.name));
+      for (const i of citedCandidates) {
+        const citation = parseBillCitation(i.name) || parseBillCitation(i.stance);
+        if (!citation) continue;
+        const bill = await lookupBillDirect(citation);
+        if (bill) results.push(billEntry('federal', bill, [i.name], i.weight));
+      }
     }
 
     // Jurisdiction lean (31 Aug 2026, P.jurisdictionLean — set once during
