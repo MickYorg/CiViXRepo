@@ -1182,7 +1182,16 @@
   </div>
 </div>
 
-<script src="civics.js"></script>
+<!-- civics.js paused here 10 Sep 2026 — the citizen flagged CiViX 101's
+     fact/quiz popups as interrupting the builder flow rather than adding
+     to it ("getting in the way"), with a "chyron" (non-interrupting
+     ticker/banner) floated as the better long-term shape to revisit
+     later, not a redesign to do right now. Every call site below
+     (maybeShow()/showDuringWait(), ~10 of them) already guards with
+     `if (window.CivicsEngine)`, so not loading the script here is a
+     clean, fully reversible pause — every call just silently no-ops —
+     rather than touching each site. Re-enable by restoring this tag;
+     civics.js itself, and its use on every other page, is untouched. -->
 <script>
 (function () {
   'use strict';
