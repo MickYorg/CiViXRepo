@@ -579,6 +579,66 @@ see "Deliberately not yet done" below for why.
   properly would mean a different fetch strategy entirely, not a tweak —
   out of scope here.
 
+  **False-positive matching from committee-name boilerplate, 10 Sep
+  2026** — the citizen caught a genuinely bad match live: a purely
+  ceremonial resolution ("Expressing support for the recognition of
+  September 7, 2026, as 'Liturgical Dance Day'...") ranked into their
+  real top-3. Root-caused by fetching the actual bill data: its only
+  connection to their manifesto was `latestAction.text` reading
+  "Referred to the House Committee on Oversight and Government Reform"
+  — the bare word "government," pulled from the 4 Sep 2026 fix's loose
+  `nameWords` extraction on the citizen's "Government transparency"
+  priority, happened to appear in a committee's bureaucratic name,
+  nothing to do with the resolution's actual (nonexistent) substance.
+  Congressional committee names are themselves built from generic
+  policy-area words, which makes any bill's latestAction/committee-
+  referral text an unusually bad place to trust bare single-word
+  matches. `matchBills()` (and its two manually-synced copies —
+  `functions/_lib/bill-matching.js` for Calendar,
+  `keywordsForMatch()`/`matchedCountFor()` in builder.html for the "N
+  matched" issue-chip counts) now score curated `SYNONYMS` entries + the
+  issue's own full name against a bill's full text (title + latest
+  action) same as before — those are specific, low-false-positive-risk
+  phrases — but the loose, single-word extraction (still real signal for
+  a citizen's own specific typed priorities) only against the bill's own
+  title now. Verified live against the real HRES 1517 data: the fix
+  correctly drops the match to zero.
+
+  **Fragile AI-JSON parsing, same day** — a second, unrelated bug the
+  same debugging session turned up: typing "H.R.9694 - Epstein Files
+  Transparency Act II" into "anything else on your mind" bounced
+  straight to the manual picker despite being about as specific as a
+  priority can get. Reproduced live against the real classifier: the
+  model correctly judged it specific, but prefixed its JSON with an
+  unprompted reassurance ("This is a real, specific piece of
+  legislation.") that broke the markdown-fence-only stripping every
+  JSON-parsing prompt in this app used — `JSON.parse` has no tolerance
+  for stray prose around the object it's given. New `parseAIJSON()`
+  (builder.html) and its server-side twin (`headlines-batch.js`) now
+  fall back to slicing out the first balanced `{...}`/`[...]` substring
+  when a direct parse fails, instead of giving up — applied to every
+  structured-JSON prompt in the app (`classifyFreeformPriority()`,
+  `boildownHeadline()`, `buildDrilldownCards()`, the pre-warmed headline
+  batch). Confirmed against the exact reproduced failure string that the
+  new parser recovers the correct object.
+
+  **Systemic reserved-502-status bug, same day, found while investigating
+  the above** — auditing every backend Function for the same body-
+  masking bug yesterday's Calendar fix uncovered (502/504/521-526 are
+  Cloudflare-reserved codes; the edge always discards the origin's body
+  for those and substitutes its own generic "error code: NNN" page)
+  turned up the identical pattern in nearly every other Function in this
+  app, not just `strategic-plan.js`: `dig-check.js` (the highest-traffic
+  endpoint by far — powers DIG itself plus every AI-backed feature that
+  reuses it), `plain-summary.js`, `openstates-people.js` and its callers
+  `state-reps.js`/`send-state-email.js`, `state-bills.js`,
+  `headline-image.js`, `calendar.js`, `municipal.js`, `reps.js`,
+  `headlines.js`. All switched to 500 — every one of these endpoints'
+  own real, useful error messages had been silently replaced by
+  Cloudflare's generic page whenever that path actually fired, across
+  the whole app, likely since whichever session first introduced this
+  pattern before it was ever noticed.
+
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title
