@@ -109,6 +109,120 @@ result in an already-open regular tab is expected and will clear on its
 own once that tab's old cached copy ages out (now capped at 1 second
 going forward, so this class of bug shouldn't recur).
 
+**10 Sep 2026, later still — official-title display and drafted-tone/
+voice, two real UX fixes.** The citizen flagged that every bill/
+ordinance card was collapsing its official title behind a disclosure
+unconditionally, even for one that's already short and plain (e.g.
+"CHIPS and Science Act") — needless obscuring for exactly the titles
+that don't need it, while naming Connecticut's own bill titles as the
+genuine case that DOES need it (dense, cross-referencing legalese,
+routinely 150+ characters). New shared `titleBlockHtml(title, label,
+url)` in take-action.html (used by `renderCard()`, `renderStateCard()`,
+`focusEntryHtml()`, and `watchCardHtml()` — every place an official
+title renders) shows a title plainly, same visual weight, when it's
+≤90 characters; only past that does it still collapse behind
+"`<label>` — official bill name" the way every card did before. Verified
+live against real examples: "CHIPS and Science Act" (21 chars) and even
+the full NDAA title (55 chars) now display directly; a real 146-character
+CT-style title still collapses. Separately, `functions/api/
+plain-summary.js`'s single summarization prompt got a second, more
+demanding branch for that same >90-character case — the citizen's
+ask to "do our research and boil it down to something that actually
+makes sense... and makes it clear why it's a high priority" for the
+genuinely long/complicated ones. No new data source was added (this
+endpoint still only ever has the bill's own title + latest-action text
+to work from, not a fetched full-text/summary from congress.gov/
+OpenStates/Legistar — a real, honestly-flagged limitation, not solved
+here), but the dense-title prompt now explicitly instructs the model to
+read past cross-referencing legal structure to the real subject matter
+and state who's affected and why it might matter, rather than producing
+a similarly opaque rewrite of the legalese — while still explicitly
+forbidden from inventing specifics the title doesn't support. Kept
+general-audience rather than personalized to any one citizen's own
+matched priority: this cache is shared across every citizen who ever
+looks at this bill (see the endpoint's own 2 Sep 2026 comment), so
+baking in "why this matches YOUR priority in X" would show one
+citizen's personalization to the next citizen who hits the same cached
+entry — a real correctness risk that was caught and avoided, not just a
+style choice. Cache key bumped to `plainsummary:v2:<id>` in the same
+change (per this project's own version-caches-on-prompt-changes
+convention) so summaries already cached under the old prompt regenerate
+once under the new one instead of sitting stale for the full 60-day TTL.
+
+The tone/voice request was the bigger of the two: the citizen said
+every drafted call script/email reads too formal and verbose by
+default, and asked CiViX to learn each citizen's own writing/speaking
+voice over time rather than stay generic forever. New shared
+`voiceInstructionFor(profile)` in take-action.html, threaded into all
+four drafting prompts (federal call+email, general call+email, state
+email — every place `/api/dig-check` gets asked to write something on a
+citizen's behalf), sets a new default tone ("brief and direct... no
+throat-clearing or formal filler") regardless of whether a citizen has
+typed enough yet for a real voice profile, then layers on
+`P.voice.description` once one exists. That description is inferred,
+not asked for directly: builder.html's new `pushVoiceSample(text)` /
+`maybeUpdateVoiceProfile()` capture a citizen's own hand-typed sentences
+(capped at the last 12) at the three genuinely-freeform-text entry
+points — `commitFreeformTopic()` ("anything on your mind?"), the
+`topics-add` chip commit loop, and `showDrilldownMercy()`'s "how do you
+feel about this?" screen — deliberately NOT from a swiped headline's
+talking point or a drilldown facet's AI-generated prompt, since that
+text is CiViX's own phrasing, not the citizen's. Once at least 3 new
+samples have accumulated since the last inference, one `/api/dig-check`
+call asks the model to describe the person's voice (formality, sentence
+length, directness, notable phrasing — explicitly NOT their opinions or
+topics) in a single sentence, stored on the manifesto as
+`P.voice.description` and referenced by every future draft — fire-and-
+forget, same pattern as every other background enrichment call in this
+app, so a failed inference just leaves the house-default tone in place
+rather than erroring visibly. This is a v1: the profile only ever grows
+from freeform typing, nothing yet lets a citizen see or directly edit
+their own inferred voice description, and there's no UI signal that
+CiViX is "listening" for this — worth a follow-up pass once there's
+real usage to see how the inferred descriptions actually read.
+
+**Flagged by the citizen, not yet started — a real roadmap list, kept
+here so it isn't lost.** 10 Sep 2026, mid-session: "remind me we need to
+make a DIG light, and work on incorporating all that good DIG
+functionality into the Citizen flow, and start making the graduate to
+Activist, and earning CiViX coin, and getting the donations,
+sponsorships, and further mocking up the Pro/Org version… we really
+need to harvest/incorporate all the DIG sources and preferences into the
+consolidated manifesto." None of this is built yet. Breaking down what's
+actually being asked for, for whenever this gets picked up:
+- **"DIG light" in the Citizen flow** — DIG today lives on its own page
+  (`dig/index.html`), reads/writes `P.sources` directly (see the 29 Aug
+  2026 entry further down), and is Activist/Pro-coded in practice even
+  though the profile schema is already shared. The ask is a lighter-
+  weight version of DIG's actual stance-checking surfaced inside the
+  Citizen swipe flow itself, not a separate page a citizen has to know
+  to go find.
+- **Citizen → Activist graduation** — a real progression path (not just
+  the existing one-time mode-gate overlay from 2 Sep 2026, which only
+  ever gates a brand-new profile) that surfaces once a citizen's
+  engagement genuinely warrants more depth/control.
+- **CiViX Coin — earning AND spending** — coin-earning already exists in
+  a first form (`civics.js`'s quiz rewards, 2 Sep 2026) but there is
+  still no spend path anywhere in the app; this ask folds coin into the
+  graduation/engagement loop more broadly, not just quiz trivia.
+- **Donations and sponsorships** — entirely new: no monetization
+  mechanism of any kind exists in CiViX today.
+- **Pro/Org mockup, further along** — Pro mode exists today as a UI
+  density/control-level toggle (see `pro-mode-enterprise-direction` in
+  memory: it's expected to read as institutional/enterprise-licensing-
+  ready eventually) but has no actual org/enterprise features (seats,
+  shared org manifestos, billing) mocked up yet.
+- **Consolidating DIG's sources/preferences into the manifesto** — this
+  one's furthest along already: 29 Aug 2026's entry below ("DIG's own
+  source list vs. the profile's § 04 sources — resolved") already merged
+  `P.sources` into one shared list read/written by both DIG and
+  builder.html, including per-topic ratings. What's explicitly still
+  open per that same entry: DIG's own UI copy still says "profile," not
+  "manifesto," and the two apps don't live-sync across tabs. Worth
+  confirming with the citizen whether "harvest/incorporate" means
+  something beyond what that entry already covers, or whether the
+  remaining gap is exactly those two named items.
+
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,

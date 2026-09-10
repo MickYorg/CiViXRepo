@@ -1557,6 +1557,48 @@
     return ex + ' Also: ' + inc;
   }
 
+  // 10 Sep 2026: the citizen asked CiViX to learn their own writing/
+  // speaking voice and tailor drafted call scripts/emails to it instead
+  // of a single generic formal register — see take-action.html's
+  // voiceInstructionFor(), the consumer of P.voice. A citizen's own
+  // hand-typed sentences are the only real signal of how THEY write — a
+  // swiped headline's talking point or a drilldown facet's prompt is
+  // CiViX's own AI-generated phrasing, not theirs, so only the three
+  // genuinely freeform-text entry points (the "anything on your mind?"
+  // cards and the drilldown "how do you feel about this?" mercy screen)
+  // ever call this.
+  const VOICE_SAMPLE_CAP = 12;
+  function pushVoiceSample(text) {
+    const t = String(text || '').trim();
+    if (t.length < 8) return; // too short to carry real style signal
+    P.voiceSamples = (P.voiceSamples || []).concat(t).slice(-VOICE_SAMPLE_CAP);
+    maybeUpdateVoiceProfile();
+  }
+
+  // Re-infers only after enough NEW samples have accumulated since the
+  // last inference, not on every single one — real accumulated signal,
+  // not a live-typing race, and at most one extra AI call per batch of
+  // fresh input. Fire-and-forget, same pattern as every other background
+  // enrichment call in this app (plain summaries, headline prewarm) — a
+  // failed inference just leaves whatever P.voice already held (or
+  // nothing, letting take-action.html's house-default tone stand) in
+  // place, never a hard error a citizen would see.
+  const VOICE_UPDATE_EVERY = 3;
+  function maybeUpdateVoiceProfile() {
+    const samples = P.voiceSamples || [];
+    const last = (P.voice && P.voice.samplesAtLastUpdate) || 0;
+    if (samples.length < 2 || samples.length - last < VOICE_UPDATE_EVERY) return;
+    const prompt = `Here are several things one specific person typed into a civic-engagement app, in their own words:
+
+${samples.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
+
+Describe this person's writing/speaking VOICE in one short sentence, for someone drafting text on their behalf to sound like them — formality, sentence length, directness, any notable phrasing. Do not summarize their opinions or the topics themselves, only their style. Respond with only the sentence, no preamble.`;
+    digCheckCall(prompt).then(text => {
+      P.voice = { description: text.trim(), samplesAtLastUpdate: samples.length, updatedAt: Date.now() };
+      save();
+    }).catch(() => {});
+  }
+
   function removeIssue(id) {
     const i = P.issues.findIndex(x => x.id === id);
     if (i < 0) return;
@@ -3020,6 +3062,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   }
 
   function commitFreeformTopic(text, topic, citation) {
+    pushVoiceSample(text);
     addIssue(topic);
     const iss = findIssue(slug(topic));
     if (iss) {
@@ -3536,6 +3579,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
     document.getElementById('citizen-drilldown-feeling-submit').addEventListener('click', () => {
       const text = document.getElementById('citizen-drilldown-feeling').value.trim();
       if (text) {
+        pushVoiceSample(text);
         addIssue(card.topic);
         const iss = findIssue(slug(card.topic));
         if (iss) { iss.weight = 2; iss.stance = text; }
@@ -3932,6 +3976,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
           })
         ));
         let added = 0;
+        card.chips.forEach(c => pushVoiceSample(c.text));
         card.chips.forEach(c => {
           if (!c.topic) return; // couldn't classify and nobody picked one by hand — skipped, not guessed
           addIssue(c.topic);

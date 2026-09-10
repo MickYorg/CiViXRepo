@@ -447,6 +447,18 @@
   .title-details summary::before { content: '▸ '; }
   .title-details[open] summary::before { content: '▾ '; }
   .title-details .card-title { font-size: 13px; margin-top: 4px; }
+  /* 10 Sep 2026: the plain, un-collapsed sibling of .title-details, used
+     when titleBlockHtml() judges a title already brief/clear enough to
+     just show — same secondary visual weight the collapsed name had
+     (this was never meant to compete with .card-synopsis above it), just
+     without needing a tap to reveal something short enough to read at a
+     glance anyway. */
+  .card-title-plain {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--paper-dim);
+    margin-bottom: 8px;
+  }
   .card-cta-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   .card-cta-row .take-action { margin-top: 0; }
   .match-tag.is-link {
@@ -887,6 +899,34 @@
     return bill.congress + '-' + bill.type + bill.number;
   }
 
+  // 10 Sep 2026: every card used to collapse the official bill/ordinance
+  // name behind a disclosure unconditionally, even a title that's already
+  // short and plain ("CHIPS and Science Act") — the citizen flagged this
+  // as needless obscuring for exactly the cases that don't need it.
+  // Reserve the collapse for what it's actually for: the genuinely long,
+  // dense legal titles state/municipal sources especially favor
+  // (Connecticut's own bill titles routinely run past 150 characters of
+  // "An Act Concerning..."). A brief, clear title now just displays
+  // plainly right in the card; only one past the length floor still
+  // hides behind "<label> — official bill name". Shared by every card
+  // that renders an official title (federal/state/municipal detail
+  // lists, the focus zone, watch cards) so the threshold can't drift
+  // between them.
+  const TITLE_CLEAR_MAX = 90;
+  function titleBlockHtml(title, label, url) {
+    const linked = url
+      ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(title)}</a>`
+      : esc(title);
+    if ((title || '').length <= TITLE_CLEAR_MAX) {
+      return `<div class="card-title-plain">${linked}</div>`;
+    }
+    return `
+        <details class="title-details">
+          <summary>${esc(label || '')} &mdash; official bill name</summary>
+          <div class="card-title">${linked}</div>
+        </details>`;
+  }
+
   // hits are matched priority names (from digest.js's scoreAgainstIssues) —
   // in citizen mode each becomes its own link back into the Manifesto's
   // §03 priorities instead of collapsing to a bare count, so "matches your
@@ -904,9 +944,6 @@
   function renderCard(bill, hits, idx, mode) {
     const label = (bill.type || '').toUpperCase() + ' ' + (bill.number || '');
     const bodyId = 'body-' + esc(slug(billSummaryId(bill)));
-    const officialTitle = bill.url
-      ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
-      : esc(bill.title);
     // Metadata (congress number, ISO update date) stays Activist/Pro-only —
     // that's a real information-density choice for Citizen, unrelated to
     // which text leads the card.
@@ -916,10 +953,7 @@
       <div class="card">
         <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="card-tags">${statusTag}<span class="tag">Federal</span></span></div>
         ${metaHtml}
-        <details class="title-details">
-          <summary>${esc(label)} &mdash; official bill name</summary>
-          <div class="card-title">${officialTitle}</div>
-        </details>
+        ${titleBlockHtml(bill.title, label, bill.url)}
         ${matchTagsHtml(hits, mode)}
         <div class="card-cta-row">
           ${isEnacted(bill)
@@ -970,6 +1004,24 @@
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!text) throw new Error('empty response');
     return text;
+  }
+
+  // 10 Sep 2026: the citizen flagged every drafted script/email as too
+  // formal and verbose by default, and asked CiViX to learn their own
+  // voice over time rather than stay generic. The default tone itself
+  // changed (brief/direct, not formal) regardless of whether a citizen
+  // has typed enough yet for a real voice profile; P.voice.description
+  // (inferred by builder.html's maybeUpdateVoiceProfile() from a
+  // citizen's own hand-typed freeform text — never from AI-generated
+  // headline talking points or drilldown prompts, which aren't their
+  // words) layers on top once one exists. Shared by all four drafting
+  // prompts below (federal call+email, general call+email, state email)
+  // so tone is consistent everywhere a script gets written on a
+  // citizen's behalf, not tuned per-modal.
+  function voiceInstructionFor(profile) {
+    const base = 'Tone: brief and direct by default — short sentences, plain words, no throat-clearing or formal filler. Get to the point fast.';
+    const desc = profile && profile.voice && profile.voice.description;
+    return desc ? `${base} Also match this specific constituent's own writing voice, inferred from things they've typed into CiViX: ${desc}` : base;
   }
 
   async function fetchReps(zip) {
@@ -1165,9 +1217,6 @@
 
     if (live) {
       const bodyId = 'watch-body-' + esc(slug(w.key));
-      const officialTitle = live.url
-        ? `<a href="${esc(live.url)}" target="_blank" rel="noopener">${esc(live.title)}</a>`
-        : esc(live.title);
       const label = w.kind === 'federal'
         ? ((live.type || '').toUpperCase() + ' ' + (live.number || '')).trim()
         : (live.identifier || '');
@@ -1176,10 +1225,7 @@
         <div class="card${w.won ? ' watch-win' : ''}">
           ${winBanner}
           <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="card-tags">${statusTag}<span class="tag">${w.kind === 'federal' ? 'Federal' : 'State'}</span></span></div>
-          <details class="title-details">
-            <summary>${esc(label)} &mdash; official bill name</summary>
-            <div class="card-title">${officialTitle}</div>
-          </details>
+          ${titleBlockHtml(live.title, label, live.url)}
           ${updatedBadge}
           <div class="card-cta-row">${digBtn}${unwatchBtn}</div>
         </div>`;
@@ -1291,6 +1337,7 @@ Bill: ${billLine}
 Latest action: ${actionLine}
 ${positionLine}
 ${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : ''}
+${voiceInstructionFor(profile)}
 
 Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask matching their position above, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.`;
 
@@ -1302,6 +1349,7 @@ Latest action: ${actionLine}
 ${positionLine}
 ${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : ''}
 Constituent's ZIP: ${zip}
+${voiceInstructionFor(profile)}
 
 Write a concise constituent email, under 180 words total, matching their position above. Respond in exactly this plain-text format, no markdown:
 
@@ -1694,6 +1742,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 ${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
 Topic: ${active.topic}
 ${stanceLine}
+${voiceInstructionFor(profile)}
 
 Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning grounded in their own words above, and a polite close asking the staffer to pass the message along.`;
 
@@ -1703,6 +1752,7 @@ ${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
 Topic: ${active.topic}
 ${stanceLine}
 Constituent's ZIP: ${zip}
+${voiceInstructionFor(profile)}
 
 Write a concise constituent email, under 180 words total. Respond in exactly this plain-text format, no markdown:
 
@@ -1956,6 +2006,7 @@ ${chamberWord}: ${rep.name}${rep.party ? ` (${rep.party})` : ''}
 Bill: ${billLine}
 Latest action: ${actionLine}
 ${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : "The constituent hasn't stated a specific position yet — keep this focused on urging attention to the bill rather than assuming a side."}
+${voiceInstructionFor(profile)}
 
 Write a concise constituent email, under 160 words, about this bill. Respond in exactly this plain-text format, no markdown, and do not include a signature or sign-off (the sender's real name and address are appended separately):
 
@@ -2358,19 +2409,13 @@ BODY: <the email body, a few short paragraphs>`;
       ? (bill.url ? `<a class="btn" href="${esc(bill.url)}" target="_blank" rel="noopener">View on your city's site &#8599;</a>` : '')
       : `<button type="button" class="take-action" data-take-state-action="${idx}">Take action &#8594;</button>`;
 
-    const officialTitle = bill.url
-      ? `<a href="${esc(bill.url)}" target="_blank" rel="noopener">${esc(bill.title)}</a>`
-      : esc(bill.title);
     const metaHtml = mode === 'citizen' ? '' : `<div class="card-meta">${esc(bill.session || '')} · updated ${fmtDate(bill.updateDate)}</div>`;
     const digBtn = `<a class="btn" href="${esc(digUrl(bill.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
     return `
       <div class="card">
         <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="tag">${esc(tag)}</span></div>
         ${metaHtml}
-        <details class="title-details">
-          <summary>${esc(bill.identifier)} &mdash; official bill name</summary>
-          <div class="card-title">${officialTitle}</div>
-        </details>
+        ${titleBlockHtml(bill.title, bill.identifier, bill.url)}
         ${matchTagsHtml(hits, mode)}
         <div class="card-cta-row">${takeActionBtn}${digBtn}</div>
       </div>`;
@@ -2665,10 +2710,7 @@ BODY: <the email body, a few short paragraphs>`;
     const statusTag = e.kind === 'federal' && e.bill && e.bill.status ? `<span class="tag status-tag">${esc(e.bill.status)}</span>` : '';
     const headtextHtml = hasOfficialTitle
       ? `<div class="card-top"><span class="card-synopsis">${esc(e.summary || 'No summary available yet.')}</span><span class="card-tags">${statusTag}<span class="tag">${kindLabel}</span></span></div>
-         <details class="title-details">
-           <summary>${esc(e.label || '')} &mdash; official bill name</summary>
-           <div class="card-title">${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</div>
-         </details>
+         ${titleBlockHtml(e.title, e.label, e.url)}
          ${whyHtml}`
       : `<div class="focus-headline"><span class="card-title">${esc(e.title)}</span><span class="tag">${kindLabel}</span></div>
          ${whyHtml}`;

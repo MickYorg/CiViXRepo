@@ -62,7 +62,13 @@ export async function onRequestPost({ request, env }) {
   const actionText = (body && body.actionText) || '';
 
   const kv = env.DIG_KV;
-  const cacheKey = `plainsummary:${id}`;
+  // v2, 10 Sep 2026: the prompt itself changed (dense-title bills now get
+  // a real second pass instead of a flat rewrite — see the comment
+  // above) — versioned so already-cached summaries from the old prompt
+  // don't sit stale under the 60-day TTL; they just regenerate once on
+  // next request under the new key, same convention as digest.js's own
+  // versioned localStorage cache keys.
+  const cacheKey = `plainsummary:v2:${id}`;
 
   if (kv) {
     try {
@@ -102,7 +108,39 @@ export async function onRequestPost({ request, env }) {
   // at," separately from this text — see deriveStatus() in
   // functions/api/calendar.js) gets closer to a real description instead
   // of a narrower rewrite of the same status line.
-  const prompt = `Rewrite this bill in plain language a busy person with no policy background could understand in five seconds — what it would actually DO or change, based on its title (which describes the real subject matter, just in legalese). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that, so this text would just be redundant with it. One to two sentences, no markdown, no quotes, under 40 words total.
+  //
+  // 10 Sep 2026: state/municipal sources in particular (the citizen
+  // named Connecticut's own bill titles specifically) routinely favor
+  // dense, cross-referencing legal titles — "An Act Concerning Revisions
+  // to Section 12-63..." — that don't describe their own subject in
+  // plain terms the way most federal short titles do. The single prompt
+  // above, applied unchanged to one of these, tended to produce a
+  // similarly opaque rewrite: accurate to the legalese, useless to a
+  // busy citizen deciding whether to care. take-action.html's own
+  // titleBlockHtml() already draws this exact line (90 characters) to
+  // decide whether to show a title plainly or collapse it — reusing it
+  // here means both halves of the app agree on what counts as "already
+  // clear" vs "needs real translation," instead of drifting apart. A
+  // title past that length gets a second, more demanding pass: read
+  // past the cross-references to the real subject matter, state who's
+  // affected and why it might matter, not just what section of statute
+  // it touches — while still never inventing specifics the title itself
+  // doesn't support (no real bill text/summary is fetched here; honesty
+  // about the limits of a title-only rewrite matters more than sounding
+  // authoritative). This is a better use of the same one Anthropic call
+  // already being spent per bill, not a second, personalized call — the
+  // cache is shared across every citizen who ever looks at this bill, so
+  // the explanation stays general-audience ("who this affects and why it
+  // matters," not "why YOUR priority X matches this"), never tailored to
+  // whichever citizen's own priorities happened to trigger the request.
+  const TITLE_CLEAR_MAX = 90;
+  const isDense = title.length > TITLE_CLEAR_MAX;
+  const prompt = isDense
+    ? `Rewrite this bill in plain language a busy person with no policy background could understand in a few seconds. Its official title is dense, legalistic, cross-referencing prior statutes/sections rather than describing itself in plain terms — common for state and local legislation. Don't just paraphrase that legal structure. Read past it to the real subject matter and state plainly: what would actually change, who it affects, and why someone might reasonably care. If the title genuinely doesn't reveal more than the general subject area, say only that much — never invent specifics it doesn't support. Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that. Two to three sentences, no markdown, no quotes, under 55 words total.
+
+Bill: ${title}
+(background only, not to be described procedurally) Latest action: ${actionText || 'No recorded action yet.'}`
+    : `Rewrite this bill in plain language a busy person with no policy background could understand in five seconds — what it would actually DO or change, based on its title (which describes the real subject matter, just in legalese). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that, so this text would just be redundant with it. One to two sentences, no markdown, no quotes, under 40 words total.
 
 Bill: ${title}
 (background only, not to be described procedurally) Latest action: ${actionText || 'No recorded action yet.'}`;
