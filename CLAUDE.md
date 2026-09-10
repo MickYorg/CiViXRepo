@@ -5,9 +5,53 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
-## Current state (as of 9 Sep 2026)
+## Current state (as of 10 Sep 2026)
 
-**Pick up here** — the plain-summary deploy-pipeline stall noted below on
+**Pick up here — a standing mandate, not a one-session task.** The user
+stepped back from individual bug reports to name the actual stakes
+directly: CiViX has two core promises — genuinely getting to know a
+citizen, and effectively advocating on their behalf — and isn't yet
+reliably delivering on either. Their own framing: a citizen could get a
+richer, more rewarding experience just Googling a bill than using CiViX
+if it keeps mis-hearing and mis-directing them, and the bar isn't "no
+bugs," it's citizens seeing CiViX as their real go-to resource for
+understanding what's happening, taking a stand, being heard, and making
+things better for themselves and people they care about. They also
+pushed back, fairly, on the pattern itself: this kind of audit has been
+asked for session after session, and one-off patches to whatever bug
+surfaces next haven't been enough.
+
+10 Sep 2026's session tried to answer that by actually walking the core
+loop end to end with real, live data (not just reading code) and fixing
+what it found at the root rather than the symptom — six real,
+structural bugs, not cosmetic ones, all detailed in their own dated
+entries further down: freeform priorities silently collapsing multiple
+typed items into one lossy AI call; classification failures swallowed
+into an unexplained generic fallback; a false-positive bill match caused
+by matching loose keywords against committee-referral boilerplate; a
+fragile JSON parser that broke on a model's own unprompted commentary;
+the exact same Cloudflare-reserved-502-status bug found in Calendar the
+day before, confirmed present in nearly every other backend Function
+including `dig-check.js` itself; and the big one — a scoring rule that
+let any unmatched specific priority unconditionally win the "top 3,"
+which is what made the same bill produce a different result every time
+it was pasted. Real, root-cause fixes for all six are live.
+
+**What this session's audit covered, and what it didn't**: everything
+above is squarely on the "getting to know the citizen" and "matching"
+half of the loop (freeform input handling, classification, bill
+matching, digest ranking). The "advocating effectively" half — actually
+taking action — was not freshly audited this session the same
+rigorous, live-data way; its known gaps are already documented in their
+own entries (federal "Send it" still ends in copy-paste, not a real
+send; no real-time watch alerts, only return-visit diffing; petition/
+rally data is external links, not CiViX's own). Whether those are the
+*right* gaps, or whether the advocacy side has its own version of
+today's "looks done but isn't" bugs, hasn't been checked with the same
+scrutiny. That's the natural next place to point this same kind of
+audit, if picking this mandate back up.
+
+**Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,
 confirmed indirectly by the run of ordinary same-day deploys logged
@@ -568,16 +612,21 @@ see "Deliberately not yet done" below for why.
     replacing, used at all three call sites — every specific thing a
     citizen has said now survives even when the taxonomy forces it to
     share a bucket with something else.
-  Not fixed in this pass, flagged as a real, harder limitation:
-  `functions/api/calendar.js` only ever fetches the ~100 federal bills
-  congress.gov reports as most-recently *updated* (any metadata touch,
-  not necessarily real legislative action), not a search — a real but
-  currently-dormant bill like S.421 may simply never be in that fetched
-  pool at all on a given day, regardless of how good the keyword match
-  is. Congress.gov's public API doesn't expose a free-text search
-  endpoint the same way its own website's search does, so fixing this
-  properly would mean a different fetch strategy entirely, not a tweak —
-  out of scope here.
+  **Resolved for the cited-bill case, 10 Sep 2026** — this note used to
+  flag `functions/api/calendar.js`'s ~100-most-recently-updated window
+  as a real, harder limitation (a real but currently-dormant bill like
+  S.421 might simply never be in that fetched pool at all, regardless of
+  match quality) and leave it out of scope, since congress.gov's public
+  API has no free-text search endpoint the way its own website does.
+  That's still true for a bill a citizen *describes* without naming —
+  but a citizen who names one by number doesn't need search at all,
+  just a direct lookup, which congress.gov's per-bill detail endpoint
+  does support. See `functions/api/bill-lookup.js` and its own entry
+  further down for the real fix this became once a live, reproducible
+  failure (H.R.9694 dominating a citizen's top-3 for the wrong reason)
+  made the gap concrete instead of theoretical. Still out of scope: a
+  bill described in prose without a citable number (e.g. "that beef
+  labeling bill") still depends on being in the fetched window.
 
   **False-positive matching from committee-name boilerplate, 10 Sep
   2026** — the citizen caught a genuinely bad match live: a purely
@@ -638,6 +687,43 @@ see "Deliberately not yet done" below for why.
   Cloudflare's generic page whenever that path actually fired, across
   the whole app, likely since whichever session first introduced this
   pattern before it was ever noticed.
+
+  **The real "totally different top-3 every time" bug, same day** — a
+  step back from individual bug reports: the citizen pointed out that
+  pasting the exact same bill name into "anything else on your mind"
+  produced completely different top-3 results run to run, and asked how
+  that was even possible. Traced end to end rather than patched: a
+  specific bill a citizen names becomes a `weight === 3` issue with a
+  written stance; `buildTopDigest()` tries to match it against the
+  fetched federal/state/municipal pools, and if nothing matches, falls
+  back to treating it as a "general priority" scored at `1000 + weight`
+  — a score high enough to unconditionally outrank every real bill
+  match, no matter how strong. Confirmed live that H.R.9694 (the bill
+  the citizen actually pasted) simply isn't in `calendar.js`'s own
+  fetched pool (the ~100 most-recently-updated federal bills) — so it
+  could never be genuinely matched, and instead won the top-3
+  unconditionally every time, for a reason that had nothing to do with
+  its actual importance. Since *which* of a citizen's priorities happen
+  to be unmatched at any given moment varies, the "top 3" was really
+  reporting coverage gaps dressed up as curation, not a stable ranking
+  — which is the literal, mechanical answer to "how is that even
+  possible." Real fix, not a patch: `functions/api/bill-lookup.js` (new)
+  fetches a specifically-cited bill directly from congress.gov's
+  per-bill detail endpoint — no full-text search needed, since the
+  citizen already gave the exact citation — and `digest.js`'s new
+  `parseBillCitation()` recognizes a bill citation in whatever
+  punctuation a citizen actually typed ("H.R.9694", "HR 9694", "hr9694"
+  all resolve). `buildTopDigest()` tries this direct lookup before ever
+  reaching the unconditional-fallback scoring, so a cited bill outside
+  the fetch window still resolves to its own real, stable data and gets
+  weighted fairly like any other federal match — not an automatic,
+  arbitrary #1. Verified live: `/api/bill-lookup?type=hr&number=9694`
+  returns H.R.9694's real title, status, and latest action straight from
+  congress.gov. Bill-shaping logic (`slim()`/`deriveStatus()`/
+  `publicUrl()`) moved out of `calendar.js` into
+  `functions/_lib/congress-bill.js` so the new endpoint doesn't
+  duplicate it. See also the "Resolved for the cited-bill case" note
+  further up this file (originally about `S.421`) — this is that fix.
 
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
