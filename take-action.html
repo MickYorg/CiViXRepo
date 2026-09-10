@@ -221,9 +221,16 @@
      genuinely enough room for each to sit around 300-360px, comfortable
      on a laptop and a tablet in landscape alike, collapsing cleanly to
      fewer/1 column exactly as before on anything narrower. */
-  .focus-zone { margin-bottom: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+  /* 10 Sep 2026: dropped the multi-column grid entirely, live from an
+     iPad screenshot — even at a real ~470-500px each, three cards side
+     by side read as cramped; there just isn't enough width on a tablet
+     (or most laptops, under this page's own .wrap cap) to make 3-across
+     work for content this dense (a synopsis, tags, matched priorities,
+     a CTA row). Back to plain full-width stacked cards — the wider
+     .wrap from the same pass still does real work here on its own,
+     since these are full-width blocks, not a fixed column measure. */
+  .focus-zone { margin-bottom: 8px; display: flex; flex-direction: column; gap: 12px; }
   .focus-label {
-    grid-column: 1 / -1;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
     letter-spacing: 0.14em;
