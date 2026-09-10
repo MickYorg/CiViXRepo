@@ -467,12 +467,20 @@
 
     gridEl.innerHTML =
       '<div class="stat"><div class="stat-num">' + (data.actionsTotal || 0).toLocaleString() + '</div><div class="stat-label">Actions taken</div></div>' +
-      '<div class="stat"><div class="stat-num">' + (data.manifestos || 0).toLocaleString() + '</div><div class="stat-label">Manifestos started</div></div>';
+      '<div class="stat"><div class="stat-num">' + (data.manifestos || 0).toLocaleString() + '</div><div class="stat-label">Manifestos started</div></div>' +
+      '<div class="stat"><div class="stat-num">' + (data.winsTotal || 0).toLocaleString() + '</div><div class="stat-label">&#127881; Watched bills that became law</div></div>';
 
     topicsEl.innerHTML = (data.topTopics && data.topTopics.length)
       ? '<p class="section-label">Most active topics</p>' + data.topTopics.map(function (t) {
           return '<div class="card"><div class="card-top"><span class="card-title">' + esc(t.name) + '</span></div>' +
             '<div class="card-body">' + t.count.toLocaleString() + ' action' + (t.count === 1 ? '' : 's') + ' logged</div></div>';
+        }).join('')
+      : '';
+
+    topicsEl.innerHTML += (data.topWinTopics && data.topWinTopics.length)
+      ? '<p class="section-label">&#127881; Wins by topic</p>' + data.topWinTopics.map(function (t) {
+          return '<div class="card"><div class="card-top"><span class="card-title">' + esc(t.name) + '</span></div>' +
+            '<div class="card-body">' + t.count.toLocaleString() + ' watched bill' + (t.count === 1 ? '' : 's') + ' became law</div></div>';
         }).join('')
       : '';
 
@@ -492,7 +500,7 @@
     fetch('/api/platform-stats')
       .then(function (r) { return r.json(); })
       .then(renderReal)
-      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [] }); });
+      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [] }); });
   }
 
   var stored = null;

@@ -481,6 +481,28 @@
     margin-top: 10px;
   }
   .take-action:hover { filter: brightness(1.06); }
+  .enacted-note {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+    color: var(--paper-dim);
+  }
+  .watch-win {
+    border-color: var(--amber);
+    background: var(--amber-wash);
+  }
+  .watch-win-banner {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--paper);
+    margin-bottom: 8px;
+  }
+  .watch-win-note {
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    line-height: 1.5;
+    margin: 4px 0 10px;
+  }
 
   /* ---- Action modal — draft a call/email against a matched bill, and
      stub an "add to calendar" using the bill's own legislative-action
@@ -847,6 +869,16 @@
     return 'dig/?topic=' + encodeURIComponent(topic);
   }
 
+  // A bill that's already been signed into law has nothing left for a
+  // citizen to lobby for — a "Take action" button on one is a real dead
+  // end, not just a stale suggestion. Federal-only: calendar.js's own
+  // deriveStatus() (see its file comment) is the only source of a real
+  // status field today; state/municipal have no equivalent yet, so this
+  // deliberately only ever matches a federal bill object.
+  function isEnacted(bill) {
+    return !!(bill && bill.status === 'Became Law');
+  }
+
   // Citizen mode trims the raw legislative metadata (congress number, ISO
   // date) and condenses the match-tag chip list to a count — Activist
   // renders exactly what this card always has; Pro is identical to
@@ -890,7 +922,9 @@
         </details>
         ${matchTagsHtml(hits, mode)}
         <div class="card-cta-row">
-          <button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button>
+          ${isEnacted(bill)
+            ? `<span class="enacted-note">&#9989; Already signed into law &mdash; nothing left to lobby for here.</span>`
+            : `<button type="button" class="take-action" data-take-action="${idx}">Take action &#8594;</button>`}
           <a class="btn" href="${esc(digUrl(bill.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>
         </div>
       </div>`;
@@ -1032,6 +1066,19 @@
     try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
     return idx === -1;
   }
+  // Persists `won: true` directly on the watch item so a bill only ever
+  // gets counted (and celebrated) once, even across return visits — same
+  // "count once, ever" shape as builder.html's P.statsReported flag for
+  // manifestos. toggleWatch() can't be reused here since it also removes
+  // the item on a second call, which this must never do.
+  function markWatchWon(key) {
+    const profile = loadRawProfile();
+    if (!profile || !Array.isArray(profile.watching)) return;
+    const w = profile.watching.find(x => x.key === key);
+    if (!w || w.won) return;
+    w.won = true;
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+  }
   // Live bill data for whatever's currently watched, keyed the same as
   // WATCH_UPDATES — populated alongside it so renderWatchingZone() can
   // show a watched bill with the exact same synopsis/status/collapsed-
@@ -1055,6 +1102,17 @@
       WATCH_LIVE[w.key] = b;
       const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
       if (latest && w.lastSeenActionDate && latest !== w.lastSeenActionDate) WATCH_UPDATES[w.key] = true;
+      // A watched bill actually becoming law is a real win, not just
+      // routine legislative churn — celebrated in watchCardHtml() (reads
+      // the persisted `won` flag on a fresh loadWatchlist(), which by the
+      // time renderWatchingZone() runs right after this always reflects
+      // what markWatchWon() just wrote) and counted once, ever. Federal-
+      // only: isEnacted() only ever matches a bill carrying calendar.js's
+      // own status field — see its comment.
+      if (kind === 'federal' && !w.won && isEnacted(b)) {
+        markWatchWon(w.key);
+        reportWin(Array.isArray(w.hits) ? w.hits : []);
+      }
     });
   }
 
@@ -1092,7 +1150,15 @@
   // watches (a citizen's own typed priority, no bill behind it) always
   // use that fallback — there's no bill data to have.
   function watchCardHtml(w) {
-    const updatedBadge = WATCH_UPDATES[w.key] ? `<span class="watching-badge">Updated since you started watching</span>` : '';
+    // A watched bill becoming law supersedes the routine "updated" badge
+    // entirely — that badge exists to flag ordinary legislative churn,
+    // and this is the biggest possible update a watch can ever produce.
+    // `w.won` is the persisted, once-ever flag from checkWatchlistUpdates()/
+    // markWatchWon() — real across return visits, not just this one.
+    const winBanner = w.won
+      ? `<div class="watch-win-banner">&#127881; This one became law!</div><p class="watch-win-note">You were watching — CiViX counted this as a win in the platform's anonymous, aggregate stats.</p>`
+      : '';
+    const updatedBadge = (!w.won && WATCH_UPDATES[w.key]) ? `<span class="watching-badge">Updated since you started watching</span>` : '';
     const digBtn = `<a class="btn" href="${esc(digUrl(w.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
     const unwatchBtn = `<button type="button" class="btn" data-unwatch="${esc(w.key)}">Stop watching</button>`;
     const live = (w.kind === 'federal' || w.kind === 'state') ? WATCH_LIVE[w.key] : null;
@@ -1107,7 +1173,8 @@
         : (live.identifier || '');
       const statusTag = w.kind === 'federal' && live.status ? `<span class="tag status-tag">${esc(live.status)}</span>` : '';
       return `
-        <div class="card">
+        <div class="card${w.won ? ' watch-win' : ''}">
+          ${winBanner}
           <div class="card-top"><span class="card-synopsis" id="${bodyId}">Getting the plain-English version&hellip;</span><span class="card-tags">${statusTag}<span class="tag">${w.kind === 'federal' ? 'Federal' : 'State'}</span></span></div>
           <details class="title-details">
             <summary>${esc(label)} &mdash; official bill name</summary>
@@ -1119,7 +1186,8 @@
     }
 
     return `
-      <div class="card">
+      <div class="card${w.won ? ' watch-win' : ''}">
+        ${winBanner}
         <div class="card-top"><span class="card-synopsis">${esc(w.title)}</span></div>
         ${updatedBadge}
         <div class="card-cta-row">
@@ -1501,6 +1569,22 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'action', level, topics: topics || [] })
+    }).catch(() => {});
+  }
+
+  // A watched bill becoming law is a real outcome, not an action the
+  // citizen took — kept in platform-stats.js's own separate win counters
+  // rather than reportAction()'s level/topics ones, so the two aren't
+  // conflated. topics here are the matched-priority names stored on the
+  // watch item itself at watch-time (see openActionModalFor()'s
+  // toggleWatch() call) — absent on any watch created before this
+  // existed, in which case this just reports the bare win with no topic
+  // breakdown rather than guessing one.
+  function reportWin(topics) {
+    fetch('/api/platform-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'win', topics: topics || [] })
     }).catch(() => {});
   }
 
@@ -2165,6 +2249,10 @@ BODY: <the email body, a few short paragraphs>`;
         title: (bill.type || '').toUpperCase() + ' ' + bill.number + ': ' + bill.title,
         url: bill.url || null,
         lastSeenActionDate: (bill.latestAction && bill.latestAction.date) || bill.updateDate || null,
+        // Carried along purely so a future win (see checkWatchlistUpdates())
+        // can be attributed to a real matched-priority topic instead of
+        // reporting bare — not used for anything else about this watch.
+        hits: Array.isArray(ACTIVE.hits) ? ACTIVE.hits : [],
         addedAt: Date.now()
       });
       renderActionCard();
@@ -2553,7 +2641,9 @@ BODY: <the email body, a few short paragraphs>`;
     // 'general' entry does, so it gets the same real CTA now: the general
     // advocacy modal (rep lookup, drafted call/email), not just a
     // round-trip back to the filing.
-    const cta = e.kind === 'federal' && e.bill
+    const cta = e.kind === 'federal' && e.bill && isEnacted(e.bill)
+      ? `<span class="enacted-note">&#9989; Already signed into law &mdash; nothing left to lobby for here.</span>`
+      : e.kind === 'federal' && e.bill
       ? `<button type="button" class="take-action" data-focus-take-action="${rank}">Take action now &#8594;</button>`
       : e.kind === 'state' && e.bill
         ? `<button type="button" class="take-action" data-focus-state-action="${rank}">Take action now &#8594;</button>`
