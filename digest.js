@@ -274,6 +274,40 @@
     }
   }
 
+  // 10 Sep 2026: "NDAA" without a year genuinely can't be resolved from
+  // the model's own memory (a very recent bill, and the citizen pushed
+  // back, fairly, that treating this as unresolvable "hogwash" — in
+  // common usage "the NDAA" always means whichever one is currently
+  // active, not some unspecified year). First attempt searched
+  // buildTopDigest()'s own already-fetched federal pool for a title
+  // match — confirmed live that this doesn't work either: the real,
+  // currently-active NDAA (S.4784) isn't even in that ~100-most-
+  // recently-updated window on a given day, the identical gap
+  // bill-lookup.js was built to close for a cited bill. bill-search.js
+  // (new) searches a much wider, congress-scoped pool (up to 250, the
+  // real congress.gov API's own per-request max) specifically for
+  // patterns like this — real, current data instead of a memorized fact
+  // that may not even be in the model's training window. Extensible to
+  // other well-known recurring/annual bills later; NDAA is the one
+  // actually reported live so far.
+  const RECURRING_BILL_PATTERNS = [
+    { mention: /\bndaa\b/i, phrase: 'national defense authorization act' }
+  ];
+  function recurringBillPatternFor(issue) {
+    const text = (issue.name || '') + ' ' + (issue.stance || '');
+    return RECURRING_BILL_PATTERNS.find(p => p.mention.test(text)) || null;
+  }
+  async function lookupRecurringBillDirect(pattern) {
+    try {
+      const r = await fetch('/api/bill-search?title=' + encodeURIComponent(pattern.phrase));
+      if (!r.ok) return null;
+      const data = await r.json();
+      return (data && data.bill) ? data.bill : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // ---- AI helpers (both hit /api/dig-check, both cached) -----------------
   async function digCheckCall(prompt) {
     const r = await fetch('/api/dig-check', {
@@ -413,6 +447,28 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       fetchDocketItems(profile && profile.token)
     ]);
 
+    // A well-known recurring/annual bill referred to by its common
+    // acronym alone ("NDAA," no year) has no formal citation to parse
+    // and isn't something the model can safely guess a number for from
+    // memory — but "the current one" is a real, searchable fact via
+    // bill-search.js's wider lookup. Resolved matches are pulled out of
+    // poolIssues before generic matching runs, same reasoning as the
+    // citable split above: this issue's own name is exactly as prone to
+    // false-positive keyword matches as any other specific-bill
+    // reference, so it shouldn't go through that path too.
+    const recurringResolved = [];
+    for (let idx = poolIssues.length - 1; idx >= 0; idx--) {
+      const i = poolIssues[idx];
+      if (i.weight !== 3 || !i.stance) continue;
+      const pattern = recurringBillPatternFor(i);
+      if (!pattern) continue;
+      const bill = await lookupRecurringBillDirect(pattern);
+      if (bill) {
+        recurringResolved.push({ issue: i, bill });
+        poolIssues.splice(idx, 1);
+      }
+    }
+
     if (fed.status === 'fulfilled' && poolIssues.length) {
       matchBills(fed.value, poolIssues).forEach(m => results.push(billEntry('federal', m.bill, m.hits, m.score)));
     }
@@ -469,6 +525,15 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         results.push(entry);
       }
     }
+
+    // Same treatment for a recurring/annual bill resolved via
+    // lookupRecurringBillDirect() — a real, current match, not a guess,
+    // so it earns the same score boost a direct citation lookup gets.
+    recurringResolved.forEach(({ issue: i, bill }) => {
+      const entry = billEntry('federal', bill, [i.name], i.weight);
+      entry.score = 50 + i.weight;
+      results.push(entry);
+    });
 
     // Jurisdiction lean (31 Aug 2026, P.jurisdictionLean — set once during
     // Citizen mode's onboarding, see builder.html's 'jurisdiction-lean'
