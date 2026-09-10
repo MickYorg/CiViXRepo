@@ -398,14 +398,15 @@ see "Deliberately not yet done" below for why.
   headlines-batch.js — kept in sync by hand, same convention as
   `issue-taxonomy.js`) now explicitly forbid any "X, even though/despite
   Z thinks otherwise" construction, with a concrete good/bad example.
-  Not addressed in this pass: `HEADLINE_BOILDOWN_KEY`
-  (`civix-headline-boildown`, builder.html's per-browser localStorage
-  cache) holds old boildowns keyed by article URL with no expiry — if a
-  citizen's browser already cached a bad pre-fix talking point for a
-  headline that resurfaces, they'd see the old phrasing until that
-  article ages out of GNews's results, not a fresh one. Clearing that
-  key would force a re-boildown; not done automatically since it's the
-  citizen's own local data.
+  **Addressed 10 Sep 2026** — flagged here as an open risk and it turned
+  out to matter: the citizen reported "did we actually fix the headline
+  summaries? I'm not seeing much," and the cause was exactly this.
+  `HEADLINE_BOILDOWN_KEY` renamed to a versioned
+  `civix-headline-boildown-v2` (and `headlines-batch.js`'s server-side
+  `BATCH_KEY` similarly versioned) — a clean break that orphans old
+  cached entries under the old key name rather than requiring every
+  citizen to manually clear localStorage. Bump the version suffix again
+  the next time either boildown prompt changes meaningfully.
 
   Separately, the citizen typed a specific, current topic tied to a
   named bill into "anything else on your mind?" and watched CiViX
