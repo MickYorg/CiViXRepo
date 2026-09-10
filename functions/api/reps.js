@@ -38,18 +38,18 @@ export async function onRequestGet({ request, env }) {
       headers: { 'X-5Calls-Token': token }
     });
   } catch (e) {
-    return json({ error: { message: 'Could not reach 5calls' } }, 502);
+    return json({ error: { message: 'Could not reach 5calls' } }, 500);
   }
 
   if (!res.ok) {
-    return json({ error: { message: `5calls returned HTTP ${res.status}` } }, 502);
+    return json({ error: { message: `5calls returned HTTP ${res.status}` } }, 500);
   }
 
   let data;
   try {
     data = await res.json();
   } catch (e) {
-    return json({ error: { message: '5calls returned an unparseable response' } }, 502);
+    return json({ error: { message: '5calls returned an unparseable response' } }, 500);
   }
 
   // Federal only, matching the calendar slice — state/local reps aren't

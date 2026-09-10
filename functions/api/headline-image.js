@@ -112,7 +112,7 @@ export async function onRequestPost({ request, env }) {
       { headers: { Authorization: `Client-ID ${apiKey}` } }
     );
   } catch (e) {
-    return json({ error: { message: 'Could not reach Unsplash API' } }, 502);
+    return json({ error: { message: 'Could not reach Unsplash API' } }, 500);
   }
 
   if (!res.ok) {

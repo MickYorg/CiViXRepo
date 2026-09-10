@@ -120,18 +120,18 @@ export async function onRequestGet({ request, env }) {
     try {
       geoRes = await fetch('https://api.zippopotam.us/us/' + zip);
     } catch (e) {
-      return json({ error: { message: 'Could not resolve a city for that ZIP' } }, 502);
+      return json({ error: { message: 'Could not resolve a city for that ZIP' } }, 500);
     }
     if (!geoRes.ok) {
       return json(
         { error: { message: geoRes.status === 404 ? 'Unrecognized ZIP code' : 'Could not resolve a city for that ZIP' } },
-        geoRes.status === 404 ? 404 : 502
+        geoRes.status === 404 ? 404 : 500
       );
     }
     const geo = await geoRes.json();
     const p = geo.places && geo.places[0];
     if (!p || !p['place name']) {
-      return json({ error: { message: 'Could not resolve a city for that ZIP' } }, 502);
+      return json({ error: { message: 'Could not resolve a city for that ZIP' } }, 500);
     }
     place = { city: p['place name'], state: p.state, stateAbbr: p['state abbreviation'] };
     if (kv) {
@@ -159,17 +159,17 @@ export async function onRequestGet({ request, env }) {
   try {
     res = await fetch(mattersUrl);
   } catch (e) {
-    return json({ error: { message: "Could not reach " + place.city + "'s legislative system" } }, 502);
+    return json({ error: { message: "Could not reach " + place.city + "'s legislative system" } }, 500);
   }
   if (!res.ok) {
-    return json({ error: { message: `${place.city}'s legislative system returned HTTP ${res.status}` } }, 502);
+    return json({ error: { message: `${place.city}'s legislative system returned HTTP ${res.status}` } }, 500);
   }
 
   let data;
   try {
     data = await res.json();
   } catch (e) {
-    return json({ error: { message: `${place.city}'s legislative system returned an unparseable response` } }, 502);
+    return json({ error: { message: `${place.city}'s legislative system returned an unparseable response` } }, 500);
   }
 
   const bills = (Array.isArray(data) ? data : [])

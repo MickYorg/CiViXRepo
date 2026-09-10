@@ -27,15 +27,15 @@ export async function onRequestGet({ request, env }) {
     try {
       geoRes = await fetch('https://api.zippopotam.us/us/' + zip);
     } catch (e) {
-      return json({ error: { message: 'Could not resolve a state for that ZIP' } }, 502);
+      return json({ error: { message: 'Could not resolve a state for that ZIP' } }, 500);
     }
     if (!geoRes.ok) {
-      return json({ error: { message: geoRes.status === 404 ? 'Unrecognized ZIP code' : 'Could not resolve a state for that ZIP' } }, geoRes.status === 404 ? 404 : 502);
+      return json({ error: { message: geoRes.status === 404 ? 'Unrecognized ZIP code' : 'Could not resolve a state for that ZIP' } }, geoRes.status === 404 ? 404 : 500);
     }
     const geo = await geoRes.json();
     const place = geo.places && geo.places[0];
     if (!place || !place.state) {
-      return json({ error: { message: 'Could not resolve a state for that ZIP' } }, 502);
+      return json({ error: { message: 'Could not resolve a state for that ZIP' } }, 500);
     }
     state = place.state; // full name, e.g. "California" — what OpenStates' jurisdiction filter wants
     if (kv) {
@@ -66,17 +66,17 @@ export async function onRequestGet({ request, env }) {
   try {
     res = await fetch(billsUrl);
   } catch (e) {
-    return json({ error: { message: 'Could not reach Open States' } }, 502);
+    return json({ error: { message: 'Could not reach Open States' } }, 500);
   }
   if (!res.ok) {
-    return json({ error: { message: `Open States returned HTTP ${res.status}` } }, 502);
+    return json({ error: { message: `Open States returned HTTP ${res.status}` } }, 500);
   }
 
   let data;
   try {
     data = await res.json();
   } catch (e) {
-    return json({ error: { message: 'Open States returned an unparseable response' } }, 502);
+    return json({ error: { message: 'Open States returned an unparseable response' } }, 500);
   }
 
   const bills = (data.results || []).map(b => ({

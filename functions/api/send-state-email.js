@@ -74,7 +74,7 @@ export async function onRequestPost({ request, env }) {
   try {
     ({ reps } = await resolveStateReps(zip, env));
   } catch (e) {
-    return json({ error: { message: e.message || 'Could not look up representatives for that ZIP' } }, e.status || 502);
+    return json({ error: { message: e.message || 'Could not look up representatives for that ZIP' } }, e.status || 500);
   }
   const rep = reps.find(r => r.id === repId);
   if (!rep || !rep.email) {
@@ -97,12 +97,12 @@ export async function onRequestPost({ request, env }) {
       })
     });
   } catch (e) {
-    return json({ error: { message: 'Could not reach the email service' } }, 502);
+    return json({ error: { message: 'Could not reach the email service' } }, 500);
   }
   if (!resendRes.ok) {
     let msg = `Email service returned HTTP ${resendRes.status}`;
     try { const b = await resendRes.json(); if (b.message) msg = b.message; } catch (e) {}
-    return json({ error: { message: msg } }, 502);
+    return json({ error: { message: msg } }, 500);
   }
   const result = await resendRes.json();
 

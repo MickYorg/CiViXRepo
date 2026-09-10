@@ -49,7 +49,7 @@ export async function onRequestGet({ request, env }) {
   if (!articles.length) {
     return json(
       { error: { message: errors.length ? errors.join('; ') : 'No headlines available right now.' } },
-      errors.some(e => e.indexOf('missing-key') !== -1) ? 500 : 502
+      500
     );
   }
 

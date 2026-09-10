@@ -18,7 +18,7 @@ export async function onRequestGet({ request, env }) {
     const { reps, state } = await resolveStateReps(zip, env);
     return json({ reps, state });
   } catch (e) {
-    return json({ error: { message: e.message || 'Lookup failed' } }, e.status || 502);
+    return json({ error: { message: e.message || 'Lookup failed' } }, e.status || 500);
   }
 }
 

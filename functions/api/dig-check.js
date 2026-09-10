@@ -137,8 +137,14 @@ export async function onRequestPost({ request, env }) {
       })
     });
   } catch (e) {
+    // 502/504/521-526 are Cloudflare-reserved status codes — the edge
+    // always discards the origin's body for those and substitutes its
+    // own bare "error code: NNN" plain-text page, so this endpoint's own
+    // JSON message would never actually reach the caller. Confirmed live
+    // 9 Sep 2026 (on strategic-plan.js first, this being the same
+    // underlying bug) — 500 instead everywhere in this file.
     return new Response(JSON.stringify({ error: { message: 'Could not reach Anthropic API' } }), {
-      status: 502,
+      status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }

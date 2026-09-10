@@ -37,15 +37,15 @@ async function resolveZipToLatLng(zip, kv) {
   try {
     res = await fetch('https://api.zippopotam.us/us/' + zip);
   } catch (e) {
-    throw apiError('Could not resolve that ZIP', 502);
+    throw apiError('Could not resolve that ZIP', 500);
   }
   if (!res.ok) {
-    throw apiError(res.status === 404 ? 'Unrecognized ZIP code' : 'Could not resolve that ZIP', res.status === 404 ? 404 : 502);
+    throw apiError(res.status === 404 ? 'Unrecognized ZIP code' : 'Could not resolve that ZIP', res.status === 404 ? 404 : 500);
   }
   const geo = await res.json();
   const place = geo.places && geo.places[0];
   if (!place || !place.latitude || !place.longitude) {
-    throw apiError('Could not resolve coordinates for that ZIP', 502);
+    throw apiError('Could not resolve coordinates for that ZIP', 500);
   }
   const result = { lat: place.latitude, lng: place.longitude, state: place.state, city: place['place name'] };
   if (kv) {
@@ -94,10 +94,10 @@ export async function resolveStateReps(zip, env) {
   try {
     res = await fetch(url);
   } catch (e) {
-    throw apiError('Could not reach Open States', 502);
+    throw apiError('Could not reach Open States', 500);
   }
   if (!res.ok) {
-    throw apiError(`Open States returned HTTP ${res.status}`, 502);
+    throw apiError(`Open States returned HTTP ${res.status}`, 500);
   }
   const data = await res.json();
   const reps = (data.results || [])

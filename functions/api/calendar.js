@@ -98,18 +98,18 @@ export async function onRequestGet({ env }) {
   try {
     res = await fetch(url);
   } catch (e) {
-    return json({ error: { message: 'Could not reach congress.gov' } }, 502);
+    return json({ error: { message: 'Could not reach congress.gov' } }, 500);
   }
 
   if (!res.ok) {
-    return json({ error: { message: `congress.gov returned HTTP ${res.status}` } }, 502);
+    return json({ error: { message: `congress.gov returned HTTP ${res.status}` } }, 500);
   }
 
   let data;
   try {
     data = await res.json();
   } catch (e) {
-    return json({ error: { message: 'congress.gov returned an unparseable response' } }, 502);
+    return json({ error: { message: 'congress.gov returned an unparseable response' } }, 500);
   }
 
   // congress.gov's own sort=updateDate+desc (the request above) sorts by

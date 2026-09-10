@@ -125,7 +125,7 @@ Bill: ${title}
       })
     });
   } catch (e) {
-    return json({ error: { message: 'Could not reach Anthropic API' } }, 502);
+    return json({ error: { message: 'Could not reach Anthropic API' } }, 500);
   }
 
   const raw = await anthropicRes.text();
@@ -133,7 +133,7 @@ Bill: ${title}
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
-    return json({ error: { message: 'Anthropic returned an unparseable response' } }, 502);
+    return json({ error: { message: 'Anthropic returned an unparseable response' } }, 500);
   }
 
   // Track spend regardless of success/failure, same as dig-check.js —
@@ -160,7 +160,7 @@ Bill: ${title}
     .replace(/^["']|["']$/g, '');
 
   if (!text) {
-    return json({ error: { message: 'Empty response from Anthropic' } }, 502);
+    return json({ error: { message: 'Empty response from Anthropic' } }, 500);
   }
 
   if (kv) {
