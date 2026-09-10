@@ -339,6 +339,15 @@
      talking point — the opposite hierarchy of a trait/issue card, which
      is why this gets its own block instead of reusing .citizen-emoji. */
   .citizen-headline-card { padding-top: 22px; }
+  /* Distinguishes the two sections of the headline deck (10 Sep 2026 —
+     "top 3 of the day" leading into a manifesto-targeted deck) so a
+     citizen can tell why the tone/topic shifts partway through, rather
+     than the deck just quietly changing character. */
+  .citizen-headline-eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 10px;
+  }
   .citizen-headline-img {
     width: 100%; max-width: 260px; aspect-ratio: 1 / 1; object-fit: cover;
     border-radius: 12px; margin-bottom: 16px; background: var(--ink);
@@ -3194,7 +3203,8 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       article: c.article,
       topic: c.topic,
       talkingPoint: c.talkingPoint,
-      photo: c.photo
+      photo: c.photo,
+      sectionLabel: c.sectionLabel || ''
     }));
     deck = [
       ...(opts.skipPostureSprinkle ? headlineCards : sprinklePostureCards(headlineCards)),
@@ -3210,12 +3220,60 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     renderCitizenCard();
   }
 
+  const TOP_STORIES_COUNT = 3;
+  const TARGETED_STORIES_COUNT = 5;
+
+  // Shared live fetch -> boildown -> photo pipeline, extracted 10 Sep
+  // 2026 so startHeadlineMode() can run it twice in one pass (once
+  // unbiased for "today's top stories," once biased for the manifesto-
+  // targeted deck) instead of once. Best-effort: returns [] on any
+  // failure (network, empty results, every boildown failing) rather than
+  // throwing — a citizen shouldn't lose the WHOLE deck because one of
+  // its two sections had a bad fetch, and startHeadlineMode() below
+  // treats "both sections empty" as the only real error case.
+  async function fetchLiveHeadlineCards(query, limit, statusNoun) {
+    let articles = [];
+    try {
+      const r = await fetch('/api/headlines?limit=' + limit + (query ? '&q=' + encodeURIComponent(query) : ''));
+      const data = await r.json();
+      if (!r.ok || data.error) return [];
+      articles = data.articles || [];
+    } catch (e) {
+      return [];
+    }
+    if (!articles.length) return [];
+
+    renderHeadlineLoading('Boiling ' + articles.length + ' ' + statusNoun + ' down to what actually matters…');
+    const boiled = await Promise.all(articles.map(async article => {
+      const b = await boildownHeadline(article);
+      return b ? { article, boildown: b } : null;
+    }));
+    const survivors = boiled.filter(Boolean);
+    if (!survivors.length) return [];
+
+    renderHeadlineLoading('Finding a picture for each one…');
+    await Promise.all(survivors.map(async s => {
+      s.photo = await fetchHeadlinePhoto(s.boildown.imageQuery);
+    }));
+
+    return survivors.map(s => ({
+      article: s.article,
+      topic: s.boildown.topic,
+      talkingPoint: s.boildown.talkingPoint,
+      photo: s.photo
+    }));
+  }
+
+  // 10 Sep 2026: restructured after the citizen asked for "top 3
+  // headlines of the day, followed by a deck of more targeted headlines
+  // based on manifesto" — previously this was either/or (a citizen with
+  // any real signal got ONLY the biased search, never genuinely
+  // prominent general news; a citizen with none got only the generic
+  // batch). Now always leads with real, prominent news before narrowing
+  // to personalization, instead of skipping straight past "what's
+  // actually happening" to "what matches you."
   async function startHeadlineMode(opts) {
     opts = opts || {};
-    // Captured before the reassignment just below wipes it — this is the
-    // one signal that tells us whether the citizen calling this had a
-    // real manifesto already (see the batch-gating comment further down).
-    const wasFirstPass = firstPass;
     firstPass = false; // done card should reflect real accumulated state, not the archetype-cards framing
     deck = [{ type: 'headline-loading' }];
     deckIndex = 0;
@@ -3223,82 +3281,49 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 
     const biasQuery = headlineQuery();
 
-    // Fast path: functions/api/headlines-batch.js pre-warms a ready deck
-    // in the background (see index.html's on-load ping and its own
-    // stale-while-revalidate refresh) — when one's ready, this skips the
-    // whole fetch -> boildown -> photo pipeline below entirely, and (since
-    // the paint above was quiet) never shows a wait-filler for a wait
-    // that, from the citizen's side, barely happened. But it's a single
-    // shared, unpersonalized cache, refreshed at most once an hour and
-    // only when *something* pings it — on a quiet day it can be far
-    // staler than that. A citizen already refining a real manifesto (not
-    // wasFirstPass) gets sent here specifically to sharpen it against
-    // today's news — a citizen flagged this batch reading old and
-    // off-target on exactly this kind of visit (9 Sep 2026) — so refining
-    // always pays for a live fetch instead, biased when there's real
-    // signal to bias with (the common case) and just plain fresh
-    // (unbiased top-headlines) on the rare edge case where it isn't. Only
-    // a genuinely first-time citizen with nothing set yet still gets the
-    // fast shared path.
-    if (wasFirstPass && !biasQuery) {
-      try {
-        const br = await fetch('/api/headlines-batch');
-        const bdata = await br.json();
-        if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
-          buildHeadlineDeckFrom(bdata.cards, opts);
-          return;
-        }
-      } catch (e) {
-        // fall through to the live pipeline below
-      }
-    }
-
-    // No pre-warmed batch used — now it's a genuine wait, so switch to the
-    // full loading treatment (status text + wait-filler).
-    renderHeadlineLoading();
-
-    let articles = [];
+    // Section 1: today's top stories, always unbiased — this is meant to
+    // read as "what's actually happening," not filtered through the
+    // citizen's own priorities. Prefers the pre-warmed batch
+    // (headlines-batch.js) since that's exactly what it's built for —
+    // fast, cached, genuinely general top headlines — for every citizen
+    // now, not just a first-time one; only falls back to a live unbiased
+    // fetch if the batch is cold or empty.
+    let topCards = [];
     try {
-      const r = await fetch('/api/headlines?limit=5' + (biasQuery ? '&q=' + encodeURIComponent(biasQuery) : ''));
-      const data = await r.json();
-      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
-      articles = data.articles || [];
+      const br = await fetch('/api/headlines-batch');
+      const bdata = await br.json();
+      if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
+        topCards = bdata.cards.slice(0, TOP_STORIES_COUNT);
+      }
     } catch (e) {
-      deck = [{ type: 'headline-error', message: e.message, opts }];
-      renderCitizenCard();
-      return;
+      // fall through to a live fetch below
+    }
+    if (!topCards.length) {
+      renderHeadlineLoading();
+      topCards = await fetchLiveHeadlineCards('', TOP_STORIES_COUNT, "today's top stories");
+    }
+    topCards = topCards.map(c => Object.assign({}, c, { sectionLabel: "Today's top story" }));
+
+    // Section 2: a second, more targeted deck — only when there's real
+    // signal to bias with (the existing headlineQuery() bias). "Sharpen
+    // what's already here" against real, fresh search results, same
+    // live pipeline as before, just no longer the ONLY thing a citizen
+    // with a manifesto ever saw.
+    let targetedCards = [];
+    if (biasQuery) {
+      renderHeadlineLoading();
+      targetedCards = await fetchLiveHeadlineCards(biasQuery, TARGETED_STORIES_COUNT, 'headlines');
+      targetedCards = targetedCards.map(c => Object.assign({}, c, { sectionLabel: 'Matches your manifesto' }));
     }
 
-    if (!articles.length) {
+    const allCards = topCards.concat(targetedCards);
+    if (!allCards.length) {
       deck = [{ type: 'headline-error', message: 'No headlines available right now.', opts }];
       renderCitizenCard();
       return;
     }
 
-    renderHeadlineLoading('Boiling ' + articles.length + ' headlines down to what actually matters…');
-    const boiled = await Promise.all(articles.map(async article => {
-      const b = await boildownHeadline(article);
-      return b ? { article, boildown: b } : null;
-    }));
-    const survivors = boiled.filter(Boolean);
-
-    if (!survivors.length) {
-      deck = [{ type: 'headline-error', message: "Couldn't make sense of today's headlines — try again in a bit.", opts }];
-      renderCitizenCard();
-      return;
-    }
-
-    renderHeadlineLoading('Finding a picture for each one…');
-    await Promise.all(survivors.map(async s => {
-      s.photo = await fetchHeadlinePhoto(s.boildown.imageQuery);
-    }));
-
-    buildHeadlineDeckFrom(survivors.map(s => ({
-      article: s.article,
-      topic: s.boildown.topic,
-      talkingPoint: s.boildown.talkingPoint,
-      photo: s.photo
-    })), opts);
+    buildHeadlineDeckFrom(allCards, opts);
   }
 
   // Ranks categories by how many of their issues a swiped-in trait hints
@@ -3718,6 +3743,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
       const p = card.photo;
       slot.innerHTML = `
         <div class="citizen-card citizen-headline-card" id="citizen-active-card">
+          ${card.sectionLabel ? `<div class="citizen-headline-eyebrow">${esc(card.sectionLabel)}</div>` : ''}
           ${p
             ? `<img class="citizen-headline-img" src="${esc(p.image)}" alt="">`
             : `<div class="citizen-headline-img citizen-headline-img-fallback">📰</div>`}
