@@ -1146,6 +1146,35 @@ see "Deliberately not yet done" below for why.
   federal bill's card renders (`renderCard()`, `focusEntryHtml()`,
   `watchCardHtml()`).
 
+  **Dead CTAs on enacted bills, and celebrating watched wins, 10 Sep
+  2026** — the citizen pointed out a real gap `deriveStatus()` made
+  possible but never used: a federal bill already signed into law
+  ("Became Law") still showed a live "Take action" button, a genuine
+  dead end since there's nothing left to lobby for. New `isEnacted(bill)`
+  gates that CTA everywhere it renders (`renderCard()`, `focusEntryHtml()`)
+  — an enacted bill now shows "✅ Already signed into law" instead.
+  State/municipal aren't touched (no status field to check, same
+  limitation the status-tag feature above already has). The citizen's
+  own framing: this shouldn't apply to a bill on the *watchlist* the same
+  way — a watched bill becoming law is a win, not a dead end, and should
+  be "celebrated and counted on the stats." `watchCardHtml()` now shows a
+  real celebration banner ("🎉 This one became law!") instead of the
+  routine "updated" badge once a watched federal bill's live status flips
+  to enacted, persisted via a `won` flag written directly onto the watch
+  item (`markWatchWon()`) so it's counted exactly once, ever, the same
+  "count once" shape `P.statsReported` already used for manifestos.
+  `platform-stats.js` gained a genuinely separate `type: "win"` counter
+  pair (`winsTotal`, `winTopics`) rather than folding wins into the
+  existing action `levels`/`topics` counters — a win is an outcome, not
+  an action the citizen took, and conflating the two would muddy both.
+  Federal watch items now also carry their matched-priority `hits` at
+  watch-time (`openActionModalFor()`'s `toggleWatch()` call) purely so a
+  future win can be attributed to a real topic — existing watches from
+  before this shipped just report a bare win with no topic breakdown,
+  rather than guessing one. `analytics.html`'s real-data view shows the
+  new total ("🎉 Watched bills that became law") and a per-topic
+  breakdown alongside the existing stats.
+
   **Shared server-side summary cache, 2 Sep 2026** — the citizen hit
   DIG's 30/day per-IP `/api/dig-check` limit on what they thought was
   their first DIG use in days. Root cause: that limit is shared across
