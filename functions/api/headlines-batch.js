@@ -19,7 +19,11 @@
 import { fetchGNews } from '../_lib/gnews.js';
 import { ALL_ISSUE_NAMES } from '../_lib/issue-taxonomy.js';
 
-const BATCH_KEY = 'headlinebatch:ready';
+// Versioned, same reasoning as builder.html's HEADLINE_BOILDOWN_KEY —
+// bump the suffix whenever boildownPrompt() below changes meaningfully,
+// so a stale-but-not-yet-expired batch (up to STORE_TTL_SECONDS old)
+// can't keep serving pre-fix talking points past a real prompt fix.
+const BATCH_KEY = 'headlinebatch:ready:v2';
 const FRESH_SECONDS = 60 * 60; // "ready by the top of the hour" framing
 const STORE_TTL_SECONDS = FRESH_SECONDS * 6; // keep a stale batch around well past freshness as a fallback
 const BATCH_SIZE = 5;

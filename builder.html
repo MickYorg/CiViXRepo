@@ -2711,7 +2711,18 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   // A swiped-in topic becomes a priority the same way picking a chip off
   // an 'issue-picker' card does, so it flows into the same zip -> done ->
   // Take Action hand-off for free.
-  const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown';
+  // 10 Sep 2026: versioned key, bumped whenever the boildown *prompt*
+  // changes meaningfully — this cache has no expiry (a headline's
+  // boildown "doesn't change once written," by original design), which
+  // means a real prompt fix (9 Sep 2026's "no compound X-even-though-Y
+  // talking points" fix) silently had zero effect for anyone whose
+  // browser had already cached the old, broken phrasing for a headline
+  // that kept resurfacing — reported live as "did we actually fix this?
+  // I'm not seeing much." A version bump is a clean break: old entries
+  // are simply orphaned under the old key name, everyone regenerates
+  // fresh under the current prompt, no per-entry logic needed. Bump this
+  // suffix again the next time the boildown prompt itself changes.
+  const HEADLINE_BOILDOWN_KEY = 'civix-headline-boildown-v2';
 
   function hashStr(s) {
     let h = 5381;
