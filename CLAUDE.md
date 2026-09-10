@@ -84,16 +84,30 @@ level Cache Rule (or legacy Page Rule) on the `mycivix.com` zone itself**
 a Browser/Edge Cache TTL for static assets that overrides whatever the
 origin (Pages Function) sends, for this domain only. No `CLOUDFLARE_API_TOKEN`
 is available in this environment to inspect or fix this via API, and it's
-a shared-infrastructure/production setting regardless, so it needs the
-user directly: **dash.cloudflare.com → the `mycivix.com` zone → Caching →
-Cache Rules** (and check legacy **Rules → Page Rules** too) for a rule
-matching `.js`/static assets with an hours-long TTL, and remove or narrow
-it. Until that's done, the `_headers` fix (and any future `.js` fix) will
-keep being invisible to real citizens on `mycivix.com` for up to 4 hours
-after every deploy, exactly as before. **First thing next session**:
-confirm with the user whether they found/removed the zone Cache Rule, then
-re-verify `curl -sI https://mycivix.com/digest.js` returns `no-cache`
-before considering this closed.
+a shared-infrastructure/production setting regardless, so it needed the
+user directly.
+
+**Resolved, same day.** The user found and lowered the zone's Browser
+Cache TTL setting (4 hours → 1 second) in the dashboard. First retest
+still showed the same bad top-3 results, which raised a fair question —
+was this actually fixed, or still a bug? Verified both halves live rather
+than guessing: (1) `curl -sI https://mycivix.com/digest.js` now returns
+`cache-control: max-age=1` — the zone change is genuinely live at the
+edge; (2) the live `digest.js` served from `mycivix.com` was downloaded
+and diffed byte-for-byte against the repo's fixed copy — identical,
+confirming the deployed code really is the fixed version, not a stale
+build. The remaining suspect was the user's own browser: a Cloudflare
+TTL change can't reach into a browser tab that already cached an old copy
+under the previous 4-hour rule — that copy stays "fresh" to the browser
+until its own original timer expires regardless of what the server now
+sends, and iPad Safari has no simple hard-refresh gesture to force past
+that the way desktop browsers do. Confirmed exactly this: a Private
+Browsing tab (guaranteed empty cache) showed correct results
+immediately. **Genuinely closed** — the matching code, the `_headers`
+fix, and the zone TTL are all correct and live; any lingering wrong
+result in an already-open regular tab is expected and will clear on its
+own once that tab's old cached copy ages out (now capped at 1 second
+going forward, so this class of bug shouldn't recur).
 
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
