@@ -21,6 +21,13 @@ import { slim } from '../_lib/congress-bill.js';
 const CACHE_TTL_SECONDS = 60 * 60; // 1 hour, same freshness window as calendar.js
 const CURRENT_CONGRESS = 119;
 const SEARCH_LIMIT = 250; // congress.gov's own documented per-request max
+// 6 pages x 250 = up to 1,500 bills, fetched in parallel. Confirmed live
+// that even one full page (250, sorted by most-recently-updated) didn't
+// contain the real, currently-active NDAA — a bill this major can still
+// rank well outside the top 250 "most recently touched" on a quiet week
+// between its own floor actions, with thousands of smaller bills getting
+// routine metadata updates ahead of it.
+const PAGE_OFFSETS = [0, 250, 500, 750, 1000, 1250];
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -52,26 +59,28 @@ export async function onRequestGet({ request, env }) {
     );
   }
 
-  const apiUrl = `https://api.congress.gov/v3/bill/${congress}?format=json&sort=updateDate+desc&limit=${SEARCH_LIMIT}&api_key=${encodeURIComponent(apiKey)}`;
+  // Confirmed live: even a single 250-item page (congress.gov's own
+  // per-request max) wasn't enough — the real, currently-active NDAA
+  // simply sits further down the "most recently updated" ranking than
+  // that on a quiet week between its own floor actions, with thousands
+  // of other bills getting minor metadata touches ahead of it. Pages a
+  // few requests deep (offset-based, in parallel) rather than one — a
+  // heavier fetch, but only for this narrow, cached, deliberately rare
+  // lookup, not general digest traffic.
+  const apiUrlFor = offset =>
+    `https://api.congress.gov/v3/bill/${congress}?format=json&sort=updateDate+desc&limit=${SEARCH_LIMIT}&offset=${offset}&api_key=${encodeURIComponent(apiKey)}`;
 
-  let res;
+  let pages;
   try {
-    res = await fetch(apiUrl);
+    pages = await Promise.all(
+      PAGE_OFFSETS.map(offset => fetch(apiUrlFor(offset)).then(r => (r.ok ? r.json() : { bills: [] })).catch(() => ({ bills: [] })))
+    );
   } catch (e) {
     return json({ error: { message: 'Could not reach congress.gov' } }, 500);
   }
-  if (!res.ok) {
-    return json({ error: { message: `congress.gov returned HTTP ${res.status}` } }, 500);
-  }
 
-  let data;
-  try {
-    data = await res.json();
-  } catch (e) {
-    return json({ error: { message: 'congress.gov returned an unparseable response' } }, 500);
-  }
-
-  const matches = (data.bills || [])
+  const allBills = pages.reduce((acc, page) => acc.concat(page.bills || []), []);
+  const matches = allBills
     .filter(b => (b.title || '').toLowerCase().includes(phrase))
     .map(slim)
     .sort((a, b) => {
@@ -83,8 +92,7 @@ export async function onRequestGet({ request, env }) {
   const payload = {
     bill: matches[0] || null,
     fetchedAt: Date.now(),
-    debugPoolSize: (data.bills || []).length,
-    debugSampleTitles: (data.bills || []).slice(0, 3).map(b => b.title)
+    debugPoolSize: allBills.length
   };
 
   if (kv) {
