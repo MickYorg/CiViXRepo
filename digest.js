@@ -278,18 +278,16 @@
   // the model's own memory (a very recent bill, and the citizen pushed
   // back, fairly, that treating this as unresolvable "hogwash" — in
   // common usage "the NDAA" always means whichever one is currently
-  // active, not some unspecified year). First attempt searched
-  // buildTopDigest()'s own already-fetched federal pool for a title
-  // match — confirmed live that this doesn't work either: the real,
-  // currently-active NDAA (S.4784) isn't even in that ~100-most-
-  // recently-updated window on a given day, the identical gap
-  // bill-lookup.js was built to close for a cited bill. bill-search.js
-  // (new) searches a much wider, congress-scoped pool (up to 250, the
-  // real congress.gov API's own per-request max) specifically for
-  // patterns like this — real, current data instead of a memorized fact
-  // that may not even be in the model's training window. Extensible to
-  // other well-known recurring/annual bills later; NDAA is the one
-  // actually reported live so far.
+  // active, not some unspecified year). Two narrower attempts confirmed-
+  // live before this one worked: buildTopDigest()'s own already-fetched
+  // federal pool (only ~100 items) didn't contain it, and neither did a
+  // single 250-item page from bill-search.js — the real, currently-
+  // active NDAA can rank well outside even that on a quiet week between
+  // its own floor actions. bill-search.js now pages 6 requests deep
+  // (1,500 bills) to actually find it — real, current data instead of a
+  // memorized fact that may not even be in the model's training window.
+  // Extensible to other well-known recurring/annual bills later; NDAA is
+  // the one actually reported live so far.
   const RECURRING_BILL_PATTERNS = [
     { mention: /\bndaa\b/i, phrase: 'national defense authorization act' }
   ];
