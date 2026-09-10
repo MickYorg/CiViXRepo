@@ -404,11 +404,26 @@
      2 Sep 2026; Activist/Pro already got the plain-language rewrite via
      enhancePlainSummaries() same as Citizen did, just buried in
      .card-body below the legalese title instead of leading with it. */
+  /* 10 Sep 2026: inside .card-top's flex row, this had no flex-grow or
+     min-width override while its sibling .card-tags carries
+     flex-shrink:0 (fixed-width, never gives space back). Whenever tags
+     had enough combined width to matter — concretely, any federal card,
+     which alone gets a second (status) tag alongside the jurisdiction
+     one — the flex algorithm put all the shrinking pressure on this
+     span alone, collapsing it toward its own content-minimum width
+     (effectively "however wide the longest word is") instead of the
+     row's actual available space. The visible result: a citizen-flagged
+     screenshot showing federal synopses wrapped almost one word per
+     line while the state card beside it (one tag, less pressure) wrapped
+     normally. flex + min-width:0 makes it claim the real remaining
+     width in the row instead of shrinking to a sliver. */
   .card-synopsis {
     font-size: 16px;
     line-height: 1.5;
     color: var(--paper);
     margin-bottom: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .title-details {
     margin-bottom: 8px;
