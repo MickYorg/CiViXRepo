@@ -79,7 +79,12 @@ export async function onRequestGet({ request, env }) {
       return bd.localeCompare(ad);
     });
 
-  const payload = { bill: matches[0] || null, fetchedAt: Date.now() };
+  const payload = {
+    bill: matches[0] || null,
+    fetchedAt: Date.now(),
+    debugPoolSize: (data.bills || []).length,
+    debugSampleTitles: (data.bills || []).slice(0, 3).map(b => b.title)
+  };
 
   if (kv) {
     try {
