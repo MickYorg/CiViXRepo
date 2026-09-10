@@ -53,11 +53,38 @@ export function slug(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// 10 Sep 2026: kept in sync with digest.js's own copy — plain substring
+// search (`indexOf`) has no concept of word boundaries, so a short/common
+// keyword can silently match inside an unrelated longer word (confirmed
+// live: "high," from a citizen's own stance text, matched inside "Higher
+// Education Act"). See digest.js's own comment for the full story.
+function matchesWord(haystack, phrase) {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('\\b' + escaped + '\\b').test(haystack);
+}
+
+// 10 Sep 2026: kept in sync with digest.js's own copy — word-boundary
+// matching alone still lets a short/generic word be a real whole-word
+// false positive (confirmed live: "National Defense Authorization Act
+// for Fiscal Year 2027" false-matched "National Fossil Act of 2026" via
+// the bare word "National"). See digest.js's own comment for the story.
+const LOOSE_WORD_STOPLIST = new Set([
+  'national', 'federal', 'government', 'public', 'state', 'states', 'america', 'american',
+  'united', 'act', 'authorization', 'authorize', 'authorizing', 'committee', 'department',
+  'agency', 'program', 'programs', 'service', 'services', 'fiscal', 'year', 'years',
+  'congress', 'congressional', 'law', 'legislation', 'bill', 'amendment', 'amendments',
+  'section', 'title', 'general', 'office', 'administration', 'policy', 'affairs', 'related',
+  'certain', 'other', 'purposes', 'require', 'requires', 'establish', 'establishes',
+  'provide', 'provides', 'improve', 'improving', 'support', 'supporting', 'protection',
+  'protecting', 'reform', 'modernization', 'accountability'
+]);
+function looseWords(text) {
+  return (text || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4 && !LOOSE_WORD_STOPLIST.has(w));
+}
+
 export function keywordsFor(issue) {
   const extra = SYNONYMS[issue.id] || [];
-  const nameWords = (issue.name || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-  const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-  return [(issue.name || '').toLowerCase()].concat(extra, nameWords, stanceWords);
+  return [(issue.name || '').toLowerCase()].concat(extra, looseWords(issue.name), looseWords(issue.stance));
 }
 
 export function scoreAgainstIssues(hay, issues) {
@@ -66,7 +93,7 @@ export function scoreAgainstIssues(hay, issues) {
   let score = 0;
   (issues || []).forEach(issue => {
     const kws = keywordsFor(issue);
-    if (kws.some(k => h.indexOf(k) !== -1)) {
+    if (kws.some(k => matchesWord(h, k))) {
       score += issue.weight || 1;
       hits.push(issue.name);
     }
@@ -86,9 +113,7 @@ function curatedKeywordsFor(issue) {
   return [(issue.name || '').toLowerCase()].concat(SYNONYMS[issue.id] || []);
 }
 function looseKeywordsFor(issue) {
-  const nameWords = (issue.name || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-  const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-  return nameWords.concat(stanceWords);
+  return looseWords(issue.name).concat(looseWords(issue.stance));
 }
 
 export function matchBills(bills, issues) {
@@ -98,8 +123,8 @@ export function matchBills(bills, issues) {
     const hits = [];
     let score = 0;
     (issues || []).forEach(issue => {
-      const matched = curatedKeywordsFor(issue).some(k => full.indexOf(k) !== -1)
-        || looseKeywordsFor(issue).some(k => title.indexOf(k) !== -1);
+      const matched = curatedKeywordsFor(issue).some(k => matchesWord(full, k))
+        || looseKeywordsFor(issue).some(k => matchesWord(title, k));
       if (matched) {
         score += issue.weight || 1;
         hits.push(issue.name);

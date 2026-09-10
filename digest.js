@@ -64,6 +64,23 @@
     return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
+  // 10 Sep 2026: every keyword check in this file used plain substring
+  // search (`hay.indexOf(k) !== -1`) — confirmed live as a second,
+  // distinct false-positive source beyond the committee-boilerplate one
+  // fixed the same day: the loose word "high" (pulled from a citizen's
+  // own stance text, "rent is too high...") silently matched inside
+  // "Higher Education Act," a bill with nothing to do with housing.
+  // Substring search has no concept of word boundaries, so any short or
+  // common keyword ("high", "act", "rent") can hide inside an unrelated
+  // longer word. Word-boundary matching is strictly more correct for
+  // every keyword here — curated phrases and loose single words alike —
+  // with no legitimate case that depended on the old partial-word
+  // behavior.
+  function matchesWord(haystack, phrase) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('\\b' + escaped + '\\b').test(haystack);
+  }
+
   // 4 Sep 2026: matching used to run only against the fixed taxonomy name
   // and its hand-authored SYNONYMS — real, specific-enough asks a citizen
   // actually types ("release the Epstein files," "defund Flock
@@ -79,11 +96,37 @@
   // builder.html's mergeStance() even when several distinct priorities
   // share one bucket) is real signal specifically for this — same >=4-char
   // heuristic already applied to the topic name itself.
+  // 10 Sep 2026: word-boundary matching (see matchesWord() above) closed
+  // the "high" hiding inside "Higher" class of false positive, but a
+  // short/generic word can still be a real whole word in two totally
+  // unrelated bills — confirmed live: "National Defense Authorization
+  // Act for Fiscal Year 2027" is a citizen's own specific priority, but
+  // the model isn't confident enough to resolve it to a real citation
+  // (a very recent bill; see buildTopDigest()'s own comment), so it
+  // falls through to this loose word extraction — and nearly every word
+  // in that official title ("National," "Defense," "Fiscal," "Year") is
+  // generic legislative-institution vocabulary that plenty of unrelated
+  // bills also legitimately contain as whole words ("National Fossil
+  // Act of 2026" false-matched this exact way). A fixed stoplist of
+  // common bureaucratic filler isn't a complete fix — no stoplist ever
+  // is — but it directly closes this specific, confirmed class of bug.
+  const LOOSE_WORD_STOPLIST = new Set([
+    'national', 'federal', 'government', 'public', 'state', 'states', 'america', 'american',
+    'united', 'act', 'authorization', 'authorize', 'authorizing', 'committee', 'department',
+    'agency', 'program', 'programs', 'service', 'services', 'fiscal', 'year', 'years',
+    'congress', 'congressional', 'law', 'legislation', 'bill', 'amendment', 'amendments',
+    'section', 'title', 'general', 'office', 'administration', 'policy', 'affairs', 'related',
+    'certain', 'other', 'purposes', 'require', 'requires', 'establish', 'establishes',
+    'provide', 'provides', 'improve', 'improving', 'support', 'supporting', 'protection',
+    'protecting', 'reform', 'modernization', 'accountability'
+  ]);
+  function looseWords(text) {
+    return text.toLowerCase().split(/\W+/).filter(w => w.length >= 4 && !LOOSE_WORD_STOPLIST.has(w));
+  }
+
   function keywordsFor(issue) {
     const extra = SYNONYMS[issue.id] || [];
-    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    return [issue.name.toLowerCase()].concat(extra, nameWords, stanceWords);
+    return [issue.name.toLowerCase()].concat(extra, looseWords(issue.name), looseWords(issue.stance || ''));
   }
 
   // Scores one haystack of text against a citizen's issues — the per-item
@@ -94,7 +137,7 @@
     let score = 0;
     issues.forEach(issue => {
       const kws = keywordsFor(issue);
-      if (kws.some(k => h.indexOf(k) !== -1)) {
+      if (kws.some(k => matchesWord(h, k))) {
         score += issue.weight || 1;
         hits.push(issue.name);
       }
@@ -126,9 +169,7 @@
     return [issue.name.toLowerCase()].concat(SYNONYMS[issue.id] || []);
   }
   function looseKeywordsFor(issue) {
-    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    return nameWords.concat(stanceWords);
+    return looseWords(issue.name).concat(looseWords(issue.stance || ''));
   }
   function scoreBillAgainstIssues(bill, issues) {
     const title = (bill.title || '').toLowerCase();
@@ -136,8 +177,8 @@
     const hits = [];
     let score = 0;
     issues.forEach(issue => {
-      const matched = curatedKeywordsFor(issue).some(k => full.indexOf(k) !== -1)
-        || looseKeywordsFor(issue).some(k => title.indexOf(k) !== -1);
+      const matched = curatedKeywordsFor(issue).some(k => matchesWord(full, k))
+        || looseKeywordsFor(issue).some(k => matchesWord(title, k));
       if (matched) {
         score += issue.weight || 1;
         hits.push(issue.name);
@@ -335,9 +376,35 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   async function buildTopDigest(profile, opts) {
     opts = opts || {};
     const limit = opts.limit || 3;
-    const issues = (profile && profile.issues) || [];
+    const allIssues = (profile && profile.issues) || [];
     const zip = profile && profile.place && profile.place.zip;
     const results = [];
+
+    // 10 Sep 2026: an issue that names one specific, citable bill
+    // ("Epstein Files Transparency Act II", "the CHIPS Act") must NEVER
+    // be run through the generic pool keyword-matching below — confirmed
+    // live, with a citizen's own real top-3, that it produces real,
+    // damaging false positives: that exact issue's own loose words
+    // ("transparency") false-matched a totally unrelated "Fiscal
+    // Sponsorship Transparency Act," and "NDAA for Fiscal Year 2027"
+    // false-matched multiple unrelated ceremonial resolutions the same
+    // way — a specific bill's name is full of short, generic words
+    // ("act," "transparency," "national") that plenty of OTHER bills'
+    // titles also happen to contain. Worse than a cosmetic wrong tag:
+    // that false match satisfied the "already matched" check the
+    // citation-lookup step below relies on, so the CORRECT bill (found
+    // via direct lookup) never even got a chance to run. Split up front
+    // instead: a citable issue is resolved via direct lookup only, full
+    // stop, never fed into matchBills()'s keyword search at all.
+    const citable = [];
+    const poolIssues = [];
+    allIssues.forEach(i => {
+      const citation = (i.weight === 3 && i.stance)
+        ? (i.billCitation || parseBillCitation(i.name) || parseBillCitation(i.stance))
+        : null;
+      if (citation) citable.push({ issue: i, citation });
+      else poolIssues.push(i);
+    });
 
     const [fed, state, municipal, docket] = await Promise.allSettled([
       fetchFederalBills(),
@@ -346,58 +413,60 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       fetchDocketItems(profile && profile.token)
     ]);
 
-    if (fed.status === 'fulfilled' && issues.length) {
-      matchBills(fed.value, issues).forEach(m => results.push(billEntry('federal', m.bill, m.hits, m.score)));
+    if (fed.status === 'fulfilled' && poolIssues.length) {
+      matchBills(fed.value, poolIssues).forEach(m => results.push(billEntry('federal', m.bill, m.hits, m.score)));
     }
-    if (state.status === 'fulfilled' && issues.length) {
-      matchBills(state.value.bills, issues).forEach(m => results.push(billEntry('state', m.bill, m.hits, m.score)));
+    if (state.status === 'fulfilled' && poolIssues.length) {
+      matchBills(state.value.bills, poolIssues).forEach(m => results.push(billEntry('state', m.bill, m.hits, m.score)));
     }
-    if (municipal.status === 'fulfilled' && municipal.value.covered && issues.length) {
-      matchBills(municipal.value.bills, issues).forEach(m => results.push(billEntry('municipal', m.bill, m.hits, m.score)));
+    if (municipal.status === 'fulfilled' && municipal.value.covered && poolIssues.length) {
+      matchBills(municipal.value.bills, poolIssues).forEach(m => results.push(billEntry('municipal', m.bill, m.hits, m.score)));
     }
 
-    // 10 Sep 2026: before ever falling back to the unconditional "general
-    // priority" scoring further down, try a direct congress.gov lookup
-    // for any high-conviction priority that names a specific, citable
-    // bill. The pools fetched above are each only the ~100 most-
-    // recently-updated items for their jurisdiction — a real, specific
-    // bill a citizen actually named can easily not be in that window on
-    // a given day (confirmed live: H.R.9694 wasn't), which used to mean
-    // it could never be genuinely matched and instead always won the
-    // unconditional fallback below for the wrong reason — not because it
-    // was the most important thing, but because it happened to be
-    // unmatched. A citizen who names an actual bill has already given
-    // exactly what's needed to fetch it directly (see bill-lookup.js).
-    // Runs before the jurisdiction-lean block below on purpose, so a
-    // bill found this way gets weighted the same as any other federal
-    // match rather than skipping that step.
-    // 10 Sep 2026: real people don't talk in bill numbers — "the CHIPS
+    // Before ever falling back to the unconditional "general priority"
+    // scoring further down, resolve every citable issue split out above
+    // via a direct congress.gov lookup. The pools fetched above are each
+    // only the ~100 most-recently-updated items for their jurisdiction —
+    // a real, specific bill a citizen actually named can easily not be
+    // in that window on a given day (confirmed live: H.R.9694 wasn't),
+    // and real people don't talk in bill numbers anyway ("the CHIPS
     // Act," "Obamacare," "the Patriot Act," "NDAA" is how this actually
-    // gets typed, not "H.R.4346." issue.billCitation (set by builder.html's
-    // classifyFreeformPriority() when the model itself confidently
-    // resolves a popular name to a real citation) is tried first; a
-    // citizen-typed literal citation the regex above can find is the
-    // fallback. Deliberately NOT gated on a keyword-overlap sanity check
-    // against the fetched bill's title — tried that, and it broke the
-    // exact case this exists to fix: verified live that "Obamacare"
-    // correctly resolves to H.R.3590 ("Patient Protection and Affordable
-    // Care Act"), which shares zero words with the popular name a
-    // citizen actually typed, by design — that's what a popular name
-    // *is*. The real safety net here is the citizen-facing confirm
-    // screen (renderFreeformConfirm() shows "Matched to HR 3590, 111th
-    // Congress" before committing) plus bill-lookup.js's own 404 on a
-    // citation that doesn't exist at all — a human catching a wrong
-    // resolution beats a keyword heuristic that would also reject
-    // correct ones.
-    if (issues.length) {
-      const alreadyMatched = new Set();
-      results.forEach(r => (r.hits || []).forEach(h => alreadyMatched.add(h)));
-      const citedCandidates = issues.filter(i => i.weight === 3 && i.stance && !alreadyMatched.has(i.name));
-      for (const i of citedCandidates) {
-        const citation = i.billCitation || parseBillCitation(i.name) || parseBillCitation(i.stance);
-        if (!citation) continue;
-        const bill = await lookupBillDirect(citation);
-        if (bill) results.push(billEntry('federal', bill, [i.name], i.weight));
+    // gets typed) — issue.billCitation (set by builder.html's
+    // classifyFreeformPriority() when the model confidently resolves a
+    // popular name to a real citation) is tried first, a citizen-typed
+    // literal citation the regex can find is the fallback. Deliberately
+    // NOT gated on a keyword-overlap sanity check against the fetched
+    // bill's title — tried that, and it broke the exact case this
+    // exists to fix: "Obamacare" correctly resolves to H.R.3590
+    // ("Patient Protection and Affordable Care Act"), which shares zero
+    // words with the popular name a citizen actually typed, by design —
+    // that's what a popular name *is*. The real safety net is the
+    // citizen-facing confirm screen (renderFreeformConfirm() shows
+    // "Matched to HR 3590, 111th Congress" before committing) plus
+    // bill-lookup.js's own 404 on a citation that doesn't exist at all.
+    // Runs before the jurisdiction-lean block below on purpose, so a
+    // bill found this way gets weighted the same way as any other
+    // federal match rather than skipping that step.
+    for (const { issue: i, citation } of citable) {
+      const bill = await lookupBillDirect(citation);
+      if (bill) {
+        const entry = billEntry('federal', bill, [i.name], i.weight);
+        // Confirmed live 10 Sep 2026: scoring this the same as an
+        // ordinary keyword match (i.weight alone, ~1-9 after lean) was
+        // a real regression, not just "more correct" — a citizen who
+        // explicitly named a specific bill (directly, or via a common
+        // name like "the CHIPS Act") could still fail to see it in
+        // their own top-3, buried behind a pile of *other* priorities'
+        // incidental keyword ties that happened to come first in
+        // insertion order. Naming an exact bill is a stronger, more
+        // deliberate signal than an algorithm finding a keyword in a
+        // bill's text — it should consistently surface, without going
+        // back to the old score:1000+ that let it unconditionally beat
+        // even a citizen's OTHER equally-explicit priorities. +50
+        // clears any realistic tie from ordinary matching while still
+        // letting several cited bills rank fairly among each other.
+        entry.score = 50 + i.weight;
+        results.push(entry);
       }
     }
 
@@ -417,10 +486,10 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       }
     });
 
-    if (docket.status === 'fulfilled' && docket.value.length && issues.length) {
+    if (docket.status === 'fulfilled' && docket.value.length && poolIssues.length) {
       for (const item of docket.value) {
         const topic = await classifyDocketItem(item);
-        const { score, hits } = scoreAgainstIssues(topic, issues);
+        const { score, hits } = scoreAgainstIssues(topic, poolIssues);
         if (score > 0) {
           results.push({
             kind: 'docket', hits, score,
@@ -446,7 +515,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     // statement leads, algorithmic matching follows.
     const matchedNames = new Set();
     results.forEach(r => (r.hits || []).forEach(h => matchedNames.add(h)));
-    issues
+    allIssues
       .filter(i => i.weight === 3 && i.stance && !matchedNames.has(i.name))
       .forEach(i => {
         results.push({

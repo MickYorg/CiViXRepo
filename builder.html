@@ -1628,11 +1628,34 @@
   // Curated CAL_SYNONYMS entries + the issue's full name are specific
   // enough to trust anywhere; the loose nameWords extraction now only
   // matches the bill's own title.
+  //
+  // Word-boundary matching plus a stoplist of common legislative filler
+  // words (also kept in sync with digest.js) close two further confirmed
+  // false-positive classes: a short keyword hiding inside an unrelated
+  // longer word ("high" inside "Higher Education Act"), and a generic
+  // institutional word being a real whole-word match in two totally
+  // unrelated bills ("National" matching both a citizen's own "National
+  // Defense Authorization Act..." priority and an unrelated "National
+  // Fossil Act").
+  function matchesWordForMatch(haystack, phrase) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('\\b' + escaped + '\\b').test(haystack);
+  }
+  const LOOSE_WORD_STOPLIST_MATCH = new Set([
+    'national', 'federal', 'government', 'public', 'state', 'states', 'america', 'american',
+    'united', 'act', 'authorization', 'authorize', 'authorizing', 'committee', 'department',
+    'agency', 'program', 'programs', 'service', 'services', 'fiscal', 'year', 'years',
+    'congress', 'congressional', 'law', 'legislation', 'bill', 'amendment', 'amendments',
+    'section', 'title', 'general', 'office', 'administration', 'policy', 'affairs', 'related',
+    'certain', 'other', 'purposes', 'require', 'requires', 'establish', 'establishes',
+    'provide', 'provides', 'improve', 'improving', 'support', 'supporting', 'protection',
+    'protecting', 'reform', 'modernization', 'accountability'
+  ]);
   function curatedKeywordsForMatch(issue) {
     return [issue.name.toLowerCase()].concat(CAL_SYNONYMS[issue.id] || []);
   }
   function looseKeywordsForMatch(issue) {
-    return issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4 && !LOOSE_WORD_STOPLIST_MATCH.has(w));
   }
   function matchedCountFor(issue) {
     const curated = curatedKeywordsForMatch(issue);
@@ -1640,7 +1663,7 @@
     const hits = bills => (bills || []).filter(b => {
       const title = (b.title || '').toLowerCase();
       const full = title + ' ' + (b.latestAction ? (b.latestAction.text || '').toLowerCase() : '');
-      return curated.some(k => full.indexOf(k) !== -1) || loose.some(k => title.indexOf(k) !== -1);
+      return curated.some(k => matchesWordForMatch(full, k)) || loose.some(k => matchesWordForMatch(title, k));
     }).length;
     return hits(FED_BILLS) + hits(STATE_BILLS);
   }
