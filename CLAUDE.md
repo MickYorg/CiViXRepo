@@ -51,6 +51,50 @@ today's "looks done but isn't" bugs, hasn't been checked with the same
 scrutiny. That's the natural next place to point this same kind of
 audit, if picking this mandate back up.
 
+**10 Sep 2026, later same day — false-positive bug the user still saw after
+all the above fixes were live, and a real, unresolved caching blocker
+found underneath it.** The user sent a fresh screenshot showing the exact
+same false-positive matching bug (ceremonial resolutions showing false
+"matched" tags) after all six fixes above were deployed. Verified live
+with a Node simulation using the exact issue strings from the screenshot
+against current production `digest.js` — it produced fully correct
+results, so the deployed code itself is right. Root cause of what the
+user was actually seeing: Cloudflare Pages serves `.js` files with a
+4-hour default browser cache (`Cache-Control: max-age=14400`, confirmed
+via `curl -sI` on `digest.js`/`mode.js`/`civics.js`), and there was no
+`_headers` file in the repo to override it — so a real, deployed fix could
+sit invisible in an already-loaded browser for up to 4 hours, which likely
+explains several earlier "I don't see the fix" moments this session too,
+not just this last one. Added `/_headers` (`/*.js` → `Cache-Control:
+no-cache`, i.e. always revalidate with the server, not "never cache") —
+committed `51cae85`, pushed, confirmed live and working correctly on
+`mycivix.pages.dev` (the Pages project's own domain: `digest.js` there now
+returns `cache-control: no-cache`).
+
+**But — confirmed live the same fix is NOT taking effect on the real
+domain.** `curl -sI https://mycivix.com/digest.js` (even cache-busted with
+a random query string, `cf-cache-status: MISS`) still returns
+`cache-control: max-age=14400`, for the identical file/etag that
+`mycivix.pages.dev` correctly serves as `no-cache`. Since `cf-cache-status`
+was `MISS` (not a stale edge cache hit), this isn't an edge-cache
+propagation lag — Cloudflare went to origin and still got the stale
+header back for the custom domain specifically. That points to a **zone-
+level Cache Rule (or legacy Page Rule) on the `mycivix.com` zone itself**
+— a separate Cloudflare feature from Pages' own `_headers` file — forcing
+a Browser/Edge Cache TTL for static assets that overrides whatever the
+origin (Pages Function) sends, for this domain only. No `CLOUDFLARE_API_TOKEN`
+is available in this environment to inspect or fix this via API, and it's
+a shared-infrastructure/production setting regardless, so it needs the
+user directly: **dash.cloudflare.com → the `mycivix.com` zone → Caching →
+Cache Rules** (and check legacy **Rules → Page Rules** too) for a rule
+matching `.js`/static assets with an hours-long TTL, and remove or narrow
+it. Until that's done, the `_headers` fix (and any future `.js` fix) will
+keep being invisible to real citizens on `mycivix.com` for up to 4 hours
+after every deploy, exactly as before. **First thing next session**:
+confirm with the user whether they found/removed the zone Cache Rule, then
+re-verify `curl -sI https://mycivix.com/digest.js` returns `no-cache`
+before considering this closed.
+
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,
