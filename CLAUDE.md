@@ -380,6 +380,32 @@ see "Deliberately not yet done" below for why.
   "expose the assumption, make it correctable" shape as the take-action
   For/Against toggle, rather than presenting a guess and a rollup
   identically.
+
+  **Two more real bugs in the same flow, 10 Sep 2026** — the specificity
+  fix above didn't fully land in practice. First: the citizen asked
+  "where is the list multiple items" — 'more-priorities' ("anything else
+  on your mind?") had always classified its whole textarea as one blob,
+  unlike 'topics-add' ("anything specific on your mind?"), which already
+  split on commas/semicolons/slashes/newlines into separate chips. A
+  citizen listing several distinct things (confirmed: a specific real
+  bill plus other items) only ever got one back, the rest silently
+  discarded with no signal anything was lost. Now splits the same way
+  and walks through each item one at a time via the existing confirm-or-
+  pick screens (`processFreeformItem()`/`advanceFreeformQueue()`, a
+  shared queue) — same per-item UX, now for as many items as were typed.
+  Second, and the more consequential one: the citizen typed an actual
+  bill introduced on congress.gov and watched it get bounced straight to
+  the manual "where does this belong?" picker despite being about as
+  specific as a citizen priority can get. `classifyFreeformPriority()`
+  swallowed every failure — including a real, visible rate-limit or
+  daily-budget message from `digCheckCall()` — into a bare `null`,
+  indistinguishable from the model just returning junk. It couldn't have
+  been the specificity logic misjudging this input; there was no way to
+  tell, because the real reason was never surfaced. Failures now return
+  `{ error: <real message> }` instead of `null`, shown on the picker
+  screen (and as a tooltip on topics-add's manual-pick fallback) so a
+  citizen — and a debugging session — can actually see why, instead of
+  an unexplained punt to manual filing.
 - `take-action.html` — **renamed from `calendar.html` 2 Sep 2026** (file,
   browser tab `<title>`, `<h1>`, and every internal link/href/comment
   across `index.html`/`builder.html`/`digest.js` moved with it in the
@@ -597,6 +623,31 @@ see "Deliberately not yet done" below for why.
   anything narrower. `.dek` and other text elements already cap their
   own line length in `ch` units independent of `.wrap`, so widening it
   doesn't affect prose readability — only how much room cards get.
+
+  **Focus-zone formatting, 10 Sep 2026 (third pass) — the real bug,
+  found from an actual screenshot** — the 9 Sep width fix hadn't
+  actually solved it: the citizen sent a real iPad screenshot showing
+  the federal cards' synopsis text wrapped almost one word per line
+  (a "staircase"), while the state card beside it wrapped normally.
+  That inconsistency was the real tell — not a column-width problem at
+  all. Root cause: inside `.card-top`'s flex row, `.card-synopsis` had
+  no `flex-grow`/`min-width` override, while its sibling `.card-tags`
+  carries `flex-shrink:0` (fixed, never gives space back). Federal cards
+  alone get a second tag (the status pill — state/municipal don't have
+  one, see the status-tag note below) next to the jurisdiction tag, so
+  their tags group claims more space; the flex algorithm put all the
+  shrinking pressure on the synopsis span alone, collapsing it toward
+  its own content-minimum width. `.card-synopsis` now gets `flex: 1 1
+  auto; min-width: 0;` so it claims its actual remaining row width
+  instead — this is shared CSS, so the fix applies everywhere
+  `.card-synopsis` renders (focus zone and the detailed lists alike),
+  not just the one spot photographed. Separately, once text wrapping was
+  legible, the citizen still didn't want the top-3 side by side at all
+  ("there isn't enough real estate for that") — `.focus-zone` dropped
+  the two-pass-old multi-column grid entirely and went back to plain
+  full-width stacked cards; the widened `.wrap` from the 9 Sep pass
+  still helps here since these are full-width blocks, not a fixed
+  column measure.
   State section is also real: `functions/api/state-bills.js` resolves the
   profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
   matched bills from OpenStates, the same "one API covers all 50
@@ -855,7 +906,17 @@ see "Deliberately not yet done" below for why.
     wallTime/status/exceptions for a specific request, and is faster than
     the dashboard for this kind of debugging.
 - `civics.js` — the shared "teachable moment" popup (word-of-the-day
-  facts + quote-matching quizzes), included on every page. As of 31 Aug
+  facts + quote-matching quizzes), included on every page. **Paused on
+  builder.html specifically, 10 Sep 2026** — the citizen flagged it as
+  interrupting the builder flow rather than adding to it, floating a
+  non-interrupting "chyron" (ticker/banner) as the better long-term
+  shape to revisit later, not something to build now. builder.html
+  simply doesn't load `civics.js` any more; every one of its ~10 call
+  sites already guards with `if (window.CivicsEngine)`, so they all
+  silently no-op rather than needing individual changes — a one-line,
+  fully reversible pause (restore the `<script>` tag to bring it back).
+  civics.js itself, and every other page's use of it, is untouched. As
+  of 31 Aug
   2026, a `fact` card auto-dissolves on its own ~3.8s after showing
   (manual "Got it"/backdrop-click still skip it immediately) — it's pure
   information, no interaction needed, so it shouldn't require a click to
