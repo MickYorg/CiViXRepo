@@ -102,10 +102,53 @@
     return { score, hits };
   }
 
+  // 10 Sep 2026: matchBills() (bills specifically, not docket items —
+  // scoreAgainstIssues() above is unchanged and still shared with docket
+  // matching) split its keyword scoring into two tiers after a live,
+  // confirmed false-positive: a purely ceremonial resolution ("Liturgical
+  // Dance Day") ranked into a citizen's real top-3 because its ONLY
+  // matching text was "Referred to the House Committee on Oversight and
+  // Government Reform" — the bare word "government" (from
+  // keywordsFor()'s loose nameWords extraction on "Government
+  // transparency") happened to appear in a committee's bureaucratic name,
+  // nothing to do with the resolution's actual (nonexistent) substance.
+  // Congressional committee names are themselves built from generic
+  // policy-area words, which makes any bill's latestAction/committee-
+  // referral text an unusually bad place to trust single generic-word
+  // matches. Curated SYNONYMS entries and the issue's own full name (both
+  // specific, low-false-positive-risk phrases) still match anywhere in a
+  // bill's title + latest action; the loose, single-word extraction
+  // (nameWords/stanceWords — real signal for a citizen's own specific
+  // typed priorities, per the 4 Sep 2026 note above) now only matches
+  // against the bill's own title, where a generic word is at least about
+  // the bill itself rather than which committee happened to receive it.
+  function curatedKeywordsFor(issue) {
+    return [issue.name.toLowerCase()].concat(SYNONYMS[issue.id] || []);
+  }
+  function looseKeywordsFor(issue) {
+    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+    return nameWords.concat(stanceWords);
+  }
+  function scoreBillAgainstIssues(bill, issues) {
+    const title = (bill.title || '').toLowerCase();
+    const full = title + ' ' + ((bill.latestAction && bill.latestAction.text) || '').toLowerCase();
+    const hits = [];
+    let score = 0;
+    issues.forEach(issue => {
+      const matched = curatedKeywordsFor(issue).some(k => full.indexOf(k) !== -1)
+        || looseKeywordsFor(issue).some(k => title.indexOf(k) !== -1);
+      if (matched) {
+        score += issue.weight || 1;
+        hits.push(issue.name);
+      }
+    });
+    return { score, hits };
+  }
+
   function matchBills(bills, issues) {
     const scored = bills.map(bill => {
-      const hay = bill.title + ' ' + (bill.latestAction ? bill.latestAction.text : '');
-      const { score, hits } = scoreAgainstIssues(hay, issues);
+      const { score, hits } = scoreBillAgainstIssues(bill, issues);
       return { bill, score, hits };
     });
     return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);

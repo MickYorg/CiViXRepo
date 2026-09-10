@@ -42,6 +42,22 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 }`;
 }
 
+// Kept in sync with builder.html's own parseAIJSON() — see its comment
+// for the live-confirmed failure this guards against (a model response
+// prefixed with unprompted reassurance prose despite an "ONLY JSON"
+// instruction, breaking a bare strip-fences-then-parse).
+function parseAIJSON(raw) {
+  const stripped = String(raw || '').trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+  try {
+    return JSON.parse(stripped);
+  } catch (e) {
+    const start = stripped.search(/[\{\[]/);
+    const end = Math.max(stripped.lastIndexOf('}'), stripped.lastIndexOf(']'));
+    if (start === -1 || end === -1 || end < start) throw e;
+    return JSON.parse(stripped.slice(start, end + 1));
+  }
+}
+
 async function boildownOne(origin, article) {
   try {
     const res = await fetch(new URL('/api/dig-check', origin), {
@@ -52,8 +68,7 @@ async function boildownOne(origin, article) {
     if (!res.ok) return null;
     const data = await res.json();
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    const raw = text.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-    const parsed = JSON.parse(raw);
+    const parsed = parseAIJSON(text);
     if (!parsed.topic || !parsed.talkingPoint) return null;
     if (ALL_ISSUE_NAMES.indexOf(parsed.topic) === -1) parsed.topic = ALL_ISSUE_NAMES[0];
     return parsed;

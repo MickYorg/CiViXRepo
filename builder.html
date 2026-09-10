@@ -1620,17 +1620,27 @@
   let STATE_BILLS = null;
   let lastFetchedZip = null;
 
-  function keywordsForMatch(issue) {
-    const extra = CAL_SYNONYMS[issue.id] || [];
-    const nameWords = issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
-    return [issue.name.toLowerCase()].concat(extra, nameWords);
+  // 10 Sep 2026: kept in sync with digest.js's own copy of this same fix
+  // (see its comment for the full story) — a bare word pulled from an
+  // issue's own name can coincidentally appear in a bill's committee-
+  // referral boilerplate ("Committee on Oversight and Government
+  // Reform") with zero connection to what the bill's actually about.
+  // Curated CAL_SYNONYMS entries + the issue's full name are specific
+  // enough to trust anywhere; the loose nameWords extraction now only
+  // matches the bill's own title.
+  function curatedKeywordsForMatch(issue) {
+    return [issue.name.toLowerCase()].concat(CAL_SYNONYMS[issue.id] || []);
   }
-
+  function looseKeywordsForMatch(issue) {
+    return issue.name.toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+  }
   function matchedCountFor(issue) {
-    const kws = keywordsForMatch(issue);
+    const curated = curatedKeywordsForMatch(issue);
+    const loose = looseKeywordsForMatch(issue);
     const hits = bills => (bills || []).filter(b => {
-      const hay = (b.title + ' ' + (b.latestAction ? b.latestAction.text : '')).toLowerCase();
-      return kws.some(k => hay.indexOf(k) !== -1);
+      const title = (b.title || '').toLowerCase();
+      const full = title + ' ' + (b.latestAction ? (b.latestAction.text || '').toLowerCase() : '');
+      return curated.some(k => full.indexOf(k) !== -1) || loose.some(k => title.indexOf(k) !== -1);
     }).length;
     return hits(FED_BILLS) + hits(STATE_BILLS);
   }
@@ -1871,6 +1881,32 @@
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!text) throw new Error('empty response');
     return text;
+  }
+
+  // Every prompt asking for structured JSON says "ONLY JSON, no other
+  // text" — the model doesn't always listen. Confirmed live 10 Sep 2026:
+  // classifying "H.R.9694 - Epstein Files Transparency Act II" got a
+  // correct, well-formed classification prefixed with an unprompted
+  // reassurance ("This is a real, specific piece of legislation.") that
+  // the old markdown-fence-only stripping couldn't handle, so a citizen
+  // typing an obviously real, specific bill got bounced to "pick it
+  // yourself" for a reason that had nothing to do with the classification
+  // itself being wrong. Strips markdown fences first (the common case,
+  // cheap), then — only if that alone doesn't parse — falls back to
+  // slicing out the first balanced-looking {...} or [...] substring, so
+  // stray prose anywhere around the real JSON doesn't sink an otherwise-
+  // correct response. Throws (same as a bare JSON.parse would) if even
+  // that fails, so callers don't need to change their own error handling.
+  function parseAIJSON(raw) {
+    const stripped = String(raw || '').trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+    try {
+      return JSON.parse(stripped);
+    } catch (e) {
+      const start = stripped.search(/[\{\[]/);
+      const end = Math.max(stripped.lastIndexOf('}'), stripped.lastIndexOf(']'));
+      if (start === -1 || end === -1 || end < start) throw e;
+      return JSON.parse(stripped.slice(start, end + 1));
+    }
   }
 
   // Same voice as DIG's own trending-topics prompt: general and durable
@@ -2713,8 +2749,8 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   "imageQuery": 2-4 concrete, photographable keywords for a stock-photo search that captures the scene (e.g. "apartment building renters", "hospital waiting room") — no proper nouns, no politician or public-figure names, nothing that would try to identify a real specific person
 }`;
     try {
-      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-      const parsed = JSON.parse(raw);
+      const raw = await digCheckCall(prompt);
+      const parsed = parseAIJSON(raw);
       if (!parsed.topic || !parsed.talkingPoint) throw new Error('incomplete boildown');
       if (ALL_ISSUE_NAMES.indexOf(parsed.topic) === -1) parsed.topic = ALL_ISSUE_NAMES[0];
       cache[key] = parsed;
@@ -2780,8 +2816,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
       return { error: (e && e.message) || 'Could not reach the classifier.' };
     }
     try {
-      const cleaned = raw.trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = parseAIJSON(raw);
       if (!parsed || typeof parsed.topic !== 'string' || !parsed.topic.trim()) {
         return { error: 'Got an unusable response — try rephrasing, or pick the topic yourself.' };
       }
@@ -3329,8 +3364,8 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   "talkingPoint": one clear, opinionated position statement (under 20 words) on that specific facet — a single, standalone claim the citizen can swipe agree or disagree with, not just a label for the facet, and NOT a comparison or debate between two sides. Never phrase it as "X shouldn't do Y, even though Z thinks otherwise" or anything else that names or nods to an opposing party's view — a citizen reading it shouldn't have to wonder whether agreeing means siding with the claim or the group being dismissed
 }, ...]`;
     try {
-      const raw = (await digCheckCall(prompt)).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-      const parsed = JSON.parse(raw);
+      const raw = await digCheckCall(prompt);
+      const parsed = parseAIJSON(raw);
       if (!Array.isArray(parsed)) throw new Error('not an array');
       return parsed.slice(0, 3).filter(p => p && p.topic && p.talkingPoint).map(p => ({
         type: 'drilldown',

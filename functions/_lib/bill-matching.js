@@ -74,10 +74,37 @@ export function scoreAgainstIssues(hay, issues) {
   return { score, hits };
 }
 
+// 10 Sep 2026: kept in sync with digest.js's own copy of this same fix —
+// see its comment for the full story (a purely ceremonial resolution
+// matched a citizen's real priority only because its committee-referral
+// note happened to contain a generic word from that issue's own name).
+// Curated SYNONYMS + the issue's full name are specific enough to trust
+// anywhere in a bill's title + latest action; the loose, single-word
+// extraction only matches against the title now, not committee-name
+// boilerplate.
+function curatedKeywordsFor(issue) {
+  return [(issue.name || '').toLowerCase()].concat(SYNONYMS[issue.id] || []);
+}
+function looseKeywordsFor(issue) {
+  const nameWords = (issue.name || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+  const stanceWords = (issue.stance || '').toLowerCase().split(/\W+/).filter(w => w.length >= 4);
+  return nameWords.concat(stanceWords);
+}
+
 export function matchBills(bills, issues) {
   const scored = (bills || []).map(bill => {
-    const hay = (bill.title || '') + ' ' + (bill.latestAction ? bill.latestAction.text : '');
-    const { score, hits } = scoreAgainstIssues(hay, issues);
+    const title = (bill.title || '').toLowerCase();
+    const full = title + ' ' + (bill.latestAction ? (bill.latestAction.text || '').toLowerCase() : '');
+    const hits = [];
+    let score = 0;
+    (issues || []).forEach(issue => {
+      const matched = curatedKeywordsFor(issue).some(k => full.indexOf(k) !== -1)
+        || looseKeywordsFor(issue).some(k => title.indexOf(k) !== -1);
+      if (matched) {
+        score += issue.weight || 1;
+        hits.push(issue.name);
+      }
+    });
     return { bill, score, hits };
   });
   return scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
