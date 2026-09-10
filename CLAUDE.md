@@ -757,6 +757,68 @@ see "Deliberately not yet done" below for why.
   the specific/general note beside it) plus `bill-lookup.js`'s own 404
   on a citation that doesn't exist at all.
 
+  **Severe false positives in the top-3, confirmed from a real
+  screenshot, same day** — the citizen sent a screenshot showing
+  "Epstein Files Transparency Act II" and "NDAA for Fiscal Year 2027"
+  (both specific issues naming one exact bill) as false "matched
+  priority" tags on three totally unrelated bills. Root cause: a
+  specific-bill issue's own name is full of short, generic words
+  ("transparency," "act," "national") that other bills' titles
+  legitimately contain as whole words too — and that false match marked
+  the issue "already matched," silently blocking the *correct*
+  citation-based lookup from ever running. Fixed by splitting citable
+  issues out of the generic pool-matching pass entirely, before it
+  runs — resolved via direct lookup only, never fed into `matchBills()`'s
+  keyword search. Added a stoplist (national, federal, government, act,
+  authorization, committee, fiscal, year, and similar legislative filler)
+  to the loose keyword extraction in all three manually-synced copies
+  (`digest.js`, `functions/_lib/bill-matching.js`, builder.html's
+  `keywordsForMatch`/`matchedCountFor`) for issues that still fall
+  through to loose matching — a real "no confident match" now beats a
+  wrong one. Also fixed a real gap in the citation-lookup fix two
+  commits earlier: scoring a resolved citation the same as an ordinary
+  keyword match (~1-9 after lean) meant a citizen's own explicitly-named
+  bill could still lose a tie to a pile of incidental matches for a
+  *different* priority and never appear in their own top-3 — `+50` base
+  score now guarantees it clears any realistic tie.
+
+  **"Of course we mean the current NDAA" — bare acronym resolution,
+  same day** — the citizen pushed back, fairly, on treating a bare
+  "NDAA" as unresolvable: in common usage "the NDAA" always means
+  whichever one is currently active, and the right fix is finding that
+  real bill, not shrugging. First attempt searched `buildTopDigest()`'s
+  own already-fetched federal pool for a title match — confirmed live
+  this didn't work either: the real, current NDAA isn't in that
+  ~100-item window on a given day. Second attempt, `bill-search.js` (new),
+  searched a single 250-item page (congress.gov's own per-request max)
+  — confirmed live that STILL wasn't enough; a bill this major can rank
+  well outside the top 250 "most recently touched" on a quiet week
+  between its own floor actions, with thousands of smaller bills getting
+  routine metadata touches ahead of it. Final version pages 6 requests
+  deep in parallel (1,500 bills total) — confirmed live this actually
+  finds it: H.R.8800, "National Defense Authorization Act for Fiscal
+  Year 2027," real data, real status. `digest.js`'s
+  `recurringBillPatternFor()`/`lookupRecurringBillDirect()` recognize a
+  bare "NDAA" mention and try this search before ever falling back to
+  the general-priority placeholder, scored the same `+50` way a formally
+  cited bill is. `RECURRING_BILL_PATTERNS` is a small, extensible list —
+  NDAA is the one actually reported live so far, not the only one this
+  mechanism could ever cover.
+
+  **Headline deck restructured: top 3 of the day, then targeted, same
+  day** — per explicit request, `startHeadlineMode()` no longer treats
+  "unbiased general news" and "manifesto-personalized search" as
+  either/or (previously any citizen with real signal got ONLY the
+  biased search, never genuinely prominent general news). Now always
+  fetches up to 3 unbiased "today's top stories" first (prefers the
+  pre-warmed batch — `headlines-batch.js` is exactly built for this —
+  falling back to a live unbiased fetch only if it's cold), followed by
+  up to 5 manifesto-targeted headlines (the existing biased search,
+  still only when there's real signal to bias with). Each card carries a
+  visible section eyebrow ("Today's top story" / "Matches your
+  manifesto") so the shift in tone partway through the deck is legible
+  rather than a silent change of character.
+
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title
