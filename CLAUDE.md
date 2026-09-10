@@ -725,6 +725,37 @@ see "Deliberately not yet done" below for why.
   duplicate it. See also the "Resolved for the cited-bill case" note
   further up this file (originally about `S.421`) — this is that fix.
 
+  **Common-parlance bill names, same day, immediate follow-up** — the
+  citizen pushed further, correctly: the fix above only helps a citizen
+  who already knows and types a formal citation ("H.R.9694") — real
+  people say "the CHIPS Act," "Obamacare," "the Patriot Act," "NDAA."
+  `classifyFreeformPriority()`'s prompt now also asks the model to
+  resolve a popular name/nickname/acronym to its real bill type/number/
+  Congress when genuinely confident, explicitly told to leave it null
+  for anything ambiguous (a bare "NDAA," which has a new bill almost
+  every Congress) or non-federal — a wrong guess is worse than none.
+  Verified live against real legislation: "the CHIPS Act" -> H.R.4346
+  (117th), "the Patriot Act" -> H.R.3162 (107th), "Obamacare" ->
+  H.R.3590 (111th), "the infrastructure bill" -> H.R.3684 (117th) — all
+  four correct against real-world knowledge, all fetch real congress.gov
+  data end to end via the same `bill-lookup.js`. "NDAA" alone correctly
+  came back with no citation rather than guessing a year. The resolved
+  citation is stored directly on the issue (`iss.billCitation`) so
+  `buildTopDigest()` doesn't need to re-ask the AI on every digest
+  rebuild — checked before falling back to `parseBillCitation()`'s regex
+  over whatever literal text a citizen typed. Caught and fixed a
+  self-inflicted bug before shipping this: the first version gated an
+  AI-resolved citation on a keyword-overlap check against the fetched
+  bill's own title — a reasonable-sounding safety net that actually
+  broke the feature's entire reason to exist, since "Obamacare" shares
+  zero words with its real title ("Patient Protection and Affordable
+  Care Act") by definition — that mismatch *is* what a popular name is.
+  Removed; the real safety net is the citizen-facing confirm screen
+  (`renderFreeformConfirm()` now shows "Matched to HR 3590, 111th
+  Congress" before committing, same "expose the assumption" shape as
+  the specific/general note beside it) plus `bill-lookup.js`'s own 404
+  on a citation that doesn't exist at all.
+
   Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
   synopsis (`digest.js`'s `plainSummarize`, already shared with
   builder.html's digest) instead of the official bill title — the title
