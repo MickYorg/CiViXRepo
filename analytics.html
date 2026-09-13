@@ -217,6 +217,34 @@
   }
   .level-bar-fill { height: 100%; background: var(--amber); border-radius: 3px; }
 
+  .spend-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 90px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 6px;
+    padding-bottom: 2px;
+  }
+  .spend-bar {
+    flex: 1 1 0;
+    min-width: 2px;
+    background: var(--amber);
+    opacity: 0.75;
+    border-radius: 2px 2px 0 0;
+    transition: opacity 0.15s ease;
+  }
+  .spend-bar:hover { opacity: 1; }
+  .spend-chart-range {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--paper-dim);
+    margin-bottom: 24px;
+  }
+
   .section-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -531,14 +559,21 @@
     var features = data.tokenFeatures || [];
     if (tokensSummary.calls > 0) {
       var maxCost = features.reduce(function (m, f) { return Math.max(m, f.costUsd); }, 0) || 1;
+      var sinceLabel = data.trackingSince ? formatDate(data.trackingSince) : null;
+      var trackingLine = sinceLabel
+        ? '<p class="card-meta" style="margin:-6px 0 14px;">Tracking real AI spend since ' + sinceLabel + ' (' + (data.daysTracked || 1) + ' day' + ((data.daysTracked || 1) === 1 ? '' : 's') + ')</p>'
+        : '';
+
       tokensEl.innerHTML =
         '<p class="section-label">Real AI work, in the open</p>' +
+        trackingLine +
         '<div class="stat-grid">' +
           '<div class="stat"><div class="stat-num">' + totalTokens.toLocaleString() + '</div><div class="stat-label">Tokens processed</div></div>' +
           '<div class="stat"><div class="stat-num">$' + tokensSummary.costUsd.toFixed(2) + '</div><div class="stat-label">Real AI spend, for citizens</div></div>' +
           '<div class="stat"><div class="stat-num">' + tokensSummary.calls.toLocaleString() + '</div><div class="stat-label">AI calls made on citizens\' behalf</div></div>' +
         '</div>' +
         '<p class="card-body" style="margin:0 0 14px;">Every dig, check, draft, and search below is a real Anthropic call CiViX made so a citizen could understand something or take action — not a simulated number. This is also the foundation for a future give-back: institutional sponsors donating usage credit to fund citizens\' own activity here.</p>' +
+        renderSpendChart(data.dailySpend || []) +
         features.map(function (f) {
           var pct = Math.round((f.costUsd / maxCost) * 100);
           var label = FEATURE_LABELS[f.name] || f.name;
@@ -551,12 +586,35 @@
     }
   }
 
+  function formatDate(isoDate) {
+    var d = new Date(isoDate + 'T00:00:00Z');
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  // Plain CSS bar chart, no charting library — same "no build system,
+  // keep it dependency-free" convention as the rest of the app. Shows at
+  // most the last 30 tracked days; each bar's height is relative to the
+  // busiest day in that window, with the exact date/amount on hover
+  // (native title attribute) rather than cluttering every bar with a label.
+  function renderSpendChart(series) {
+    if (!series.length) return '';
+    var recent = series.slice(-30);
+    var max = recent.reduce(function (m, d) { return Math.max(m, d.costUsd); }, 0) || 1;
+    var bars = recent.map(function (d) {
+      var pct = Math.max(2, Math.round((d.costUsd / max) * 100));
+      return '<div class="spend-bar" style="height:' + pct + '%" title="' + esc(formatDate(d.date)) + ' — $' + d.costUsd.toFixed(3) + '"></div>';
+    }).join('');
+    return '<p class="section-label">Spend over time' + (series.length > 30 ? ' (last 30 days)' : '') + '</p>' +
+      '<div class="spend-chart">' + bars + '</div>' +
+      '<div class="spend-chart-range"><span>' + esc(formatDate(recent[0].date)) + '</span><span>' + esc(formatDate(recent[recent.length - 1].date)) + '</span></div>';
+  }
+
   function loadRealStats() {
     realFetched = true;
     fetch('/api/platform-stats')
       .then(function (r) { return r.json(); })
       .then(renderReal)
-      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [], tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 } }); });
+      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [], tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 }, dailySpend: [], trackingSince: null, daysTracked: 0 }); });
   }
 
   var stored = null;

@@ -21,8 +21,9 @@
 const PRICE_PER_MTOK_INPUT = 2;
 const PRICE_PER_MTOK_OUTPUT = 10;
 const PRICE_PER_1000_WEB_SEARCHES = 10; // only dig-check.js's calls ever carry this (its own web_search tool) — 0 for the other two
-const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2; // daily budget counter only — pstats:tokens never expires
+const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2; // daily budget counter only — pstats:tokens/pstats:dailySpend never expire
 const MAX_FEATURES = 50;
+const MAX_DAILY_ENTRIES = 400; // ~13 months — bounds pstats:dailySpend's growth without losing real recent history
 
 export function todayKey() {
   return new Date().toISOString().slice(0, 10); // UTC date
@@ -79,5 +80,34 @@ export async function recordSpend(kv, feature, usage, dateKey, priorRecord) {
       ? Object.fromEntries(entries.sort((a, b) => b[1].costUsd - a[1].costUsd).slice(0, MAX_FEATURES))
       : tokens;
     await kv.put('pstats:tokens', JSON.stringify(trimmed));
+  } catch (e) { /* real-usage dashboard is best-effort */ }
+
+  // Day-by-day history, for the dashboard's spend-over-time chart — a
+  // separate structure from the daily budget-cap counter above (that one
+  // expires after 2 days and only ever holds a single float; this one is
+  // kept, bounded to MAX_DAILY_ENTRIES, so a real trend can be shown).
+  try {
+    const daily = (await kv.get('pstats:dailySpend', { type: 'json' })) || {};
+    const d = daily[dateKey] || { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    d.calls += 1;
+    d.inputTokens += usage.input_tokens || 0;
+    d.outputTokens += usage.output_tokens || 0;
+    d.costUsd += cost;
+    daily[dateKey] = d;
+
+    const dayEntries = Object.entries(daily);
+    const trimmedDaily = dayEntries.length > MAX_DAILY_ENTRIES
+      ? Object.fromEntries(dayEntries.sort((a, b) => a[0].localeCompare(b[0])).slice(-MAX_DAILY_ENTRIES))
+      : daily;
+    await kv.put('pstats:dailySpend', JSON.stringify(trimmedDaily));
+  } catch (e) { /* real-usage dashboard is best-effort */ }
+
+  // Written once, the first time any real spend is ever recorded — a
+  // plain "get, write only if absent" (no atomic compare-and-set in KV,
+  // but a rare simultaneous first-write race is harmless here: worst
+  // case it's set twice to the same date).
+  try {
+    const since = await kv.get('pstats:trackingSince');
+    if (!since) await kv.put('pstats:trackingSince', dateKey);
   } catch (e) { /* real-usage dashboard is best-effort */ }
 }

@@ -54,6 +54,17 @@ async function readJson(kv, key, fallback) {
   }
 }
 
+// pstats:trackingSince is written as a bare date string (see
+// functions/_lib/token-stats.js), not JSON — needs its own plain-text read.
+async function readText(kv, key, fallback) {
+  try {
+    const v = await kv.get(key);
+    return v || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 function json(body, status) {
   return new Response(JSON.stringify(body), {
     status: status || 200,
@@ -62,14 +73,16 @@ function json(body, status) {
 }
 
 async function handleGet(kv) {
-  const [manifestos, levels, topics, wins, winTopics, functions, tokens] = await Promise.all([
+  const [manifestos, levels, topics, wins, winTopics, functions, tokens, dailySpend, trackingSince] = await Promise.all([
     readJson(kv, 'pstats:manifestos', { count: 0 }),
     readJson(kv, 'pstats:levels', {}),
     readJson(kv, 'pstats:topics', {}),
     readJson(kv, 'pstats:wins', { count: 0 }),
     readJson(kv, 'pstats:winTopics', {}),
     readJson(kv, 'pstats:functions', {}),
-    readJson(kv, 'pstats:tokens', {})
+    readJson(kv, 'pstats:tokens', {}),
+    readJson(kv, 'pstats:dailySpend', {}),
+    readText(kv, 'pstats:trackingSince', null)
   ]);
 
   const actionsTotal = Object.values(levels).reduce((a, b) => a + b, 0);
@@ -102,6 +115,21 @@ async function handleGet(kv) {
     costUsd: sum.costUsd + t.costUsd
   }), { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 });
 
+  // Chronological, for the dashboard's spend-over-time chart — the KV map
+  // itself has no guaranteed key order, so this is where it gets sorted.
+  const dailySpendSeries = Object.entries(dailySpend)
+    .map(([date, d]) => ({
+      date,
+      calls: d.calls || 0,
+      inputTokens: d.inputTokens || 0,
+      outputTokens: d.outputTokens || 0,
+      costUsd: d.costUsd || 0
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const daysTracked = trackingSince
+    ? Math.max(1, Math.round((Date.now() - new Date(trackingSince + 'T00:00:00Z').getTime()) / 86400000) + 1)
+    : 0;
+
   return json({
     manifestos: manifestos.count || 0,
     actionsTotal,
@@ -111,7 +139,10 @@ async function handleGet(kv) {
     topWinTopics,
     functions,
     tokenFeatures,
-    tokensSummary
+    tokensSummary,
+    dailySpend: dailySpendSeries,
+    trackingSince,
+    daysTracked
   });
 }
 
@@ -189,7 +220,8 @@ export async function onRequestGet({ env }) {
   } catch (e) {
     return json({
       manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [],
-      functions: {}, tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 }
+      functions: {}, tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 },
+      dailySpend: [], trackingSince: null, daysTracked: 0
     }, 200);
   }
 }
