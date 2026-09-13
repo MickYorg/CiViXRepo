@@ -60,7 +60,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   const dailyBudget = Number(env.DIG_DAILY_BUDGET_USD || 20);
-  const dailyLimitPerIp = Number(env.DIG_DAILY_LIMIT_PER_IP || 30);
+  const dailyLimitPerIp = Number(env.DIG_DAILY_LIMIT_PER_IP || 100);
   const key = todayKey();
   const kv = env.DIG_KV;
 
