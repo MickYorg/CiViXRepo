@@ -20,21 +20,29 @@
 //     — those count a citizen taking an action; this counts a real
 //     outcome, kept in its own counters (winsTotal, winTopics) rather
 //     than folded into the action ones so the two aren't conflated
+//   - functions:  13 Sep 2026 — a free-form name -> count map for AI-backed
+//     features that aren't a completed take-action (so don't fit
+//     `levels`), for the platform-wide "usage celebration" ticker
+//     (usage-ticker.js): today just DIG's own `dig_check` and `dig_debate`.
+//     Same open-set shape as `topics` — add a new name at its call site,
+//     no backend change needed — rather than a fixed enum, since more
+//     functions (plain-summary, strategic-plan, ...) will likely join.
 
 const MAX_TOPIC_ENTRIES = 500;
 const MAX_NAME_LEN = 200;
 const MAX_TOPICS_PER_REQUEST = 10;
+const MAX_FUNCTION_ENTRIES = 50;
 const LEVELS = ['federal', 'state', 'municipal', 'general'];
 
 function clampName(s) {
   return String(s || '').trim().slice(0, MAX_NAME_LEN);
 }
 
-function trimTopics(map) {
+function trimMap(map, max) {
   const entries = Object.entries(map);
-  if (entries.length <= MAX_TOPIC_ENTRIES) return map;
+  if (entries.length <= max) return map;
   entries.sort((a, b) => b[1] - a[1]);
-  return Object.fromEntries(entries.slice(0, MAX_TOPIC_ENTRIES));
+  return Object.fromEntries(entries.slice(0, max));
 }
 
 async function readJson(kv, key, fallback) {
@@ -54,12 +62,13 @@ function json(body, status) {
 }
 
 async function handleGet(kv) {
-  const [manifestos, levels, topics, wins, winTopics] = await Promise.all([
+  const [manifestos, levels, topics, wins, winTopics, functions] = await Promise.all([
     readJson(kv, 'pstats:manifestos', { count: 0 }),
     readJson(kv, 'pstats:levels', {}),
     readJson(kv, 'pstats:topics', {}),
     readJson(kv, 'pstats:wins', { count: 0 }),
-    readJson(kv, 'pstats:winTopics', {})
+    readJson(kv, 'pstats:winTopics', {}),
+    readJson(kv, 'pstats:functions', {})
   ]);
 
   const actionsTotal = Object.values(levels).reduce((a, b) => a + b, 0);
@@ -78,7 +87,8 @@ async function handleGet(kv) {
     levels,
     topTopics,
     winsTotal: wins.count || 0,
-    topWinTopics
+    topWinTopics,
+    functions
   });
 }
 
@@ -91,8 +101,8 @@ async function handlePost(request, kv) {
   }
 
   const type = body && body.type;
-  if (type !== 'manifesto' && type !== 'action' && type !== 'win') {
-    return json({ error: { message: 'Expected { type: "manifesto" | "action" | "win" }' } }, 400);
+  if (type !== 'manifesto' && type !== 'action' && type !== 'win' && type !== 'function') {
+    return json({ error: { message: 'Expected { type: "manifesto" | "action" | "win" | "function" }' } }, 400);
   }
 
   // Stats are nice-to-have, never load-bearing — any storage hiccup here
@@ -103,6 +113,13 @@ async function handlePost(request, kv) {
       const m = await readJson(kv, 'pstats:manifestos', { count: 0 });
       m.count = (m.count || 0) + 1;
       await kv.put('pstats:manifestos', JSON.stringify(m));
+    } else if (type === 'function') {
+      const name = clampName(body.name);
+      if (name) {
+        const functions = await readJson(kv, 'pstats:functions', {});
+        functions[name] = (functions[name] || 0) + 1;
+        await kv.put('pstats:functions', JSON.stringify(trimMap(functions, MAX_FUNCTION_ENTRIES)));
+      }
     } else if (type === 'win') {
       // A watched bill actually became law — a real outcome, not an
       // action the citizen took, so this stays in its own counters
@@ -118,7 +135,7 @@ async function handlePost(request, kv) {
           const name = clampName(t);
           if (name) winTopics[name] = (winTopics[name] || 0) + 1;
         });
-        await kv.put('pstats:winTopics', JSON.stringify(trimTopics(winTopics)));
+        await kv.put('pstats:winTopics', JSON.stringify(trimMap(winTopics, MAX_TOPIC_ENTRIES)));
       }
     } else {
       const level = LEVELS.includes(body.level) ? body.level : 'general';
@@ -133,7 +150,7 @@ async function handlePost(request, kv) {
           const name = clampName(t);
           if (name) topics[name] = (topics[name] || 0) + 1;
         });
-        await kv.put('pstats:topics', JSON.stringify(trimTopics(topics)));
+        await kv.put('pstats:topics', JSON.stringify(trimMap(topics, MAX_TOPIC_ENTRIES)));
       }
     }
   } catch (e) {
@@ -147,7 +164,7 @@ export async function onRequestGet({ env }) {
   try {
     return await handleGet(env.DIG_KV);
   } catch (e) {
-    return json({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [] }, 200);
+    return json({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [], functions: {} }, 200);
   }
 }
 

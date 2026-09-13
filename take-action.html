@@ -165,6 +165,25 @@
   }
   .dek-link a { color: var(--amber-ink); }
 
+  .usage-ticker {
+    display: none;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 24px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(224,169,63,0.08);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    line-height: 1.5;
+  }
+  .usage-ticker.usage-ticker-ready { display: flex; }
+  .usage-ticker-emoji { flex-shrink: 0; }
+  .usage-ticker-text strong { color: var(--amber-ink); }
+  .usage-ticker-tagline { color: var(--paper-dim); }
+
   .wip {
     display: flex;
     align-items: flex-start;
@@ -743,6 +762,8 @@
   <p class="dek">Municipal, state, and federal legislative activity, matched against what's actually in your manifesto — with a clear next step for each.</p>
   <p class="dek-link"><a href="calendar.html">Want the bigger picture? See your multi-year strategy &#8594;</a></p>
 
+  <div id="usage-ticker" class="usage-ticker"></div>
+
   <div class="focus-zone" id="focus-zone">
     <p class="fed-status mono">Finding your top 3 actions&hellip;</p>
   </div>
@@ -789,6 +810,7 @@
 <script src="mode.js"></script>
 <script src="civics.js"></script>
 <script src="digest.js"></script>
+<script src="usage-ticker.js"></script>
 <script>
 (function () {
   var root = document.documentElement;

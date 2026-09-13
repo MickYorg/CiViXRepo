@@ -103,6 +103,26 @@
   .mark em { font-style: normal; color: var(--amber-ink); }
   .topbar-right { display: flex; align-items: center; gap: 10px; }
 
+  .usage-ticker {
+    display: none;
+    align-items: baseline;
+    gap: 8px;
+    margin: 16px auto 0;
+    max-width: 720px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(224,169,63,0.08);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    line-height: 1.5;
+  }
+  .usage-ticker.usage-ticker-ready { display: flex; }
+  .usage-ticker-emoji { flex-shrink: 0; }
+  .usage-ticker-text strong { color: var(--amber-ink); }
+  .usage-ticker-tagline { color: var(--paper-dim); }
+
   .icon-btn {
     appearance: none;
     background: none;
@@ -999,6 +1019,8 @@
     </button>
   </div>
 </header>
+
+<div id="usage-ticker" class="usage-ticker"></div>
 
 <div class="mode-gate-overlay" id="mode-gate-overlay" hidden>
   <div class="mode-gate-card">
@@ -4262,5 +4284,6 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   ensureDrop(false).then(() => { if (P.token) loadInbox(); });
 })();
 </script>
+<script src="usage-ticker.js"></script>
 </body>
 </html>

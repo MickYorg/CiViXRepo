@@ -1088,6 +1088,25 @@
   }
   .wd-debate-btn:hover:not(:disabled) { background: var(--rust); color: var(--paper); }
   .wd-debate-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .usage-ticker {
+    display: none;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(212,162,76,0.08);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--paper-dim);
+    line-height: 1.5;
+  }
+  .usage-ticker.usage-ticker-ready { display: flex; }
+  .usage-ticker-emoji { flex-shrink: 0; }
+  .usage-ticker-text strong { color: var(--amber); }
+  .usage-ticker-tagline { color: var(--paper-dim); }
   .wd-debate-points { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
   .wd-debate-points ul { margin: 0; padding-left: 18px; }
   .wd-debate-points li { margin-bottom: 8px; font-size: 13.5px; line-height: 1.5; }
@@ -1345,6 +1364,8 @@
     </div>
   </div>
 
+  <div id="usage-ticker" class="usage-ticker"></div>
+
   <!-- ONBOARDING: profile builder -->
   <div id="wd-onboard" class="wd-onboard" style="display:none;">
     <div class="wd-info-chip">
@@ -1492,6 +1513,7 @@
 
 <script src="../mode.js"></script>
 <script src="../civics.js"></script>
+<script src="../usage-ticker.js"></script>
 <script>
 (function() {
   // Self-hosted build: no window.storage API here (that's a claude.ai
@@ -1560,6 +1582,18 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, name, ...(extra || {}) })
+      }).catch(() => {});
+    } catch (e) { /* best-effort */ }
+  }
+
+  // Feeds the platform-wide usage-ticker.js celebration line (a separate,
+  // anonymous counter map from dig-stats.js above — see platform-stats.js).
+  function postFunctionStat(name) {
+    try {
+      fetch('/api/platform-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'function', name })
       }).catch(() => {});
     } catch (e) { /* best-effort */ }
   }
@@ -2740,6 +2774,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       const { stance, summary } = await checkSourceWithRetry(src, currentTopic);
       setCachedResult(currentTopic, src.name, { stance, summary, timestamp });
       updateCard(src.name, { stance, summary, timestamp });
+      postFunctionStat('dig_check');
     } catch (e) {
       updateCard(src.name, { error: e.message || 'request failed', timestamp });
     }
@@ -3293,6 +3328,7 @@ POINT: <talking point in a single sentence>
       const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
       const points = text.split('\n').map(l => l.replace(/^POINT:\s*/i, '').trim()).filter(Boolean);
       result = points.length ? points : ['No talking points returned.'];
+      postFunctionStat('dig_debate');
     } catch (e) {
       result = { error: e.message || 'request failed' };
     }
