@@ -126,9 +126,16 @@ async function handleGet(kv) {
       costUsd: d.costUsd || 0
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
-  const daysTracked = trackingSince
-    ? Math.max(1, Math.round((Date.now() - new Date(trackingSince + 'T00:00:00Z').getTime()) / 86400000) + 1)
-    : 0;
+  // Both sides truncated to midnight UTC before differencing — otherwise
+  // Date.now() being anywhere past noon UTC on day 1 itself rounds the gap
+  // up to a full day, making a same-day start read as "2 days" instead of 1.
+  const MS_PER_DAY = 86400000;
+  let daysTracked = 0;
+  if (trackingSince) {
+    const todayMidnight = Math.floor(Date.now() / MS_PER_DAY) * MS_PER_DAY;
+    const sinceMidnight = new Date(trackingSince + 'T00:00:00Z').getTime();
+    daysTracked = Math.max(1, Math.round((todayMidnight - sinceMidnight) / MS_PER_DAY) + 1);
+  }
 
   return json({
     manifestos: manifestos.count || 0,
