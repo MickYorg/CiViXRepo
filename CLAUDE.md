@@ -1683,7 +1683,20 @@ Set per-environment (Production + Preview) in the dashboard, never in
 deployment (not just "Retry deployment") is required after adding one:
 
 - `ANTHROPIC_API_KEY` — powers `/api/dig-check` (DIG's checks, and the
-  Inbox/calendar-action AI drafting, which reuse the same endpoint).
+  Inbox/calendar-action AI drafting, which reuse the same endpoint). **Two
+  real outages hit this key, 13 Sep 2026, worth knowing before the next
+  rotation**: (1) the previous key had been created in Anthropic Console
+  with a 30-day expiration set, which lapsed silently with no warning —
+  when creating a replacement, set expiration to "No expiration," not
+  another fixed window. (2) The first replacement key was created
+  **unscoped from any workspace** — Console allows this, but an unscoped
+  key makes every Anthropic API call fail with `invalid_request_error:
+  "This API key is not scoped to a workspace..."` unless the request adds
+  an `anthropic-workspace-id` header, which `dig-check.js` doesn't send.
+  Fixed by recreating the key scoped to the actual workspace (Console's
+  key-creation screen has a workspace picker) rather than adding header
+  plumbing. Confirmed live end-to-end after both fixes: `/api/dig-check`
+  returned a real completion from `claude-sonnet-5`.
 - `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
 - `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
 - `OPENSTATES_API_KEY` — powers `/api/state-bills` and `/api/state-reps`
