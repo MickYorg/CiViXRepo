@@ -223,6 +223,137 @@ actually being asked for, for whenever this gets picked up:
   something beyond what that entry already covers, or whether the
   remaining gap is exactly those two named items.
 
+**13 Sep 2026 — a real, auditable token-spend/transparency system, plus
+two real DIG bugs found live during testing.** Session started from an
+`ANTHROPIC_API_KEY` outage (now documented in its own entry under
+"Required Cloudflare Pages secrets" above — a silent 30-day expiration
+plus, on the replacement, an unscoped-workspace key) and grew into the
+citizen's own standing ask: "I'd like to see a real meaningful dashboard
+with more stats, including real token spend across the platform... in
+the spirit of transparency that is at the heart of the platform... this
+will eventually be part of the pitch for donations, crowdfunding,
+sponsorships (hardcore institutional users donating usage credits to
+common citizens)." That last part raised the bar on this work
+specifically — it's future fundraising collateral, not a vanity number,
+so it had to be real and auditable, not estimated.
+
+- **DIG: two real bugs found live while stress-testing after the key
+  fix.** (1) A "no coverage found" result still showed the model's full
+  2-3 sentence narration of its own failed search — verbose for
+  effectively nothing — and the DEBATE button still ran normally against
+  it, burning a real request against the per-visitor daily cap for a
+  stance that didn't exist. New `hasCoverage(r)` in `dig/index.html`
+  gates both: a short fixed line replaces the verbose narration, and
+  DEBATE is disabled (with an explanatory title) whenever there's
+  nothing to argue for; `runDebate()` also guards itself directly, not
+  just the button. (2) `runDebate()`'s own error handling threw a bare
+  `request failed (429)` instead of reading `dig-check.js`'s real message
+  (e.g. "Daily limit of 30 checks reached... resets at UTC midnight") —
+  same swallowed-error pattern this project has hit before elsewhere, now
+  fixed to match `checkSource()`'s existing handling.
+- **`DIG_DAILY_LIMIT_PER_IP` raised 30 → 100** (a code-level default, no
+  Cloudflare secret exists for this one) — real testers were starting to
+  use DIG, and 30/day was easy to burn through since every source in a
+  check, plus every debate click, counts individually. **Still open**:
+  the *shared* daily budget (`DIG_DAILY_BUDGET_USD`, still $20) wasn't
+  raised alongside it — flagged to the citizen that more testers each
+  pushing toward the new 100-check ceiling could plausibly hit the $20
+  shared cap before any one visitor hits their own limit, but not
+  actioned. Worth revisiting now that the new dashboard (below) shows
+  real spend rather than an estimate.
+- **Dark-mode bill-title links were unreadable, light mode was fine** —
+  root-caused to `titleBlockHtml()`'s short-title path (10 Sep 2026):
+  `.card-title-plain` styled its own text color but never overrode the
+  `<a>` inside it, unlike the long-title path's `.card-title a`. The link
+  fell back to the browser's default blue/visited color — coincidentally
+  legible against the light background, unreadable against dark. Fixed
+  with the same `color: inherit` rule `.card-title a` already had.
+- **A platform-wide usage-celebration ticker** (`usage-ticker.js`, new —
+  shared like `civics.js`/`digest.js`/`mode.js`, no build system to share
+  a component any other way) shown on DIG, Take Action, and builder.html:
+  a real, positively-framed line ("N checks run · N talking points
+  pulled · N actions taken · N manifestos built — citizens are putting
+  CiViX to work"), backed by a new `type: "function"` counter in
+  `platform-stats.js` (a free-form name → count map, same open-set shape
+  as the existing `topics` map). Went through two corrections from the
+  citizen: the first icon (🎉) was flagged as something the app had
+  already moved away from once before (see `avoid-party-emoji` in
+  memory) — swapped for 📈. An all-zero first-ever state shows "Be part
+  of the first wave..." instead of a flat string of zeroes.
+- **Real, per-function token/spend tracking — the actual centerpiece of
+  this session.** `grep -rl api.anthropic.com functions/` confirmed only
+  three Functions ever call Anthropic directly: `dig-check.js`,
+  `plain-summary.js`, `strategic-plan.js` — every other AI-backed feature
+  in the app reuses `dig-check.js`'s own HTTP endpoint. Each of the three
+  had independently duplicated `estimateCost()`/`todayKey()` and wrote
+  only a single aggregate `spent` float to `usage:<date>`, enough to gate
+  the shared daily budget cap but with no record of which feature spent
+  it, no token counts, and no running total. New
+  `functions/_lib/token-stats.js` centralizes this: `recordSpend(kv,
+  feature, usage, dateKey, priorRecord)` keeps the existing budget-cap
+  bookkeeping unchanged and additionally writes a genuine, lifetime
+  `pstats:tokens` map (feature → calls/inputTokens/outputTokens/costUsd).
+  `dig-check.js` now accepts an optional `feature` tag on its request
+  body (defaults to `'other'`, never rejected — backward-compatible with
+  any caller that doesn't pass one); `plain-summary.js`/
+  `strategic-plan.js` record under their own fixed names. Every call site
+  across the app was tagged with its own real feature name — real
+  coverage, not a sample: `dig_check`, `dig_debate`,
+  `dig_source_lookup`, `dig_trending_topics` (`dig/index.html`);
+  `voice_inference`, `inbox_classify`, `headline_boildown`,
+  `freeform_classify`, `drilldown_cards` (`builder.html`);
+  `docket_classify` (`digest.js`); `federal_draft`, `general_draft`,
+  `state_draft` (`take-action.html`); `headline_boildown` again
+  (`headlines-batch.js`'s internal same-origin call); plus
+  `plain_summary` and `strategic_plan` server-side. `platform-stats.js`
+  exposes this as `tokenFeatures` (sorted by real spend) and
+  `tokensSummary` (grand totals). `analytics.html`'s real-data view
+  gained a genuine "Real AI work, in the open" section — total tokens
+  processed, total real $ spent, total AI calls made on citizens'
+  behalf, and a per-feature card list with human-readable labels (a
+  `FEATURE_LABELS` map, not raw snake_case names — this is meant to read
+  as a real dashboard, not a debug dump). `usage-ticker.js` also
+  surfaces the running total inline and links out to the full dashboard
+  from wherever it's shown.
+- **Dates and a spend-over-time chart**, same-day follow-up ask
+  ("add some dates to show how long we've been tracking, and a spend
+  over time tracker"). `recordSpend()` now also writes
+  `pstats:dailySpend` (a date → stats map, bounded to the most recent
+  400 days, never expires — a separate structure from the existing
+  `usage:<date>` budget counter, which still expires after 2 days and
+  only ever holds one float) and `pstats:trackingSince` (written once,
+  the first time any real spend is ever recorded). `analytics.html` shows
+  "Tracking real AI spend since `<date>` (`<N>` days)" plus a plain CSS
+  bar chart of the last 30 tracked days — no charting library, same
+  dependency-free convention as the rest of the app; each bar's exact
+  date/amount shows on hover. Caught and fixed a real bug from verifying
+  this live rather than assuming it worked: `daysTracked` read "2" for a
+  tracking history that started earlier that same day, because
+  `Date.now()` (already past noon UTC) minus midnight UTC on day one
+  rounded a sub-day gap up to a full day. Fixed by truncating both sides
+  to midnight UTC before differencing; confirmed live afterward that a
+  same-day start now correctly reads "1 day."
+- **Verified live throughout, not just deployed**: every stage was
+  confirmed against real production behavior rather than assumed —
+  including one real test call that showed up correctly attributed in
+  `tokenFeatures` immediately after the first deploy, and genuine
+  production traffic (`headline_boildown`, from the live headline
+  pre-warming pipeline, not test calls) showing up correctly tagged on
+  its own, confirming the instrumentation captures real citizen usage,
+  not just this session's own testing.
+- **Explicitly not done this session, worth naming for the next
+  sprint**: the daily-spend history and chart are brand new — there's
+  only ever going to be one real day of trend data until more days
+  actually pass, so the chart won't look like much yet. The donation/
+  crowdfunding/sponsorship mechanism this dashboard is meant to
+  eventually support (see the citizen's own framing above, and the
+  existing "donations, sponsorships" line in the still-not-started
+  roadmap list further up this file) has no code behind it yet — this
+  session built the trustworthy data it would need, not the give-back
+  mechanism itself. And the shared daily budget question flagged above
+  (`DIG_DAILY_BUDGET_USD` staying at $20 while the per-IP ceiling
+  quintupled) is still an open decision, not a resolved one.
+
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,
