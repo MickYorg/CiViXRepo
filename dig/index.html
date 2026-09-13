@@ -1086,7 +1086,8 @@
     cursor: pointer;
     margin-left: auto;
   }
-  .wd-debate-btn:hover { background: var(--rust); color: var(--paper); }
+  .wd-debate-btn:hover:not(:disabled) { background: var(--rust); color: var(--paper); }
+  .wd-debate-btn:disabled { opacity: 0.4; cursor: default; }
   .wd-debate-points { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
   .wd-debate-points ul { margin: 0; padding-left: 18px; }
   .wd-debate-points li { margin-bottom: 8px; font-size: 13.5px; line-height: 1.5; }
@@ -3085,11 +3086,21 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
+  // A source only has real coverage to debate or juxtapose against when it
+  // actually found something — "no coverage found" is a valid, honest
+  // result but has no stance behind it to argue for, so the debate feature
+  // and the verbose search-narration summary both need to be gated on this
+  // rather than shown unconditionally.
+  function hasCoverage(r) {
+    return !!(r && !r.error && r.stance && !/no coverage found/i.test(r.stance));
+  }
+
   function renderFocusCard(direction) {
     const src = sources[focusIndex];
     const r = resultsState[src.name];
     const rating = (src.ratings && src.ratings[currentTopic]) || { quality: null, stars: 0 };
     const trust = sourceTrust(src);
+    const noCoverage = r && !r.error && r.stance && /no coverage found/i.test(r.stance);
 
     focusPrev.disabled = focusIndex === 0;
     focusNext.disabled = focusIndex === sources.length - 1;
@@ -3100,7 +3111,9 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       ? `<div class="wd-focus-summary wd-dim">Not checked yet for this topic.</div>`
       : r.error
         ? `<div class="wd-focus-summary wd-dim">Couldn't retrieve this one: ${escapeHtml(r.error)}</div>`
-        : `<div class="wd-focus-summary">${escapeHtml(r.summary || 'No summary returned.')}</div>`;
+        : noCoverage
+          ? `<div class="wd-focus-summary wd-dim">No coverage found from this source on this topic.</div>`
+          : `<div class="wd-focus-summary">${escapeHtml(r.summary || 'No summary returned.')}</div>`;
 
     const trustHtml = trust
       ? `<div class="wd-trust-badge" title="Your average coverage-quality rating for ${escapeAttr(src.name)}, across ${trust.count} topic${trust.count === 1 ? '' : 's'} rated">General trust: ${'★'.repeat(Math.round(trust.avg))}${'☆'.repeat(5 - Math.round(trust.avg))} (${trust.avg})</div>`
@@ -3136,7 +3149,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
         <button class="wd-like-btn" data-quality="accurate" title="Fair and accurate coverage of this topic">✓ Fair &amp; accurate</button>
         <button class="wd-like-btn wd-dislike-btn" data-quality="off" title="Off the mark on this topic">✗ Off the mark</button>
         <div class="wd-stars" id="wd-focus-stars"></div>
-        <button class="wd-debate-btn" id="wd-debate-btn">DEBATE ⇄</button>
+        <button class="wd-debate-btn" id="wd-debate-btn" ${hasCoverage(r) ? '' : 'disabled'} title="${hasCoverage(r) ? '' : 'No coverage found for this source — nothing to build talking points from'}">DEBATE ⇄</button>
       </div>
     `;
     if (direction === 'next') void focusCardEl.offsetWidth, focusCardEl.classList.add('wd-slide-next');
@@ -3231,6 +3244,8 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
   }, { passive: true });
 
   async function runDebate(name) {
+    if (!hasCoverage(resultsState[name])) return; // nothing to argue for — matches the disabled button
+
     const key = `${currentTopic}::${name}`;
     const pointsEl = document.getElementById('wd-debate-points');
     if (debateCache[key] && debateCache[key] !== 'loading') {
@@ -3260,7 +3275,20 @@ POINT: <talking point in a single sentence>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })
       });
-      if (!response.ok) throw new Error(`request failed (${response.status})`);
+      if (!response.ok) {
+        // Surface dig-check.js's own real message (e.g. "Daily limit of 30
+        // checks reached... resets at UTC midnight") instead of a bare
+        // status code — the debate feature shares the same per-IP/daily
+        // budget caps as the main check, so a citizen who's already run a
+        // full source list is likely to hit this here too, and deserves
+        // the same clear explanation checkSource() already gives.
+        let detail = '';
+        try {
+          const errBody = await response.json();
+          detail = (errBody && errBody.error && errBody.error.message) || '';
+        } catch (parseErr) { /* body wasn't JSON — fall back to the status code */ }
+        throw new Error(detail || `request failed (${response.status})`);
+      }
       const data = await response.json();
       const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
       const points = text.split('\n').map(l => l.replace(/^POINT:\s*/i, '').trim()).filter(Boolean);
