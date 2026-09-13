@@ -67,7 +67,7 @@ async function boildownOne(origin, article) {
     const res = await fetch(new URL('/api/dig-check', origin), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: boildownPrompt(article) })
+      body: JSON.stringify({ prompt: boildownPrompt(article), feature: 'headline_boildown' })
     });
     if (!res.ok) return null;
     const data = await res.json();

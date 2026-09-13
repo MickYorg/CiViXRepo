@@ -15,11 +15,19 @@
     return (n || 0).toLocaleString();
   }
 
+  // dig/index.html is the only one of the three host pages nested a
+  // directory deep, so it's the only one that needs a relative-path
+  // adjustment to reach the root-level dashboard.
+  function analyticsHref() {
+    return /\/dig\/?(index\.html)?$/.test(location.pathname) ? '../analytics.html' : 'analytics.html';
+  }
+
   function render(el, stats) {
     const checks = (stats.functions && stats.functions.dig_check) || 0;
     const talkingPoints = (stats.functions && stats.functions.dig_debate) || 0;
     const actions = stats.actionsTotal || 0;
     const manifestos = stats.manifestos || 0;
+    const costUsd = (stats.tokensSummary && stats.tokensSummary.costUsd) || 0;
     const total = checks + talkingPoints + actions + manifestos;
 
     if (total === 0) {
@@ -32,8 +40,9 @@
     if (talkingPoints) parts.push(`<strong>${fmt(talkingPoints)}</strong> talking points pulled`);
     if (actions) parts.push(`<strong>${fmt(actions)}</strong> actions taken`);
     if (manifestos) parts.push(`<strong>${fmt(manifestos)}</strong> manifestos built`);
+    if (costUsd > 0) parts.push(`<strong>$${costUsd.toFixed(2)}</strong> of real AI work done, in the open`);
 
-    el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">${parts.join(' · ')}<span class="usage-ticker-tagline"> — citizens are putting CiViX to work</span></span>`;
+    el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">${parts.join(' · ')}<span class="usage-ticker-tagline"> — citizens are putting CiViX to work</span> <a class="usage-ticker-link" href="${analyticsHref()}">See the full dashboard &#8594;</a></span>`;
   }
 
   async function init() {

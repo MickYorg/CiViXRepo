@@ -15,11 +15,10 @@
 
 import { electionFacts } from '../_lib/election-dates.js';
 import { matchBills, slug } from '../_lib/bill-matching.js';
+import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h — same manifesto, same plan, no new spend on a reload
-const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2;
-const PRICE_PER_MTOK_INPUT = 2;
-const PRICE_PER_MTOK_OUTPUT = 10;
+const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2; // per-IP rate-limit counter TTL (unrelated to token-stats.js's own budget-counter TTL)
 
 // Trimmed down 9 Sep 2026 (originally 20/8/15/10/10) after a live failure
 // traced to generation latency, not a data-shape bug — a smaller input
@@ -48,17 +47,6 @@ const CONTINGENCY_SCENARIOS = [
   { id: 'electoral-constitutional-crisis', name: 'Constitutional / electoral crisis', framing: 'A contested election or a serious breach of democratic norms is the moment Democracy-category priorities matter most.' }
 ];
 const CONTINGENCY_SCENARIO_IDS = CONTINGENCY_SCENARIOS.map(s => s.id);
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function estimateCost(usage) {
-  if (!usage) return 0;
-  const inputCost = ((usage.input_tokens || 0) / 1_000_000) * PRICE_PER_MTOK_INPUT;
-  const outputCost = ((usage.output_tokens || 0) / 1_000_000) * PRICE_PER_MTOK_OUTPUT;
-  return inputCost + outputCost;
-}
 
 function secondsUntilMidnightUTC() {
   const now = new Date();
@@ -254,14 +242,7 @@ export async function onRequestPost({ request, env }) {
 
   const dailyBudget = Number(env.DIG_DAILY_BUDGET_USD || 20);
   const dateKey = todayKey();
-  let record = { spent: 0 };
-  if (kv) {
-    try {
-      record = (await kv.get(`usage:${dateKey}`, { type: 'json' })) || { spent: 0 };
-    } catch (e) {
-      record = { spent: 0 };
-    }
-  }
+  const record = await readDailyUsage(kv, dateKey);
   if (record.spent >= dailyBudget) {
     return json({ error: { message: `Daily budget of $${dailyBudget} reached — resets at UTC midnight. Try again tomorrow.` } }, 402);
   }
@@ -393,10 +374,7 @@ export async function onRequestPost({ request, env }) {
 
   if (kv) {
     try {
-      const cost = estimateCost(parsed.usage);
-      if (cost > 0) {
-        await kv.put(`usage:${dateKey}`, JSON.stringify({ spent: (record.spent || 0) + cost }), { expirationTtl: COUNTER_TTL_SECONDS });
-      }
+      await recordSpend(kv, 'strategic_plan', parsed.usage, dateKey, record);
     } catch (e) {}
   }
 

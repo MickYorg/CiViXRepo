@@ -354,6 +354,7 @@
     <div class="stat-grid" id="real-stat-grid"></div>
     <div id="real-topics"></div>
     <div id="real-levels"></div>
+    <div id="real-tokens"></div>
   </div>
 
   <div id="sample-view" hidden>
@@ -422,6 +423,30 @@
   }
 
   var LEVEL_LABELS = { federal: 'Federal', state: 'State', municipal: 'Municipal', general: 'General' };
+  // Every distinct caller of /api/dig-check (plus the two other Functions
+  // that call Anthropic directly — plain-summary.js, strategic-plan.js)
+  // tags its own real spend with one of these names — see
+  // functions/_lib/token-stats.js. Human labels here, not raw feature
+  // names, since this is meant to read as a real dashboard, not a debug
+  // dump.
+  var FEATURE_LABELS = {
+    dig_check: 'DIG stance checks',
+    dig_debate: 'DIG talking-points pulls',
+    dig_source_lookup: 'DIG source lookups',
+    dig_trending_topics: 'DIG trending-topics refresh',
+    voice_inference: "Learning a citizen's writing voice",
+    inbox_classify: 'Inbox topic classification',
+    headline_boildown: 'Headline boildowns',
+    freeform_classify: 'Freeform priority classification',
+    drilldown_cards: '"It\'s complicated" facet generation',
+    docket_classify: 'Docket item classification',
+    federal_draft: 'Federal call/email drafts',
+    general_draft: 'General advocacy drafts',
+    state_draft: 'State email drafts',
+    plain_summary: 'Plain-language bill summaries',
+    strategic_plan: 'Multi-year strategic plans',
+    other: 'Other AI assistance'
+  };
   var toggle = document.getElementById('view-toggle');
   var thumb = document.getElementById('view-toggle-thumb');
   var realView = document.getElementById('real-view');
@@ -461,8 +486,11 @@
     var gridEl = document.getElementById('real-stat-grid');
     var topicsEl = document.getElementById('real-topics');
     var levelsEl = document.getElementById('real-levels');
+    var tokensEl = document.getElementById('real-tokens');
+    var tokensSummary = data.tokensSummary || { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    var totalTokens = (tokensSummary.inputTokens || 0) + (tokensSummary.outputTokens || 0);
 
-    var hasData = (data.manifestos || 0) > 0 || (data.actionsTotal || 0) > 0;
+    var hasData = (data.manifestos || 0) > 0 || (data.actionsTotal || 0) > 0 || tokensSummary.calls > 0;
     statusEl.hidden = hasData;
 
     gridEl.innerHTML =
@@ -493,6 +521,34 @@
             '<div class="level-bar-track"><div class="level-bar-fill" style="width:' + pct + '%"></div></div></div>';
         }).join('')
       : '';
+
+    // Real, auditable AI spend — every /api/dig-check caller (plus
+    // plain-summary.js and strategic-plan.js, the only other two Functions
+    // that call Anthropic directly) tags its own real usage, so this is a
+    // genuine breakdown of where the platform's own real work is going,
+    // not an estimate. Framed as transparency, not a cost warning — this
+    // is proof of real work happening on citizens' behalf.
+    var features = data.tokenFeatures || [];
+    if (tokensSummary.calls > 0) {
+      var maxCost = features.reduce(function (m, f) { return Math.max(m, f.costUsd); }, 0) || 1;
+      tokensEl.innerHTML =
+        '<p class="section-label">Real AI work, in the open</p>' +
+        '<div class="stat-grid">' +
+          '<div class="stat"><div class="stat-num">' + totalTokens.toLocaleString() + '</div><div class="stat-label">Tokens processed</div></div>' +
+          '<div class="stat"><div class="stat-num">$' + tokensSummary.costUsd.toFixed(2) + '</div><div class="stat-label">Real AI spend, for citizens</div></div>' +
+          '<div class="stat"><div class="stat-num">' + tokensSummary.calls.toLocaleString() + '</div><div class="stat-label">AI calls made on citizens\' behalf</div></div>' +
+        '</div>' +
+        '<p class="card-body" style="margin:0 0 14px;">Every dig, check, draft, and search below is a real Anthropic call CiViX made so a citizen could understand something or take action — not a simulated number. This is also the foundation for a future give-back: institutional sponsors donating usage credit to fund citizens\' own activity here.</p>' +
+        features.map(function (f) {
+          var pct = Math.round((f.costUsd / maxCost) * 100);
+          var label = FEATURE_LABELS[f.name] || f.name;
+          return '<div class="card"><div class="card-top"><span class="card-title">' + esc(label) + '</span><span class="tag">$' + f.costUsd.toFixed(3) + '</span></div>' +
+            '<div class="card-meta">' + f.calls.toLocaleString() + ' call' + (f.calls === 1 ? '' : 's') + ' &middot; ' + (f.inputTokens + f.outputTokens).toLocaleString() + ' tokens</div>' +
+            '<div class="level-bar-track"><div class="level-bar-fill" style="width:' + pct + '%"></div></div></div>';
+        }).join('');
+    } else {
+      tokensEl.innerHTML = '';
+    }
   }
 
   function loadRealStats() {
@@ -500,7 +556,7 @@
     fetch('/api/platform-stats')
       .then(function (r) { return r.json(); })
       .then(renderReal)
-      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [] }); });
+      .catch(function () { renderReal({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [], tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 } }); });
   }
 
   var stored = null;

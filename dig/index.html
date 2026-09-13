@@ -1107,6 +1107,8 @@
   .usage-ticker-emoji { flex-shrink: 0; }
   .usage-ticker-text strong { color: var(--amber); }
   .usage-ticker-tagline { color: var(--paper-dim); }
+  .usage-ticker-link { margin-left: 8px; color: var(--amber); text-decoration: none; white-space: nowrap; }
+  .usage-ticker-link:hover { text-decoration: underline; }
   .wd-debate-points { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
   .wd-debate-points ul { margin: 0; padding-left: 18px; }
   .wd-debate-points li { margin-bottom: 8px; font-size: 13.5px; line-height: 1.5; }
@@ -1608,7 +1610,7 @@
     const response = await fetch('/api/dig-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, feature: 'dig_source_lookup' })
     });
     if (!response.ok) throw new Error('lookup failed');
     const data = await response.json();
@@ -1666,7 +1668,7 @@
       const response = await fetch('/api/dig-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, feature: 'dig_trending_topics' })
       });
       if (!response.ok) throw new Error('trending fetch failed');
       const data = await response.json();
@@ -2693,7 +2695,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       response = await fetch("/api/dig-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, feature: 'dig_check' })
       });
     } catch (networkErr) {
       const err = new Error('network hiccup — retrying');
@@ -3308,7 +3310,7 @@ POINT: <talking point in a single sentence>
       const response = await fetch('/api/dig-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, feature: 'dig_debate' })
       });
       if (!response.ok) {
         // Surface dig-check.js's own real message (e.g. "Daily limit of 30

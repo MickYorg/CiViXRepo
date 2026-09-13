@@ -307,11 +307,11 @@
   }
 
   // ---- AI helpers (both hit /api/dig-check, both cached) -----------------
-  async function digCheckCall(prompt) {
+  async function digCheckCall(prompt, feature) {
     const r = await fetch('/api/dig-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, feature })
     });
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
@@ -347,7 +347,7 @@
 Captured item: "${item.title}"${item.note ? `\nTheir note: "${item.note}"` : ''}${item.host ? `\nSource: ${item.host}` : ''}
 
 Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy area this falls under (e.g. "Housing affordability", "Immigration and border policy", "Criminal justice reform") — general enough that it would still make sense as a topic next month, not tied to this one event. No markdown, no explanation, no surrounding quotes.`;
-      const topic = (await digCheckCall(prompt)).replace(/^["']|["']$/g, '').trim();
+      const topic = (await digCheckCall(prompt, 'docket_classify')).replace(/^["']|["']$/g, '').trim();
       topics[item.id] = { topic, at: Date.now() };
       saveJSON(INBOX_TOPICS_KEY, topics);
       return topic;

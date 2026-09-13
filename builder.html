@@ -122,6 +122,8 @@
   .usage-ticker-emoji { flex-shrink: 0; }
   .usage-ticker-text strong { color: var(--amber-ink); }
   .usage-ticker-tagline { color: var(--paper-dim); }
+  .usage-ticker-link { margin-left: 8px; color: var(--amber-ink); text-decoration: none; white-space: nowrap; }
+  .usage-ticker-link:hover { text-decoration: underline; }
 
   .icon-btn {
     appearance: none;
@@ -1615,7 +1617,7 @@
 ${samples.map((s, i) => `${i + 1}. "${s}"`).join('\n')}
 
 Describe this person's writing/speaking VOICE in one short sentence, for someone drafting text on their behalf to sound like them — formality, sentence length, directness, any notable phrasing. Do not summarize their opinions or the topics themselves, only their style. Respond with only the sentence, no preamble.`;
-    digCheckCall(prompt).then(text => {
+    digCheckCall(prompt, 'voice_inference').then(text => {
       P.voice = { description: text.trim(), samplesAtLastUpdate: samples.length, updatedAt: Date.now() };
       save();
     }).catch(() => {});
@@ -1962,11 +1964,14 @@ Describe this person's writing/speaking VOICE in one short sentence, for someone
   function digUrl(topic) {
     return 'dig/?topic=' + encodeURIComponent(topic);
   }
-  async function digCheckCall(prompt) {
+  // `feature` (13 Sep 2026) tags which caller spent this — see
+  // functions/_lib/token-stats.js — for the real per-function usage
+  // dashboard. Optional; falls back to 'other' server-side if omitted.
+  async function digCheckCall(prompt, feature) {
     const r = await fetch('/api/dig-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, feature })
     });
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
@@ -2013,7 +2018,7 @@ Describe this person's writing/speaking VOICE in one short sentence, for someone
 Captured item: "${it.title}"${it.note ? `\nTheir note: "${it.note}"` : ''}${it.host ? `\nSource: ${it.host}` : ''}
 
 Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy area this falls under (e.g. "Housing affordability", "Immigration and border policy", "Criminal justice reform") — general enough that it would still make sense as a topic next month, not tied to this one event. No markdown, no explanation, no surrounding quotes.`;
-    const text = await digCheckCall(prompt);
+    const text = await digCheckCall(prompt, 'inbox_classify');
     return text.replace(/^["']|["']$/g, '').trim();
   }
 
@@ -2856,7 +2861,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   "imageQuery": 2-4 concrete, photographable keywords for a stock-photo search that captures the scene (e.g. "apartment building renters", "hospital waiting room") — no proper nouns, no politician or public-figure names, nothing that would try to identify a real specific person
 }`;
     try {
-      const raw = await digCheckCall(prompt);
+      const raw = await digCheckCall(prompt, 'headline_boildown');
       const parsed = parseAIJSON(raw);
       if (!parsed.topic || !parsed.talkingPoint) throw new Error('incomplete boildown');
       if (ALL_ISSUE_NAMES.indexOf(parsed.topic) === -1) parsed.topic = ALL_ISSUE_NAMES[0];
@@ -2935,7 +2940,7 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     // silent, unexplained punt to the manual picker.
     let raw;
     try {
-      raw = await digCheckCall(prompt);
+      raw = await digCheckCall(prompt, 'freeform_classify');
     } catch (e) {
       return { error: (e && e.message) || 'Could not reach the classifier.' };
     }
@@ -3533,7 +3538,7 @@ Reply with ONLY a JSON array of exactly 3 objects, no markdown fences, no other 
   "talkingPoint": one clear, opinionated position statement (under 20 words) on that specific facet — a single, standalone claim the citizen can swipe agree or disagree with, not just a label for the facet, and NOT a comparison or debate between two sides. Never phrase it as "X shouldn't do Y, even though Z thinks otherwise" or anything else that names or nods to an opposing party's view — a citizen reading it shouldn't have to wonder whether agreeing means siding with the claim or the group being dismissed
 }, ...]`;
     try {
-      const raw = await digCheckCall(prompt);
+      const raw = await digCheckCall(prompt, 'drilldown_cards');
       const parsed = parseAIJSON(raw);
       if (!Array.isArray(parsed)) throw new Error('not an array');
       return parsed.slice(0, 3).filter(p => p && p.topic && p.talkingPoint).map(p => ({

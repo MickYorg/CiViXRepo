@@ -62,13 +62,14 @@ function json(body, status) {
 }
 
 async function handleGet(kv) {
-  const [manifestos, levels, topics, wins, winTopics, functions] = await Promise.all([
+  const [manifestos, levels, topics, wins, winTopics, functions, tokens] = await Promise.all([
     readJson(kv, 'pstats:manifestos', { count: 0 }),
     readJson(kv, 'pstats:levels', {}),
     readJson(kv, 'pstats:topics', {}),
     readJson(kv, 'pstats:wins', { count: 0 }),
     readJson(kv, 'pstats:winTopics', {}),
-    readJson(kv, 'pstats:functions', {})
+    readJson(kv, 'pstats:functions', {}),
+    readJson(kv, 'pstats:tokens', {})
   ]);
 
   const actionsTotal = Object.values(levels).reduce((a, b) => a + b, 0);
@@ -81,6 +82,26 @@ async function handleGet(kv) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
+  // Real per-feature Anthropic spend (functions/_lib/token-stats.js writes
+  // this on every call to dig-check.js/plain-summary.js/strategic-plan.js
+  // — the only three Functions that call Anthropic directly), plus the
+  // grand totals the transparency dashboard leads with.
+  const tokenFeatures = Object.entries(tokens)
+    .map(([name, t]) => ({
+      name,
+      calls: t.calls || 0,
+      inputTokens: t.inputTokens || 0,
+      outputTokens: t.outputTokens || 0,
+      costUsd: t.costUsd || 0
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd);
+  const tokensSummary = tokenFeatures.reduce((sum, t) => ({
+    calls: sum.calls + t.calls,
+    inputTokens: sum.inputTokens + t.inputTokens,
+    outputTokens: sum.outputTokens + t.outputTokens,
+    costUsd: sum.costUsd + t.costUsd
+  }), { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 });
+
   return json({
     manifestos: manifestos.count || 0,
     actionsTotal,
@@ -88,7 +109,9 @@ async function handleGet(kv) {
     topTopics,
     winsTotal: wins.count || 0,
     topWinTopics,
-    functions
+    functions,
+    tokenFeatures,
+    tokensSummary
   });
 }
 
@@ -164,7 +187,10 @@ export async function onRequestGet({ env }) {
   try {
     return await handleGet(env.DIG_KV);
   } catch (e) {
-    return json({ manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [], functions: {} }, 200);
+    return json({
+      manifestos: 0, actionsTotal: 0, levels: {}, topTopics: [], winsTotal: 0, topWinTopics: [],
+      functions: {}, tokenFeatures: [], tokensSummary: { calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 }
+    }, 200);
   }
 }
 

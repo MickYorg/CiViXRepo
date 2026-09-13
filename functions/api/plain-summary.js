@@ -25,21 +25,9 @@
 // floor vote) and this doesn't auto-regenerate for that — accepted
 // then, still accepted now, not something this pass changes.
 
+import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
+
 const CACHE_TTL_SECONDS = 60 * 60 * 24 * 60; // 60 days — cheap to keep, real spend to regenerate
-const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2;
-const PRICE_PER_MTOK_INPUT = 2;
-const PRICE_PER_MTOK_OUTPUT = 10;
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // UTC date
-}
-
-function estimateCost(usage) {
-  if (!usage) return 0;
-  const inputCost = ((usage.input_tokens || 0) / 1_000_000) * PRICE_PER_MTOK_INPUT;
-  const outputCost = ((usage.output_tokens || 0) / 1_000_000) * PRICE_PER_MTOK_OUTPUT;
-  return inputCost + outputCost;
-}
 
 export async function onRequestPost({ request, env }) {
   const apiKey = env.ANTHROPIC_API_KEY;
@@ -81,14 +69,7 @@ export async function onRequestPost({ request, env }) {
 
   const dailyBudget = Number(env.DIG_DAILY_BUDGET_USD || 20);
   const dateKey = todayKey();
-  let record = { spent: 0 };
-  if (kv) {
-    try {
-      record = (await kv.get(`usage:${dateKey}`, { type: 'json' })) || { spent: 0 };
-    } catch (e) {
-      record = { spent: 0 };
-    }
-  }
+  const record = await readDailyUsage(kv, dateKey);
 
   if (record.spent >= dailyBudget) {
     return json({ error: { message: `Daily budget of $${dailyBudget} reached — resets at UTC midnight.` } }, 402);
@@ -178,10 +159,7 @@ Bill: ${title}
   // some error responses still report partial usage.
   if (kv) {
     try {
-      const cost = estimateCost(parsed.usage);
-      if (cost > 0) {
-        await kv.put(`usage:${dateKey}`, JSON.stringify({ spent: (record.spent || 0) + cost }), { expirationTtl: COUNTER_TTL_SECONDS });
-      }
+      await recordSpend(kv, 'plain_summary', parsed.usage, dateKey, record);
     } catch (e) {}
   }
 

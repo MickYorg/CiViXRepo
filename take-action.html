@@ -183,6 +183,8 @@
   .usage-ticker-emoji { flex-shrink: 0; }
   .usage-ticker-text strong { color: var(--amber-ink); }
   .usage-ticker-tagline { color: var(--paper-dim); }
+  .usage-ticker-link { margin-left: 8px; color: var(--amber-ink); text-decoration: none; white-space: nowrap; }
+  .usage-ticker-link:hover { text-decoration: underline; }
 
   .wip {
     display: flex;
@@ -1019,11 +1021,11 @@
     } catch (e) { return null; }
   }
 
-  async function digCheckCall(prompt) {
+  async function digCheckCall(prompt, feature) {
     const r = await fetch('/api/dig-check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, feature })
     });
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
@@ -1387,8 +1389,8 @@ SUBJECT: <subject line>
 BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chamberWord} [last name]," and signed "A constituent in ${zip || '[ZIP]'}">`;
 
     const [callResult, emailResult] = await Promise.allSettled([
-      digCheckCall(callPrompt),
-      digCheckCall(emailPrompt)
+      digCheckCall(callPrompt, 'federal_draft'),
+      digCheckCall(emailPrompt, 'federal_draft')
     ]);
 
     if (!ACTIVE || ACTIVE.bill !== bill) return; // closed or switched bills while in flight
@@ -1790,8 +1792,8 @@ SUBJECT: <subject line>
 BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWord} [last name]," and signed "A constituent in ${zip || '[ZIP]'}">`;
 
     const [callResult, emailResult] = await Promise.allSettled([
-      digCheckCall(callPrompt),
-      digCheckCall(emailPrompt)
+      digCheckCall(callPrompt, 'general_draft'),
+      digCheckCall(emailPrompt, 'general_draft')
     ]);
 
     if (GENERAL_ACTIVE !== active) return;
@@ -2045,7 +2047,7 @@ BODY: <the email body, a few short paragraphs>`;
 
     let text;
     try {
-      text = await digCheckCall(prompt);
+      text = await digCheckCall(prompt, 'state_draft');
     } catch (e) {
       if (STATE_ACTIVE !== active) return;
       active.draft = { status: 'error', error: e.message || 'request failed' };
