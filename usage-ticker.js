@@ -23,7 +23,7 @@
     const total = checks + talkingPoints + actions + manifestos;
 
     if (total === 0) {
-      el.innerHTML = `<span class="usage-ticker-emoji">🎉</span><span class="usage-ticker-text">Be part of the first wave of citizens using CiViX — your activity here becomes the platform's very first stats.</span>`;
+      el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">Be part of the first wave of citizens using CiViX — your activity here becomes the platform's very first stats.</span>`;
       return;
     }
 
@@ -33,7 +33,7 @@
     if (actions) parts.push(`<strong>${fmt(actions)}</strong> actions taken`);
     if (manifestos) parts.push(`<strong>${fmt(manifestos)}</strong> manifestos built`);
 
-    el.innerHTML = `<span class="usage-ticker-emoji">🎉</span><span class="usage-ticker-text">${parts.join(' · ')}<span class="usage-ticker-tagline"> — citizens are putting CiViX to work</span></span>`;
+    el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">${parts.join(' · ')}<span class="usage-ticker-tagline"> — citizens are putting CiViX to work</span></span>`;
   }
 
   async function init() {
