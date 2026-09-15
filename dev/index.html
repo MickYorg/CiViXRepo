@@ -83,7 +83,8 @@
     <h2>🗑️ Reset</h2>
     <p>Wipes your manifesto, DIG's cache, and the splash's own memory (return-visit wording, animation-replay gate) from this browser entirely — the same as never having visited. Your Send to CiViX address is kept and reused, not reissued.</p>
     <div class="row">
-      <button data-persona="clear" data-go="../index.html">Clear</button>
+      <button data-persona="clear">Clear (stay here)</button>
+      <button class="primary" data-persona="clear" data-go="../index.html">Clear &amp; go to CiViX</button>
     </div>
   </div>
 
@@ -292,8 +293,12 @@
         return;
       }
       refreshRestoreCard();
-      setStatus('Set. Heading to ' + go + '…');
-      window.setTimeout(function () { window.location.href = go; }, 250);
+      if (go) {
+        setStatus('Set. Heading to ' + go + '…');
+        window.setTimeout(function () { window.location.href = go; }, 250);
+      } else {
+        setStatus('Cleared. Staying here.');
+      }
     });
   });
 })();
