@@ -124,15 +124,20 @@
     font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.06em;
     color: var(--paper-dim); margin: 8px 0 0;
   }
-  .sound-toggle {
-    position: absolute; right: 12px; bottom: 12px;
-    appearance: none; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,15,28,0.72);
-    color: #fff; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
-    letter-spacing: 0.04em; padding: 8px 13px; border-radius: 20px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 7px; backdrop-filter: blur(2px);
+  .play-overlay {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    appearance: none; border: none; background: rgba(10,15,28,0.28); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s ease;
   }
-  .sound-toggle:hover { border-color: rgba(255,255,255,0.6); }
-  .sound-toggle svg { width: 14px; height: 14px; display: block; flex-shrink: 0; }
+  .play-overlay:hover { background: rgba(10,15,28,0.4); }
+  .play-circle {
+    width: 72px; height: 72px; border-radius: 50%; background: var(--amber);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  .play-overlay svg { width: 28px; height: 28px; color: #0A0F1C; margin-left: 3px; flex-shrink: 0; }
+  .play-overlay[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -154,20 +159,16 @@
 <div class="wrap">
   <div class="crumb">CIVIX 101</div>
   <h1>Civics, explained.</h1>
-  <p class="dek">The same definitions and games that pop up while you're building your manifesto — all in one place, browsable anytime, no waiting for one to show up.</p>
+  <p class="dek">Watch how CiViX works, read the founding documents themselves, and browse the same definitions and games that pop up while you're building your manifesto — all in one place, browsable anytime.</p>
 
   <div class="hero-video">
-    <video id="explainer-video" poster="civix101-explainer-poster.jpg" autoplay muted loop playsinline preload="metadata">
+    <video id="explainer-video" poster="civix101-explainer-poster.jpg" playsinline preload="metadata" controls>
       <source src="civix101-explainer.mp4" type="video/mp4">
     </video>
-    <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Unmute video" aria-pressed="false">
-      <svg id="sound-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M11 5 6 9H2v6h4l5 4V5Z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
-      </svg>
-      <svg id="sound-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
-        <path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
-      </svg>
-      <span id="sound-toggle-label">Unmute</span>
+    <button class="play-overlay" id="play-overlay" type="button" aria-label="Play video">
+      <span class="play-circle">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7Z"/></svg>
+      </span>
     </button>
   </div>
   <p class="hero-video-caption">CiViX, explained in under two minutes.</p>
@@ -242,20 +243,14 @@
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
 
   var video = document.getElementById('explainer-video');
-  var soundBtn = document.getElementById('sound-toggle');
-  var iconOff = document.getElementById('sound-icon-off');
-  var iconOn = document.getElementById('sound-icon-on');
-  var soundLabel = document.getElementById('sound-toggle-label');
-  if (video && soundBtn) {
-    soundBtn.addEventListener('click', function () {
-      video.muted = !video.muted;
-      if (!video.muted) { video.play().catch(function () {}); }
-      soundBtn.setAttribute('aria-pressed', String(!video.muted));
-      soundBtn.setAttribute('aria-label', video.muted ? 'Unmute video' : 'Mute video');
-      soundLabel.textContent = video.muted ? 'Unmute' : 'Mute';
-      iconOff.style.display = video.muted ? '' : 'none';
-      iconOn.style.display = video.muted ? 'none' : '';
+  var playOverlay = document.getElementById('play-overlay');
+  if (video && playOverlay) {
+    playOverlay.addEventListener('click', function () {
+      video.play().catch(function () {});
     });
+    video.addEventListener('play', function () { playOverlay.hidden = true; });
+    video.addEventListener('pause', function () { playOverlay.hidden = false; });
+    video.addEventListener('ended', function () { playOverlay.hidden = false; });
   }
 
   function esc(s) {
