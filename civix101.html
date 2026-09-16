@@ -113,6 +113,26 @@
     border: 1px solid var(--amber); border-radius: 20px; padding: 9px 18px; margin-top: 44px;
   }
   .home-link:hover { background: var(--amber-wash); }
+
+  .hero-video {
+    position: relative; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--line); margin: 22px 0 8px; background: #000;
+    aspect-ratio: 16 / 9;
+  }
+  .hero-video video { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .hero-video-caption {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.06em;
+    color: var(--paper-dim); margin: 8px 0 0;
+  }
+  .sound-toggle {
+    position: absolute; right: 12px; bottom: 12px;
+    appearance: none; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,15,28,0.72);
+    color: #fff; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px;
+    letter-spacing: 0.04em; padding: 8px 13px; border-radius: 20px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px; backdrop-filter: blur(2px);
+  }
+  .sound-toggle:hover { border-color: rgba(255,255,255,0.6); }
+  .sound-toggle svg { width: 14px; height: 14px; display: block; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -135,6 +155,22 @@
   <div class="crumb">CIVIX 101</div>
   <h1>Civics, explained.</h1>
   <p class="dek">The same definitions and games that pop up while you're building your manifesto — all in one place, browsable anytime, no waiting for one to show up.</p>
+
+  <div class="hero-video">
+    <video id="explainer-video" poster="civix101-explainer-poster.jpg" autoplay muted loop playsinline preload="metadata">
+      <source src="civix101-explainer.mp4" type="video/mp4">
+    </video>
+    <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Unmute video" aria-pressed="false">
+      <svg id="sound-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5 6 9H2v6h4l5 4V5Z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+      </svg>
+      <svg id="sound-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+        <path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+      </svg>
+      <span id="sound-toggle-label">Unmute</span>
+    </button>
+  </div>
+  <p class="hero-video-caption">CiViX, explained in under two minutes.</p>
 
   <div class="section-label">Explainers</div>
   <p class="section-dek">Short, plain-language definitions of terms that show up constantly in the news and on the calendar.</p>
@@ -186,6 +222,23 @@
     applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
   });
   themeMeta.setAttribute('content', THEME_COLORS[root.getAttribute('data-theme')] || THEME_COLORS.dark);
+
+  var video = document.getElementById('explainer-video');
+  var soundBtn = document.getElementById('sound-toggle');
+  var iconOff = document.getElementById('sound-icon-off');
+  var iconOn = document.getElementById('sound-icon-on');
+  var soundLabel = document.getElementById('sound-toggle-label');
+  if (video && soundBtn) {
+    soundBtn.addEventListener('click', function () {
+      video.muted = !video.muted;
+      if (!video.muted) { video.play().catch(function () {}); }
+      soundBtn.setAttribute('aria-pressed', String(!video.muted));
+      soundBtn.setAttribute('aria-label', video.muted ? 'Unmute video' : 'Mute video');
+      soundLabel.textContent = video.muted ? 'Unmute' : 'Mute';
+      iconOff.style.display = video.muted ? '' : 'none';
+      iconOn.style.display = video.muted ? 'none' : '';
+    });
+  }
 
   function esc(s) {
     return String(s == null ? '' : s)
