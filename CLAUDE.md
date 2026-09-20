@@ -354,6 +354,86 @@ so it had to be real and auditable, not estimated.
   (`DIG_DAILY_BUDGET_USD` staying at $20 while the per-IP ceiling
   quintupled) is still an open decision, not a resolved one.
 
+**20 Sep 2026 — international-expansion CBA, researched and decided:
+not now, and not France.** The user asked how hard it'd be to adapt
+CiViX beyond its "somewhat myopic" US focus, then asked to zoom out
+further: survey the landscape, name the one or two most adaptable
+alternate jurisdictions, and scope a high-level cost/benefit on going
+international at all — kept here so the research isn't re-done next
+time this comes up. Live-researched (not from memory) each candidate's
+actual open civic-data maturity:
+- **Canada — best structural fit.** OpenNorth's [Represent API](https://represent.opennorth.ca/)
+  returns federal *and* provincial *and* municipal representatives from
+  one postal-code query — closer to a drop-in replacement for CiViX's
+  entire congress.gov + OpenStates + 5calls + Legistar stack than
+  anything else found, and its three-tier shape maps almost 1:1 onto
+  CiViX's existing federal/state/municipal model. English-speaking (no
+  translation cost), officially bilingual infrastructure (a real asset
+  if French were ever revisited later). Real weakness: municipal
+  boundary data is self-reported as covering only ~45 municipalities
+  with open ward data — the same "curated city list" limitation CiViX
+  already lives with today (8 US cities); bill-tracking
+  (OpenParliament.ca) is community-run, not official, and would need a
+  robustness check before being load-bearing.
+- **UK — best "send" infrastructure.** The mySociety ecosystem
+  ([TheyWorkForYou](https://data.mysociety.org/datasets/theyworkforyou-api/) +
+  [WriteToThem](https://www.mysociety.org/2026/07/29/improvements-to-writetothem/))
+  plus the UK Parliament's own official [Bills API](https://bills-api.parliament.uk/)
+  already solves the one gap this file has flagged as *permanent* for
+  US federal — WriteToThem is a real, working "email your MP"
+  mechanism, something 5calls has never had a recipient address for.
+  English-speaking. Real weakness: the UK is unitary-with-devolution,
+  not federal/state/municipal — Scotland/Wales/NI aren't "states" every
+  citizen has one of — so the tier model would need real rethinking,
+  and local-council data has no Legistar-style standard, more
+  fragmented than even Canada's municipal gap.
+- **Also scanned, ranked below those two**: Australia
+  ([TheyVoteForYou](https://www.oaf.org.au/projects/they-vote-for-you/),
+  federal-only, no confirmed state/municipal equivalent); Germany
+  ([abgeordnetenwatch.de](https://www.abgeordnetenwatch.de/api), a
+  genuinely excellent free CC0 federal+state API, offset by real
+  German-language i18n cost and no found municipal equivalent or send
+  mechanism); **France came in weakest of the group** — `data.assemblee-
+  nationale.fr`/NosParlementaires cover only the Assemblée, no confirmed
+  address→rep→email API was found, and the unitary régions/départements/
+  communes structure doesn't map to the three-tier model at all (there's
+  also an unrelated French open-parliament API already branded "CIVIX" —
+  not a blocker, just worth knowing before ever pitching the name there).
+
+  The CBA: going international at all could strengthen the donation/
+  institutional-sponsor pitch already on this file's roadmap ("built
+  once, extensible everywhere" beats "US civic app"), and Canada/UK are
+  the only two candidates cheap enough to prove that thesis rather than
+  assert it, since most of the hard data-sourcing problem is already
+  solved by someone else's free API for those two specifically. But the
+  real cost was never going to be a config flag regardless of country —
+  every one needs its own bill-matching synonym taxonomy, its own
+  election-calendar-facts module (this app's is built on fixed US
+  constitutional dates; every country has different ones), its own
+  "send" mechanism shaped by whatever contact data that country
+  actually publishes, and — per this project's own hard-won
+  verify-live-don't-assume rule — roughly doubles the QA burden per
+  country supported. And the bigger risk: the 10 Sep mandate above is
+  still open — the "advocating effectively" half of the loop was
+  explicitly flagged as not yet audited with the same rigor as
+  matching/classification — so spending a cycle on a second country now
+  risks repeating "looks done but isn't," just in two markets instead
+  of one.
+
+  **Decision: not pursuing international now, and if it's ever picked
+  up, don't lead with France.** If this comes back, the recommended
+  shape is an architecture investment, not a country launch: extract a
+  pluggable jurisdiction-adapter interface (tiers, bill source, rep
+  source, send mechanism, election-calendar rules, synonym taxonomy)
+  and validate it against **Canada first** — cheapest possible second
+  implementation (English, one unified API) and a real forcing function
+  for whether the abstraction is actually general or secretly
+  US-only. UK would be the natural third target specifically to
+  backport a working "send" mechanism into the abstraction. France
+  stays a legitimate stretch goal later — its unitary structure would
+  usefully stress-test the tier model — but shouldn't be the first
+  target given everything above.
+
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,
