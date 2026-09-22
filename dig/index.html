@@ -2651,6 +2651,34 @@
     return { stance, summary };
   }
 
+  // Extracts a "PREFIX: <item>" list from freeform model text — used for
+  // DEBATE's "POINT: ..." talking points. A naive `text.split('\n')` (what
+  // this used to do) breaks two ways, both confirmed live against real
+  // production output: an unprompted preamble line before the first
+  // PREFIX: survives as a bogus extra item (nothing filtered non-matching
+  // lines out), and a single point whose own text happens to contain a
+  // literal newline (e.g. the model wrapping a quoted excerpt onto its own
+  // line) gets split into several broken fragments instead of staying one
+  // item. This instead finds each PREFIX:-marked span directly and
+  // collapses any internal whitespace/newlines within it, so one logical
+  // point stays one list entry regardless of how the model formatted it,
+  // and text outside a PREFIX: span is never treated as an item.
+  function parsePointList(text, prefix) {
+    // The lookahead's own `$` would match end-of-*line* (not end-of-string)
+    // under the /m flag also needed for `^`, cutting every point off at its
+    // first internal line break — confirmed live, see the real captured
+    // failure this fix was verified against. (?![\s\S]) is the true
+    // end-of-string test that isn't affected by /m.
+    const re = new RegExp(`^${prefix}:\\s*([\\s\\S]*?)(?=^${prefix}:\\s*|(?![\\s\\S]))`, 'gim');
+    const points = [];
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const point = m[1].replace(/\s+/g, ' ').trim();
+      if (point) points.push(point);
+    }
+    return points;
+  }
+
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   // Wraps the raw API call with retry + backoff for rate limits and
@@ -3329,7 +3357,7 @@ POINT: <talking point in a single sentence>
       }
       const data = await response.json();
       const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-      const points = text.split('\n').map(l => l.replace(/^POINT:\s*/i, '').trim()).filter(Boolean);
+      const points = parsePointList(text, 'POINT');
       result = points.length ? points : ['No talking points returned.'];
       postFunctionStat('dig_debate');
     } catch (e) {
