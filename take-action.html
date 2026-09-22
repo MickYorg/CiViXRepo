@@ -819,6 +819,8 @@
 
 <script src="mode.js"></script>
 <script src="civics.js"></script>
+<script src="app-shell.js"></script>
+<script src="push.js"></script>
 <script src="digest.js"></script>
 <script src="usage-ticker.js"></script>
 <script>
@@ -1148,6 +1150,7 @@
     if (idx !== -1) { profile.watching.splice(idx, 1); delete WATCH_UPDATES[item.key]; }
     else profile.watching.push(item);
     try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+    if (window.CivixPush) window.CivixPush.resync();
     return idx === -1;
   }
   // Persists `won: true` directly on the watch item so a bill only ever
@@ -1275,6 +1278,19 @@
       </div>`;
   }
 
+  // The push opt-in lives here, not on page load — asked for only when a
+  // citizen is already looking at their watchlist and the value is obvious,
+  // never a blind cold-start OS prompt.
+  function pushRowHtml() {
+    if (!window.CivixPush || !window.CivixPush.available) {
+      return `<p class="watch-note">CiViX also checks these every time you open this page.</p>`;
+    }
+    if (window.CivixPush.isEnabled()) {
+      return `<p class="watch-note">&#128276; Push alerts are on for this device. <button type="button" class="btn" data-push-disable>Turn off</button></p>`;
+    }
+    return `<p class="watch-note">&#128276; Want a nudge the moment one of these moves, even when you're not here? <button type="button" class="btn" data-push-enable>Get notified</button></p>`;
+  }
+
   function renderWatchingZone() {
     const zone = document.getElementById('watching-zone');
     if (!zone) return;
@@ -1282,7 +1298,7 @@
     if (!list.length) { zone.innerHTML = ''; return; }
     zone.innerHTML = `<p class="focus-label">Watching (${list.length})</p>` +
       list.map(watchCardHtml).join('') +
-      `<p class="watch-note">CiViX checks these for updates when you visit this page — real-time alerts aren't built yet.</p>`;
+      pushRowHtml();
     const liveEntries = list
       .filter(w => (w.kind === 'federal' || w.kind === 'state') && WATCH_LIVE[w.key])
       .map(w => ({ w, live: WATCH_LIVE[w.key], isState: w.kind === 'state' }));
@@ -2370,6 +2386,15 @@ BODY: <the email body, a few short paragraphs>`;
       if (ACTIVE) renderActionCard();
       if (GENERAL_ACTIVE) renderGeneralActionCard();
       if (STATE_ACTIVE) renderStateActionCard();
+      return;
+    }
+
+    if (t.closest('[data-push-enable]') && window.CivixPush) {
+      window.CivixPush.requestPermission().then(renderWatchingZone);
+      return;
+    }
+    if (t.closest('[data-push-disable]') && window.CivixPush) {
+      window.CivixPush.disable().then(renderWatchingZone);
       return;
     }
 

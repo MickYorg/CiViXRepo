@@ -1,0 +1,22 @@
+name = "civix-push-scheduler"
+main = "index.js"
+compatibility_date = "2026-08-24"
+
+# Hourly — matches calendar.js/state-bills.js/municipal.js's existing 1-hour
+# cache TTL; checking more often buys nothing since the underlying data
+# can't change faster than that anyway.
+[triggers]
+crons = ["0 * * * *"]
+
+# Same DIG_KV namespace the main mycivix Pages project uses (see the root
+# wrangler.toml) — this Worker only ever reads pushdevice:* records that
+# functions/api/push-register.js writes, and writes its own pushnotified:*
+# bookkeeping alongside them.
+[[kv_namespaces]]
+binding = "DIG_KV"
+id = "51a8027e54724bfb8b6cb34d3ae10ec3"
+
+# FCM_SERVICE_ACCOUNT_JSON, FCM_PROJECT_ID, and TRIGGER_SECRET are secrets —
+# set via `wrangler secret put <name>` from inside workers/push-scheduler/,
+# never committed here. See CLAUDE.md's "Required Cloudflare Pages secrets"
+# section for the equivalent pattern used by the main project.

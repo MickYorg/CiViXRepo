@@ -3,3 +3,6 @@
 node_modules/
 .netlify/
 *.log
+www/
+ios/App/App/public/
+android/app/src/main/assets/public/

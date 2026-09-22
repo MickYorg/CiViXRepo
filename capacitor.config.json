@@ -1,0 +1,20 @@
+{
+  "appId": "com.mycivix.app",
+  "appName": "CiViX",
+  "webDir": "www",
+  "server": {
+    "hostname": "mycivix.com",
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0A0F1C",
+      "overlaysWebView": false
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
