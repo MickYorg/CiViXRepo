@@ -2689,21 +2689,45 @@ BODY: <the email body, a few short paragraphs>`;
   // comment in municipal.js for why (an Event has no topic text worth
   // keyword-matching, just a body name like "City Council"). This is
   // "what's coming up," not "what's relevant to you."
+  // Legistar's own EventLocation field doesn't always hold a real room or
+  // address — confirmed live against Boston's raw API (22 Sep 2026): a
+  // committee hearing's event can carry its own hearing subject there
+  // instead ("PILOT Agreements ... Committee Hearing on Docket #1338"),
+  // while a plain meeting on the same day correctly has a real room
+  // ("Room 801, City Hall"). Concatenating it unconditionally into the
+  // date/time meta line assumed it was always the first kind — for the
+  // second, that produced a garbled run-on that reads like broken
+  // location text, while also burying what's actually the single most
+  // useful detail on the card (which hearing this is, since ev.body is
+  // just the generic body name, e.g. "City Council"). A real location
+  // string doesn't contain these words in practice, so that's used to
+  // tell the two shapes apart and surface each correctly instead.
+  function looksLikeHearingSubject(loc) {
+    return /\bhearing\b|\bdocket\b/i.test(loc || '');
+  }
+
   function renderMunicipalEvents(events, city) {
     const el = document.getElementById('municipal-events');
     if (!el) return;
     if (!events || !events.length) { el.innerHTML = ''; return; }
     el.innerHTML =
       `<p class="section-label">Upcoming in ${esc(city || 'your city')}</p>` +
-      events.map(ev => `
+      events.map(ev => {
+        const isHearingSubject = ev.location && looksLikeHearingSubject(ev.location);
+        const metaLoc = ev.location && !isHearingSubject ? ' · ' + esc(ev.location) : '';
+        const regardingLine = isHearingSubject
+          ? `<div class="card-meta">Regarding: ${esc(ev.location)}</div>` : '';
+        return `
         <div class="card">
           <div class="card-top"><span class="card-title">${esc(ev.body || 'Meeting')}</span><span class="tag">Meeting</span></div>
-          <div class="card-meta">${esc(fmtDate(ev.date))}${ev.time ? ' · ' + esc(ev.time) : ''}${ev.location ? ' · ' + esc(ev.location) : ''}</div>
+          <div class="card-meta">${esc(fmtDate(ev.date))}${ev.time ? ' · ' + esc(ev.time) : ''}${metaLoc}</div>
+          ${regardingLine}
           <div class="card-body">
             ${ev.url ? `<a href="${esc(ev.url)}" target="_blank" rel="noopener">Meeting details &#8594;</a>` : ''}
             ${ev.agendaUrl ? ` &nbsp;·&nbsp; <a href="${esc(ev.agendaUrl)}" target="_blank" rel="noopener">Agenda (PDF) &#8594;</a>` : ''}
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
   }
 
   // ---- Focus zone: top-3 actions, front and center ----------------------
