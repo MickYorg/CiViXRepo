@@ -434,6 +434,102 @@ actual open civic-data maturity:
   usefully stress-test the tier model — but shouldn't be the first
   target given everything above.
 
+**20 Sep 2026, same day — new highest priority: lock down functionality and
+ship a real MVP to the App Store and Google Play.** A significant new
+initiative, tracked here so the next session isn't starting cold — full
+detail lives in the approved plan at
+`~/.claude/plans/jolly-plotting-fountain.md`, this is the summary.
+
+Decided with the user: both iOS and Android, simultaneously, via
+**Capacitor** (wraps the existing static-HTML architecture in a native
+shell rather than a framework rewrite); build real push notifications and
+a native Send-to-CiViX **now**, not deferred (see below for why that
+reverses this file's own prior "not now" stance on push, and how); MVP
+scope is everything that exists today, fully audited, not trimmed; no
+developer accounts existed yet for either store.
+
+A mid-planning sanity check flagged real scope creep worth recording: push
+notifications directly reverse this project's own recorded decision (the
+"Real-time watch alerts" line just above) that real-time alerts needed
+their own dedicated infrastructure project and were deliberately out of
+scope — building them now, bundled into "locking down" existing
+functionality, would have quietly undone that decision rather than
+revisited it on purpose. The user's answer resolved this directly rather
+than dismissing it: push and native Send-to-CiViX are legitimate
+"bells and whistles" for an app meant to carry real app-store trust and
+gravitas, but the manifesto's own core promise — **"never shared, never
+sold"** — has to be a literal engineering constraint on how they're
+built, not marketing copy layered on after. That shaped three concrete
+decisions: push notification banners never name the actual bill/topic
+(generic "open CiViX to see what changed" text only, since the payload
+transits Apple's/Google's infrastructure and can sit on a lock screen
+anyone can glimpse); only FCM's messaging component is used, no bundled
+Firebase Analytics/tracking; and "turn off push" is a real server-side KV
+delete, not a client-side toggle. This is now saved as a standing product
+ethos (`civix-trust-and-frictionless-ethos` in memory) for future feature
+work generally, not just this one.
+
+**Shipped this session (Phase 1-4 of the plan):**
+- Capacitor bring-up: `capacitor.config.json` sets `server.hostname:
+  "mycivix.com"` so the bundled app's WebView origin matches the live
+  domain and every existing Function keeps working with zero backend
+  changes (confirmed via direct inspection that none of the 17 Functions
+  had ever needed CORS headers before — they only served same-origin
+  browser requests). `functions/api/_middleware.js` (new) adds a
+  defensive CORS fallback regardless. `scripts/build-www.sh` packages the
+  site into `www/` for the native shell without introducing a bundler for
+  the website itself — excludes `dev/` (dev-only tooling) and the 9.4MB
+  `civix101-explainer.mp4` (now referenced by `civix101.html` via its
+  live `https://mycivix.com/...` URL instead of a relative path, so it
+  streams rather than bloating the app binary).
+- `app-shell.js` (new, root, same self-guarding-IIFE convention as
+  civics.js/mode.js) — a native bottom nav bar (Home/Manifesto/Take
+  Action/Calendar/DIG), Android back-button handling, and status-bar
+  theming, all gated on `Capacitor.isNativePlatform()` so the exact same
+  bundled HTML serves both the public website (untouched) and the native
+  app (gets the new chrome) from one copy of each page. No SPA rewrite —
+  full-page navigations still work exactly as before.
+- Real push notifications: `functions/api/push-register.js` (device
+  registry, watch-keys-only storage, modeled on `dig-check.js`'s KV
+  rate-limit conventions) + `push.js` (client, explicit contextual opt-in
+  only via a button in `renderWatchingZone()`, never a cold-start OS
+  prompt) + `workers/push-scheduler/` (a standalone Cloudflare Worker —
+  Cron Triggers aren't available to Pages Functions — hourly diff against
+  live federal/state bill data, sends via FCM's HTTP v1 API, deletes a
+  device's record on an invalid-token response). See the "Real-time watch
+  alerts" entry further down (now updated) for the full picture.
+- Native Send-to-CiViX on Android: an `ACTION_SEND` intent-filter plus
+  `MainActivity.java`'s `routeShareIntent()` route an OS share directly
+  into `send-to-civix.html` using the exact same `title`/`text`/`url`
+  query params the existing PWA `share_target` already defines — the
+  receiving page doesn't know or care which path a share came from.
+- A first-pass app icon (`scripts/make-icon.js`, pure SVG geometry
+  rendered via `sharp`/librsvg — no external image-generation tool
+  needed): a navy circle-and-checkmark mark on the existing `--ink`
+  background, deliberately swappable for real brand art later with zero
+  downstream rework. `npx capacitor-assets generate --android` produced
+  the full Android icon/splash size set (123 files) from it.
+
+**Real environment gap found, not yet resolved**: this Mac has no iOS
+toolchain at all — no Xcode, no Homebrew, and macOS's bundled Ruby (2.6)
+is too old for CocoaPods, which `npx cap add ios` needs. The user is
+installing Xcode themselves (which also clears a path to CocoaPods via
+Homebrew) rather than having this session chain-install Homebrew/Ruby/
+CocoaPods directly. The Android side has no equivalent blocker for
+generating/configuring the project (Capacitor's own tooling was enough),
+but actually building/running it still needs Android Studio/SDK + a JDK,
+neither of which is installed either — confirmed, not yet acted on.
+
+**Explicitly not done yet, per the plan's remaining phases**: Phase 5
+(the full live-data audit of the "advocating effectively" half of the
+loop, plus verifying behavior inside the actual native WebView shell —
+not just desktop Chrome), Phase 6 (Privacy Policy/Terms of Service pages
+— neither exists in this repo today — plus store metadata and the
+Apple/Google privacy questionnaires), and Phase 7 (TestFlight/Play
+internal testing, submission) are all still ahead, and Phase 1-4's own
+work has not yet been verified on a real device or even a simulator/
+emulator, since neither toolchain is installed yet on this machine.
+
 **Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
 2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
 this session; `plain-summary.js` has been live and unremarkable since,
@@ -476,6 +572,54 @@ manifesto: a fresh generation succeeds in ~24s with specific, grounded
 content (e.g. "Testify at CPA affordable housing funds hearing"), and
 an identical repeat request returns from the 24h KV cache in ~0.16s.
 Calendar is genuinely working now, not just deployed.
+
+**22 Sep 2026 — "Hey CiViX" voice assistant, thought through and
+deliberately not started.** The user wanted to talk through a voice-
+assistant feature under that name before committing to anything, so this
+is captured as a roadmap idea with real constraints attached, not a
+started initiative. Three distinct things could hide behind "Hey CiViX,"
+worth distinguishing if this comes back:
+1. **Voice as manifesto input** — speaking instead of typing into the
+   freeform "anything else on your mind?" entry points, which would also
+   feed richer signal into the existing `P.voice` writing-tone inference
+   (`pushVoiceSample()`/`voiceInstructionFor()`, 10 Sep 2026). Note the
+   naming collision if this is ever built: `P.voice` already means
+   *writing tone*, not speech, so a literal voice-input feature needs its
+   own field name.
+2. **Voice as drafted-action output** — reading a drafted call script
+   aloud for rehearsal before a citizen actually dials. This is the one
+   that would land on the still-unaudited "advocating effectively" half
+   of the loop (the open 10 Sep mandate) rather than adding a new
+   surface next to it.
+3. **A real wake-word assistant** — "Hey CiViX, what's happening with
+   the NDAA," answered by voice.
+
+For (3) specifically: a true phone-wide "Hey Siri"-style background
+hotword isn't available to third-party apps on either iOS or Android
+without deep platform-specific workarounds, so any real build would be
+push-to-talk or foreground listening, not a literal always-on wake word
+— "Hey CiViX" could still work as the feature's name/marketing framing
+even if the trigger is a button tap. Whatever gets built has to keep the
+mic constraint literal, the same way the 20 Sep push-notification work
+treated "never shared, never sold" as an engineering constraint, not
+copy: on-device wake-word detection only (e.g. Porcupine), transcription
+via each OS's own on-device speech framework (`Speech` on iOS,
+`SpeechRecognizer` on Android) rather than a cloud STT service, so raw
+audio never leaves the device. The query-handling side would reuse
+existing capability rather than add new backend intelligence — routing
+recognized intents into `bill-lookup.js`/`buildTopDigest()`/
+`classifyFreeformPriority()`, the same pipelines typed input already
+goes through.
+
+Real cost, named but not resolved: this is native-only (needs the
+Capacitor shell, which has no working iOS/Android toolchain on this
+machine yet per the 20 Sep entry) and isn't part of the current MVP
+scope — Phases 5-7 (advocacy-side audit, Privacy/Terms pages, store
+submission) are still the standing priority. If this gets picked up,
+building it before those finish would be the same kind of quiet scope
+slide this file has already flagged once for the DIG-light/coin/Pro-org
+roadmap list (10 Sep 2026) — worth deciding on purpose, not by default,
+when it comes back up.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
@@ -2023,13 +2167,18 @@ they'd pay off, are:
   search links today rather than CiViX's own data — real external
   tools, not fake results, but still not a curated petition partner or
   a local-events feed of CiViX's own. That remains the real gap here.
-- **Real-time watch alerts** — take-action.html's new watchlist (see
-  entry above) does honest return-visit change detection against the
-  federal calendar's own fetch, but there's no accounts system,
-  notification backend, or scheduled job to actually push an alert to a
-  citizen who isn't on the page. Building that is a real infrastructure
-  project (accounts, a job runner, an email/push channel), not a small
-  extension — the "mock it up now" scope stopped short of it on purpose.
+- **Real-time watch alerts — shipped 20 Sep 2026** as part of the app-store
+  MVP push (see that dated entry further up). `functions/api/
+  push-register.js` + the standalone `workers/push-scheduler/` Cloudflare
+  Worker (Cron Triggers aren't available to Pages Functions, hence a
+  sibling Worker rather than another Function) now do real, hourly,
+  server-side diffing against a device's registered watchlist and send an
+  actual push via FCM (bridges to APNs for iOS too) — this line used to
+  say that needed its own dedicated infrastructure project and wasn't
+  small; it turned out to be exactly that scope, and this session built
+  it. Native-app-only (`push.js`, gated on `Capacitor.isNativePlatform()`)
+  — the public website's return-visit diffing (`checkWatchlistUpdates()`)
+  is unchanged and still the only mechanism there.
 - **Federal "Send it" still ends in a copy+paste, not a real send** —
   take-action.html's `fireOff()` (see entry above) removed a manual step but
   not the fundamental blocker: 5calls has no real recipient email address
