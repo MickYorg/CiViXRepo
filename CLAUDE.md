@@ -621,6 +621,66 @@ slide this file has already flagged once for the DIG-light/coin/Pro-org
 roadmap list (10 Sep 2026) — worth deciding on purpose, not by default,
 when it comes back up.
 
+**22 Sep 2026 — resumed the App Store build; Phase 1-4 committed, Phase 5
+audit started, one real bug found and fixed.** Picked back up from the
+20 Sep session, which had left Phase 1-4's real code sitting uncommitted
+in the working tree. Committed and pushed it (`06c7f8a`) after verifying
+the live deploy didn't regress the public site — confirmed `app-shell.js`
+correctly no-ops when `window.Capacitor` is undefined (the case on the
+real website), and that the new CORS middleware only adds headers for
+allowlisted native-app origins, leaving ordinary browser requests
+untouched. **Toolchain gap is still unresolved**: checked again this
+session — no full Xcode (Command Line Tools only), no Homebrew/
+CocoaPods, no Android Studio/SDK, no JDK. Phase 1's real-device
+verification stays blocked until that's installed.
+
+With native work blocked, started Phase 5 (the "advocating effectively"
+live-data audit) instead, since it needs no native environment — real
+Node/curl tests against production endpoints, same methodology as 10
+Sep's audit:
+- **DIG's DEBATE talking points — real bug found and fixed.**
+  `runDebate()`'s parser (`dig/index.html`) used a naive
+  `text.split('\n')` that kept every non-empty line unconditionally, no
+  check that a line actually started with `POINT:`. Reproduced live
+  against real production output twice, in the same response: an
+  unprompted preamble sentence before the first `POINT:` survived as a
+  bogus extra talking point, and a single point whose text happened to
+  wrap onto its own line (the model formatting a quoted excerpt that
+  way) split into multiple broken sentence fragments instead of staying
+  one item. New `parsePointList(text, prefix)` finds each `PREFIX:`-
+  marked span directly via regex instead of splitting on newlines,
+  collapsing any internal whitespace into one line — verified against
+  the real captured failing response (correctly recovers 6 clean,
+  complete points) plus clean/empty/single-item cases. A first regex
+  attempt had its own bug caught before shipping: the lookahead's `$`
+  matches end-of-*line*, not end-of-string, once `/m` is also on (needed
+  for `^`), so it truncated every point at its own first line break;
+  fixed with `(?![\s\S])` as the real end-of-string test. Pushed
+  (`bca7d44`).
+- **Verified clean, no bugs found**: DIG's main stance-check flow
+  (`checkSource()`/`hasCoverage()`) — the 13 Sep fix correctly gates
+  "no coverage found" results and disables DEBATE for them, confirmed
+  against a real live response where the model again prepended
+  unpromoted narration (the STANCE/SUMMARY regex parser isn't anchored
+  to string start, so it's unaffected). Calendar's `strategic-plan.js`
+  — tested live with a realistic 8-issue, multi-jurisdiction manifesto
+  (Boston ZIP): real grounded data (actual Legistar/malegislature.gov
+  URLs), correct item counts against its own schema (6 tactical, 4
+  strategic, 4 contingency scenarios, all within the 4-6/3-4/2-4
+  ranges the prompt specifies). `send-state-email.js` — reviewed
+  carefully for correctness (server-side recipient re-derivation from
+  `repId`, no PII logging, real rate limiting, 500 not a reserved
+  status) without triggering an actual send, since that's a real,
+  outward-facing email to a real government office — code checks out.
+  The general-advocacy email draft prompt (`generateGeneralDrafts()`)
+  — live-tested, SUBJECT/BODY parsing is a single-value extraction
+  (not the repeated-list-item pattern that caused the DEBATE bug), no
+  issue found.
+- **Not yet covered this pass**: federal reps.js live lookup end-to-end,
+  docket/`classifyDocketItem()`, municipal events, and verifying
+  behavior inside the actual native WebView shell (still blocked on the
+  toolchain regardless). Worth continuing before calling Phase 5 done.
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
