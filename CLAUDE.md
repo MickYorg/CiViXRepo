@@ -887,7 +887,16 @@ manifest meta-data. iOS push still needs an APNs key uploaded to Firebase.
 **The user HAS an active, paid Apple Developer Program account** (stated
 23 Sep 2026 — supersedes the 20 Sep "no developer accounts existed yet"
 line above; don't walk them through enrollment again). Google Play
-Console account status not yet confirmed. iOS push also needs code work:
+Console account status not yet confirmed. **iOS bundle ID is
+`com.mycivix.ios`, not `com.mycivix.app`** — `com.mycivix.app` turned out
+to be already registered by someone outside the user's Apple team, so the
+user registered `com.mycivix.ios` (Push Notifications capability on,
+Broadcast off) and `ios/App/App.xcodeproj`'s `PRODUCT_BUNDLE_IDENTIFIER`
+was changed to match. Android keeps `com.mycivix.app` (Play's namespace
+is separate), and `capacitor.config.json`'s shared `appId` stays
+`com.mycivix.app` — it doesn't control the iOS bundle ID after
+`cap add ios`. The APNs key was created Team Scoped, Sandbox &
+Production. iOS push also needs code work:
 Capacitor's iOS push plugin returns a raw APNs token, but the Worker
 sends via FCM, so the iOS app needs Firebase Messaging added to convert
 APNs → FCM token, plus the Push Notifications capability in Xcode and
