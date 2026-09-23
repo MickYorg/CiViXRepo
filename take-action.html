@@ -1058,6 +1058,28 @@
     return desc ? `${base} Also match this specific constituent's own writing voice, inferred from things they've typed into CiViX: ${desc}` : base;
   }
 
+  // 22 Sep 2026, found live during Phase 5's audit: a drafted call script
+  // or email body would sometimes come back with a stray single newline
+  // in the middle of a sentence — the model wrapping a quoted/paraphrased
+  // claim in its own literal line break, the same habit that corrupted
+  // DIG's DEBATE talking points (dig/index.html's parsePointList — see
+  // that fix's own comment for the first place this pattern showed up).
+  // Every drafted script/email renders with white-space: pre-wrap
+  // (.action-draft), so an uncleaned response shows those breaks as real,
+  // sentence-splitting line breaks on screen — worst of all in a call
+  // script meant to be read aloud live on the phone. This collapses any
+  // single newline inside a paragraph into a space while preserving a
+  // real paragraph break (a blank line), so intentional structure (e.g.
+  // a greeting on its own line) survives but a stray mid-sentence break
+  // doesn't. Applied to every drafted call script and email body below.
+  function cleanDraftText(text) {
+    return String(text || '')
+      .split(/\n\s*\n/)
+      .map(p => p.replace(/\s*\n\s*/g, ' ').replace(/ +([,.;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim())
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
   async function fetchReps(zip) {
     if (REPS_CACHE[zip]) return REPS_CACHE[zip];
     const r = await fetch('/api/reps?zip=' + encodeURIComponent(zip));
@@ -1387,7 +1409,9 @@ ${positionLine}
 ${stanceText ? `Related priorities they've told CiViX about: ${stanceText}` : ''}
 ${voiceInstructionFor(profile)}
 
-Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask matching their position above, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.`;
+Respond with ONLY the call script itself, prefixed with "SCRIPT:" and nothing before it — no preamble, no commentary, no markdown formatting or dividers. Plain text, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask matching their position above, one or two sentences of reasoning, and a polite close asking the staffer to pass the message along.
+
+SCRIPT: <the call script, plain text only>`;
 
     const emailPrompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office about a bill in Congress, for a civic-engagement tool.
 
@@ -1411,9 +1435,13 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
 
     if (!ACTIVE || ACTIVE.bill !== bill) return; // closed or switched bills while in flight
 
-    ACTIVE.drafts[lean].call = callResult.status === 'fulfilled'
-      ? { status: 'done', text: callResult.value }
-      : { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+    if (callResult.status === 'fulfilled') {
+      const callText = callResult.value;
+      const scriptMatch = callText.match(/SCRIPT:\s*([\s\S]+)/i);
+      ACTIVE.drafts[lean].call = { status: 'done', text: cleanDraftText(scriptMatch ? scriptMatch[1].trim() : callText) };
+    } else {
+      ACTIVE.drafts[lean].call = { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+    }
 
     if (emailResult.status === 'fulfilled') {
       const text = emailResult.value;
@@ -1422,7 +1450,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       ACTIVE.drafts[lean].email = {
         status: 'done',
         subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${billLine}`,
-        body: bodyMatch ? bodyMatch[1].trim() : text
+        body: cleanDraftText(bodyMatch ? bodyMatch[1].trim() : text)
       };
     } else {
       ACTIVE.drafts[lean].email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
@@ -1792,7 +1820,9 @@ Topic: ${active.topic}
 ${stanceLine}
 ${voiceInstructionFor(profile)}
 
-Write a short call script a constituent could read from when calling this office, addressed to whichever staffer answers. Plain text, no markdown, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning grounded in their own words above, and a polite close asking the staffer to pass the message along.`;
+Respond with ONLY the call script itself, prefixed with "SCRIPT:" and nothing before it — no preamble, no commentary, no markdown formatting or dividers. Plain text, natural to read aloud, under 130 words. Include: who's calling and why, a clear specific ask, one or two sentences of reasoning grounded in their own words above, and a polite close asking the staffer to pass the message along.
+
+SCRIPT: <the call script, plain text only>`;
 
     const emailPrompt = `You're helping a constituent draft a short email to their ${chamberWord}'s office, for a civic-engagement tool. There's no specific bill attached — this is a general concern the constituent wants on record.
 
@@ -1814,9 +1844,13 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
 
     if (GENERAL_ACTIVE !== active) return;
 
-    active.call = callResult.status === 'fulfilled'
-      ? { status: 'done', text: callResult.value }
-      : { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+    if (callResult.status === 'fulfilled') {
+      const callText = callResult.value;
+      const scriptMatch = callText.match(/SCRIPT:\s*([\s\S]+)/i);
+      active.call = { status: 'done', text: cleanDraftText(scriptMatch ? scriptMatch[1].trim() : callText) };
+    } else {
+      active.call = { status: 'error', error: (callResult.reason && callResult.reason.message) || 'request failed' };
+    }
 
     if (emailResult.status === 'fulfilled') {
       const text = emailResult.value;
@@ -1825,7 +1859,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
       active.email = {
         status: 'done',
         subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${active.topic}`,
-        body: bodyMatch ? bodyMatch[1].trim() : text
+        body: cleanDraftText(bodyMatch ? bodyMatch[1].trim() : text)
       };
     } else {
       active.email = { status: 'error', error: (emailResult.reason && emailResult.reason.message) || 'request failed' };
@@ -2076,7 +2110,7 @@ BODY: <the email body, a few short paragraphs>`;
     active.draft = {
       status: 'done',
       subject: subjectMatch ? subjectMatch[1].split('\n')[0].trim() : `Regarding ${billLine}`,
-      body: bodyMatch ? bodyMatch[1].trim() : text
+      body: cleanDraftText(bodyMatch ? bodyMatch[1].trim() : text)
     };
     renderStateActionCard();
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
