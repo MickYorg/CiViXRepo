@@ -896,7 +896,25 @@ was changed to match. Android keeps `com.mycivix.app` (Play's namespace
 is separate), and `capacitor.config.json`'s shared `appId` stays
 `com.mycivix.app` — it doesn't control the iOS bundle ID after
 `cap add ios`. The APNs key was created Team Scoped, Sandbox &
-Production. iOS push also needs code work:
+Production, and uploaded to Firebase in both the Development and
+Production slots. iOS Firebase wiring done the same day: `FirebaseMessaging`
+pod (no Analytics; added under the Podfile's "Add your Pods here", which
+`cap sync` never overwrites); `AppDelegate.swift` calls
+`FirebaseApp.configure()` and implements the
+`didRegisterForRemoteNotificationsWithDeviceToken`/`didFail...` callbacks
+Capacitor's push plugin requires (they were missing entirely before, so
+iOS `register()` could never have resolved), swapping the APNs token for
+an FCM token; `Info.plist` sets `FirebaseMessagingAutoInitEnabled=NO` and
+`FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED=YES`; `App/App.entitlements`
+(`aps-environment`) wired via `CODE_SIGN_ENTITLEMENTS`;
+`GoogleService-Info.plist` bundled as a resource but gitignored (public
+repo, same as Android's). Simulator build succeeds and the app launches.
+**Not yet verified**: an actual iOS push delivery. Automating the iOS
+WebView (via `appium-remote-debugger` against the simulator's
+`webinspectord_sim` socket) failed with a usbmux timeout; next attempt
+should just use Safari → Develop → Simulator on the Mac, or test the
+real opt-in button on a physical iPhone (needs `DEVELOPMENT_TEAM` set in
+Xcode signing — the Team ID wasn't recorded in the repo yet). iOS push also needs code work:
 Capacitor's iOS push plugin returns a raw APNs token, but the Worker
 sends via FCM, so the iOS app needs Firebase Messaging added to convert
 APNs → FCM token, plus the Push Notifications capability in Xcode and

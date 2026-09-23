@@ -19,6 +19,9 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
+  # Messaging only (no FirebaseAnalytics): converts the APNs device token
+  # into the FCM token workers/push-scheduler sends to. See AppDelegate.swift.
+  pod 'FirebaseMessaging'
 end
 
 post_install do |installer|
