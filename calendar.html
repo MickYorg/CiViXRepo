@@ -790,9 +790,26 @@
     if (loadingMsgTimer) { clearInterval(loadingMsgTimer); loadingMsgTimer = null; }
   }
 
-  async function fetchPlan(force) {
+  // 23 Sep 2026: a citizen hit "the server sent back something unexpected"
+  // inside the native iOS app specifically — a real generation genuinely
+  // takes 30-45+ seconds, and iOS's own network-suspension behavior for a
+  // backgrounded/not-strictly-foreground app (confirmed present in this
+  // session's own device logs: repeated "NetworkProcess Background
+  // Assertion"/"NearSuspended Assertion" cycling) can plausibly truncate
+  // a long-running fetch's response without the fetch() promise cleanly
+  // rejecting — res.ok reads true, but the body isn't valid JSON. This
+  // couldn't be reproduced with an identical direct request (worked fine,
+  // 41s, valid JSON), which is itself informative: it means this failure
+  // mode is transient, not a real data problem, and — since the server
+  // only ever caches a response after successfully parsing it itself,
+  // regardless of whether the client actually received it — a retry very
+  // likely hits the 24h KV cache instantly rather than paying for a
+  // second real generation. isRetry caps this at one automatic retry so
+  // a genuinely persistent problem still surfaces as a real error rather
+  // than looping forever.
+  async function fetchPlan(force, isRetry) {
     if (!PROFILE) return;
-    startLoadingMessages();
+    if (!isRetry) startLoadingMessages();
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
     let res;
     try {
@@ -831,6 +848,7 @@
       return;
     }
     if (!data) {
+      if (!isRetry) return fetchPlan(force, true);
       stopLoadingMessages();
       showStatus('The server sent back something unexpected. Try again in a moment.', true);
       return;

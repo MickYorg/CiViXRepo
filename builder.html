@@ -3302,14 +3302,22 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
   // its two sections had a bad fetch, and startHeadlineMode() below
   // treats "both sections empty" as the only real error case.
   async function fetchLiveHeadlineCards(query, limit, statusNoun) {
+    // Same one-retry-on-parse-failure resilience as the batch fetch above
+    // (see its own 23 Sep 2026 comment) — this is the fallback path when
+    // the batch is genuinely cold, so it's already the "something's
+    // wrong, try harder" branch; worth one retry before giving up rather
+    // than silently reporting no headlines for what may be a transient
+    // native-fetch hiccup rather than GNews actually having nothing.
     let articles = [];
-    try {
-      const r = await fetch('/api/headlines?limit=' + limit + (query ? '&q=' + encodeURIComponent(query) : ''));
-      const data = await r.json();
-      if (!r.ok || data.error) return [];
-      articles = data.articles || [];
-    } catch (e) {
-      return [];
+    for (let attempt = 0; attempt < 2 && !articles.length; attempt++) {
+      try {
+        const r = await fetch('/api/headlines?limit=' + limit + (query ? '&q=' + encodeURIComponent(query) : ''));
+        const data = await r.json();
+        if (!r.ok || data.error) continue;
+        articles = data.articles || [];
+      } catch (e) {
+        // fall through to a retry
+      }
     }
     if (!articles.length) return [];
 
@@ -3358,15 +3366,28 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
     // fast, cached, genuinely general top headlines — for every citizen
     // now, not just a first-time one; only falls back to a live unbiased
     // fetch if the batch is cold or empty.
+    //
+    // 23 Sep 2026: a citizen hit "No headlines available" on repeated
+    // retries inside the native iOS app specifically — same underlying
+    // cause diagnosed the same day in calendar.html's fetchPlan(): a
+    // fetch can resolve with res.ok true but a body that fails to
+    // parse, most likely iOS suspending/throttling network activity for
+    // an app that isn't held strictly foreground (confirmed present in
+    // this session's own device logs). The old code treated a parse
+    // failure here identically to "batch genuinely has nothing yet" and
+    // silently fell through — one retry first, since this endpoint is
+    // fast and KV-cached, so a retry costs nothing beyond a moment.
     let topCards = [];
-    try {
-      const br = await fetch('/api/headlines-batch');
-      const bdata = await br.json();
-      if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
-        topCards = bdata.cards.slice(0, TOP_STORIES_COUNT);
+    for (let attempt = 0; attempt < 2 && !topCards.length; attempt++) {
+      try {
+        const br = await fetch('/api/headlines-batch');
+        const bdata = await br.json();
+        if (br.ok && Array.isArray(bdata.cards) && bdata.cards.length) {
+          topCards = bdata.cards.slice(0, TOP_STORIES_COUNT);
+        }
+      } catch (e) {
+        // fall through to a retry, then to a live fetch below
       }
-    } catch (e) {
-      // fall through to a live fetch below
     }
     if (!topCards.length) {
       renderHeadlineLoading();
