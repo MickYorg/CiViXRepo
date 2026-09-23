@@ -886,8 +886,10 @@ monochrome icon set via the `com.google.firebase.messaging.default_notification_
 manifest meta-data. iOS push still needs an APNs key uploaded to Firebase.
 **The user HAS an active, paid Apple Developer Program account** (stated
 23 Sep 2026 — supersedes the 20 Sep "no developer accounts existed yet"
-line above; don't walk them through enrollment again). Google Play
-Console account status not yet confirmed. **iOS bundle ID is
+line above; don't walk them through enrollment again). The user
+**also has a Google Play Console developer account** (confirmed 23 Sep
+2026); whether it's personal vs. organization (which decides if the
+20-tester/14-day closed-testing rule applies) not yet confirmed. **iOS bundle ID is
 `com.mycivix.ios`, not `com.mycivix.app`** — `com.mycivix.app` turned out
 to be already registered by someone outside the user's Apple team, so the
 user registered `com.mycivix.ios` (Push Notifications capability on,
