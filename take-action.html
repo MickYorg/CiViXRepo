@@ -1075,7 +1075,19 @@
   function cleanDraftText(text) {
     return String(text || '')
       .split(/\n\s*\n/)
-      .map(p => p.replace(/\s*\n\s*/g, ' ').replace(/ +([,.;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim())
+      .map(paragraph => {
+        // A line break right after a comma or colon (a signature block's
+        // "Sincerely,\nA constituent…", a greeting's "Hi,\n…") is a real,
+        // intentional break, not the bug — only collapse a break where
+        // the line before it just trails off mid-sentence, which is what
+        // the quote-wrapping bug actually looks like.
+        const lines = paragraph.split('\n').map(l => l.trim()).filter(Boolean);
+        let out = lines[0] || '';
+        for (let i = 1; i < lines.length; i++) {
+          out += (/[,:]\s*$/.test(out) ? '\n' : ' ') + lines[i];
+        }
+        return out.replace(/ +([,.;:!?])/g, '$1').replace(/ {2,}/g, ' ').trim();
+      })
       .filter(Boolean)
       .join('\n\n');
   }
