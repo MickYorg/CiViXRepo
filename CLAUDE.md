@@ -820,6 +820,48 @@ Recommendation given: ship free with zero monetization UI for the
 initial release, design this deliberately once there's real usage to
 learn from, not before submission.
 
+**23 Sep 2026, later — Android built and verified live on an emulator;
+one real, Android-only bug that broke every API call, fixed.**
+
+**Toolchain, known-working path on this Intel Mac**: Android Studio's
+bundled JDK is 25, which Gradle 8.11 (pinned by Capacitor 7) can't run
+("Unsupported class file major version 69"). `brew install openjdk@21`
+started source-building glib/harfbuzz (hours on Intel) — abandoned for a
+standalone Temurin JDK 21 tarball from the Adoptium API, unpacked to
+`~/jdks/jdk-21.0.12.1+1` (no deps, user-local). Build with
+`JAVA_HOME=~/jdks/jdk-21.0.12.1+1/Contents/Home ANDROID_HOME=~/Library/Android/sdk
+./gradlew assembleDebug` from `android/`. Android Studio's wizard didn't
+install `cmdline-tools`, so they were fetched manually into
+`~/Library/Android/sdk/cmdline-tools/latest`; an emulator `civix_pixel`
+(API 35 google_apis x86_64, Pixel 6 profile) now exists. Debugging trick
+that worked well: `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>`
+then Chrome DevTools Protocol `Runtime.evaluate` over its WebSocket —
+real JS evaluation inside the live app WebView, no Android Studio needed.
+
+**The bug**: `server.hostname: "mycivix.com"` makes Capacitor's Android
+local server claim *every* `https://mycivix.com/*` request, `/api/*`
+included — and since those aren't bundled files, its SPA fallback
+answered every Function call with `index.html` (200, `text/html`).
+Every AI/data feature in the app was dead on Android. iOS never hit this
+(WKWebView can't intercept `https`, so iOS was never serving these
+locally). Fixed in `MainActivity.java` with a `BridgeWebViewClient`
+subclass that returns `null` from `shouldInterceptRequest` for `/api/*`
+and any non-bundled file path (e.g. the streamed explainer video),
+handing those to the WebView's real network stack (POST bodies included)
+while bundled pages still load locally — same-origin preserved, no
+JS/CORS changes. Verified live: `/api/dig-stats` returns real JSON, POST
+reaches `dig-check.js`'s own validation, and builder.html's usage ticker
+and Unsplash card photo load real data.
+
+**Also fixed, Android 15 edge-to-edge**: target SDK 35 enforces
+edge-to-edge, so the native bottom nav sat under the gesture bar and the
+StatusBar plugin's background color was ignored. `capacitor.config.json`
+now sets `android.adjustMarginsForEdgeToEdge: "auto"`, and the app theme's
+`windowBackground` is the ink navy (`res/values/colors.xml`) so both
+system-bar strips match. Push still isn't wired on Android: no
+`google-services.json` yet (needs a Firebase project, messaging only, no
+Analytics — the user's step).
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
