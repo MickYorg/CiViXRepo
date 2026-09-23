@@ -883,8 +883,15 @@ production KV: a real push sent with the Worker's own `fcm.js`
 with the generic lock-screen-safe text. Cosmetic follow-up: the
 notification's small icon is a generic circle — Android needs a
 monochrome icon set via the `com.google.firebase.messaging.default_notification_icon`
-manifest meta-data. iOS push still needs an APNs key uploaded to Firebase
-(requires the Apple Developer account).
+manifest meta-data. iOS push still needs an APNs key uploaded to Firebase.
+**The user HAS an active, paid Apple Developer Program account** (stated
+23 Sep 2026 — supersedes the 20 Sep "no developer accounts existed yet"
+line above; don't walk them through enrollment again). Google Play
+Console account status not yet confirmed. iOS push also needs code work:
+Capacitor's iOS push plugin returns a raw APNs token, but the Worker
+sends via FCM, so the iOS app needs Firebase Messaging added to convert
+APNs → FCM token, plus the Push Notifications capability in Xcode and
+`GoogleService-Info.plist`.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
