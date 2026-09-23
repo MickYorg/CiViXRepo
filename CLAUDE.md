@@ -869,12 +869,22 @@ dependency tree has `firebase-messaging` only, no `firebase-analytics`.
 `register()`/`unregister()` flip it on/off) plus
 `firebase_analytics_collection_deactivated=true` as a backstop. Verified
 live: clean launch with no token, and a real 142-char FCM token issued on
-an explicit `register()` call. **Still not live**: the
-`workers/push-scheduler` Worker has never been deployed (`wrangler
-deployments list` → "does not exist"), and it needs the
-`FCM_SERVICE_ACCOUNT_JSON` (Firebase → Project settings → Service
-accounts → Generate new private key), `FCM_PROJECT_ID` (`civix-deb58`),
-and `TRIGGER_SECRET` secrets before any push can actually be sent.
+an explicit `register()` call. **Push is live end to end (Android), same day**: `workers/push-scheduler`
+deployed for the first time (`civix-push-scheduler.mycivix.workers.dev`,
+hourly cron) with `FCM_SERVICE_ACCOUNT_JSON` (Firebase service-account
+key, piped straight from file, never committed), `FCM_PROJECT_ID`
+(`civix-deb58`), and `TRIGGER_SECRET` set as Worker secrets. The trigger
+secret's only local copy is `~/.civix-push-trigger-secret` (mode 600) —
+use it as the `X-Trigger-Secret` header on `POST /run` to fire a manual
+run. A manual run returns `{"devices":0,"notified":0}` (nobody has opted
+in yet). Verified the real delivery path without writing test data to
+production KV: a real push sent with the Worker's own `fcm.js`
+`sendPush()` to the emulator's token arrived in the notification shade
+with the generic lock-screen-safe text. Cosmetic follow-up: the
+notification's small icon is a generic circle — Android needs a
+monochrome icon set via the `com.google.firebase.messaging.default_notification_icon`
+manifest meta-data. iOS push still needs an APNs key uploaded to Firebase
+(requires the Apple Developer account).
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
