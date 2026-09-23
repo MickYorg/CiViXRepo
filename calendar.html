@@ -758,9 +758,41 @@
     document.getElementById('plan-content').style.display = 'none';
   }
 
+  // 23 Sep 2026: a citizen reported waiting on a static "Loading your
+  // strategy…" message and, after checking back later, wasn't sure if
+  // it had actually died — a real generation can genuinely take up to
+  // the server's own 65s timeout for a rich manifesto, but the page gave
+  // zero signal of progress the whole time, so a real wait and a real
+  // hang were indistinguishable. These rotate every 7s instead of
+  // sitting frozen, describing real steps the backend actually does
+  // (gather → match → ground against real dates → draft) rather than
+  // generic filler, so it reads as progress, not just reassurance.
+  // civics.js's showDuringWait() (below) still fires once alongside this
+  // for a real "101" fact card — this doesn't replace that, it fixes the
+  // main status line's own silence for the rest of the wait.
+  const LOADING_MESSAGES = [
+    'Gathering what’s happening in your city, state, and Washington…',
+    'Matching it against what you’ve told CiViX matters to you…',
+    'Grounding it in real election and legislative calendar facts…',
+    'Weighing near-term moves against longer-term strategy…',
+    'Almost there — writing up your plan…'
+  ];
+  let loadingMsgTimer = null;
+  function startLoadingMessages() {
+    let i = 0;
+    showStatus(LOADING_MESSAGES[0], false);
+    loadingMsgTimer = setInterval(() => {
+      i = (i + 1) % LOADING_MESSAGES.length;
+      showStatus(LOADING_MESSAGES[i], false);
+    }, 7000);
+  }
+  function stopLoadingMessages() {
+    if (loadingMsgTimer) { clearInterval(loadingMsgTimer); loadingMsgTimer = null; }
+  }
+
   async function fetchPlan(force) {
     if (!PROFILE) return;
-    showStatus('Loading your strategy — first-time generation can take up to a minute…', false);
+    startLoadingMessages();
     if (window.CivicsEngine) window.CivicsEngine.showDuringWait();
     let res;
     try {
@@ -778,6 +810,7 @@
     } catch (e) {
       // The fetch() call itself failed — a real connectivity problem, not
       // a server-side error response (those are handled below).
+      stopLoadingMessages();
       showStatus('Could not reach the server — check your connection and try again.', true);
       return;
     }
@@ -791,15 +824,18 @@
       data = await res.json();
     } catch (e) {}
     if (!res.ok) {
+      stopLoadingMessages();
       const message = (data && data.error && data.error.message)
         || `Something went wrong building your plan (HTTP ${res.status}). Try again in a moment.`;
       showStatus(message, true);
       return;
     }
     if (!data) {
+      stopLoadingMessages();
       showStatus('The server sent back something unexpected. Try again in a moment.', true);
       return;
     }
+    stopLoadingMessages();
     renderPlan(data);
   }
 
