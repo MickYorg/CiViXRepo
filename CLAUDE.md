@@ -913,8 +913,11 @@ repo, same as Android's). Simulator build succeeds and the app launches.
 WebView (via `appium-remote-debugger` against the simulator's
 `webinspectord_sim` socket) failed with a usbmux timeout; next attempt
 should just use Safari → Develop → Simulator on the Mac, or test the
-real opt-in button on a physical iPhone (needs `DEVELOPMENT_TEAM` set in
-Xcode signing — the Team ID wasn't recorded in the repo yet). iOS push also needs code work:
+real opt-in button on a physical iPhone (Apple Team ID is `22Q786NFKQ`, now set as `DEVELOPMENT_TEAM` in the
+App target with Automatic signing. A device build currently fails with
+"No Accounts" until the user signs Xcode into their Apple ID under
+Xcode → Settings → Accounts; after that `-allowProvisioningUpdates`
+can create the development profile for `com.mycivix.ios` itself). iOS push also needs code work:
 Capacitor's iOS push plugin returns a raw APNs token, but the Worker
 sends via FCM, so the iOS app needs Firebase Messaging added to convert
 APNs → FCM token, plus the Push Notifications capability in Xcode and
