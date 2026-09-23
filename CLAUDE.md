@@ -681,6 +681,145 @@ Sep's audit:
   behavior inside the actual native WebView shell (still blocked on the
   toolchain regardless). Worth continuing before calling Phase 5 done.
 
+**23 Sep 2026 — the iOS toolchain got fully resolved, Phase 1 verified
+genuinely live on a real Simulator, and that verification immediately
+surfaced two more real bugs (both fixed) plus a real, architectural
+native-specific failure class worth knowing about going forward.**
+
+**Toolchain, resolved with real workarounds worth remembering**: this
+Mac is Intel (`x86_64`, a 2019 MacBook Pro), and both Xcode and Homebrew
+have now fully dropped Intel support in their current releases —
+confirmed live, not assumed. Xcode 27 is `arm64`-only (no Intel slice at
+all); **Xcode 26.6 is the last version that still ships a genuine
+universal binary** (confirmed via `lipo -info`) and is the one to
+install from developer.apple.com/download/applications, not whatever
+the Mac App Store defaults to. Homebrew's own installer now hard-aborts
+on any non-`arm64` Mac (`if [[ "${UNAME_MACHINE}" != "arm64" ]]; then
+abort ...`, no override flag) — worked around by running the installer
+from the last commit before that check was added
+(`7a133dcc74051ee4efc79467ed215dfedf45aea2`), which still installs real
+upstream Homebrew to `/usr/local`. That got Homebrew itself working, but
+`brew install cocoapods` still failed — Homebrew's own `ruby` formula
+pulls in `llvm@22`+`rust` to build itself from source (Ruby's Rust-based
+YJIT), and `llvm@22`'s own formula has a genuinely broken pinned
+checksum for one of its patch files (reproduced twice, identical
+mismatch both times — not a flaky download). Real fix: skip Homebrew's
+own Ruby entirely and `brew install ruby@3.3` instead — a real, still-
+bottled, minimal-dependency formula (just `libyaml`+`openssl@3`, no
+LLVM/Rust) — then `gem install cocoapods` against that Ruby directly.
+Worked cleanly, no compilation needed. **If this exact toolchain wall
+gets hit again on this or another Intel Mac, this whole sequence (Xcode
+26.6, the pre-restriction Homebrew installer commit, `ruby@3.3` instead
+of Homebrew's own `ruby`) is the known-working path — no need to
+re-discover it.**
+
+**Phase 1 (iOS) verified genuinely live, not just "it built"**: real
+Xcode Simulator build succeeded, installed, and launched via `xcrun
+simctl`; confirmed via real screenshots that the splash correctly
+auto-advances into builder.html's Citizen-mode trait deck (matching
+documented behavior) and that `app-shell.js`'s native bottom nav
+renders correctly — its first-ever real test inside an actual native
+Capacitor runtime, since every prior "verification" of it was just
+confirming it correctly no-ops on the public website. Confirmed via
+device logs that real HTTPS fetches to `mycivix.com` succeed with real
+200s from inside the native shell — the actual proof point Phase 1
+needed. `ios/` is now committed (matches `android/`'s own 20 Sep
+commit) — a real, working generated project, not a stub.
+
+**Two more real bugs found live, only reachable once the app was
+actually running natively — both fixed and pushed**:
+- DIG's DEBATE talking-points parser: same-day earlier fix, see above.
+- **Municipal events**: `renderMunicipalEvents()` concatenated
+  Legistar's `EventLocation` field unconditionally into the date/time
+  meta line as if it always held a real room — confirmed live against
+  Boston's raw Legistar API that it sometimes holds a committee
+  hearing's own subject instead ("PILOT Agreements ... Committee
+  Hearing on Docket #1338"), producing a garbled run-on. Fixed with
+  `looksLikeHearingSubject()` — a real location renders inline as
+  before, a hearing subject gets its own "Regarding:" line instead.
+- **Drafted call scripts/emails**: the federal/general call-script
+  prompts had no structural marker at all (unlike the email's existing
+  SUBJECT:/BODY: pattern), so a real, live-captured response showed
+  unprompted preamble text and a markdown `---` divider verbatim to a
+  citizen, in a script meant to be read aloud on a live phone call —
+  plus the same mid-sentence-newline quote-wrapping habit that broke
+  DEBATE. Fixed with a `SCRIPT:` marker (verified live: stopped the
+  preamble outright) plus a shared `cleanDraftText()` cleanup applied to
+  every drafted script/email body. Caught a real regression in the fix
+  itself before shipping — the first version also flattened legitimate
+  signature-block line breaks ("Sincerely,\nA constituent...") into a
+  run-on; fixed to only collapse a break that isn't preceded by a
+  natural pause (comma/colon).
+- **"Add to calendar" disabled outright, not patched**: audited live —
+  100 of 100 real bills in the federal pool had a `latestAction` date in
+  the past, which isn't a data-quality fluke, it's what "latest action"
+  means by construction. A calendar "reminder" built from it was
+  guaranteed useless every time. User's call: pull the button, keep the
+  date as plain informational text. `buildIcs()`/`downloadIcs()` kept,
+  unused, in case a real forward-looking date source ever exists.
+  Calendar's own static "Loading your strategy…" line also got replaced
+  with 5 rotating, real-progress-describing messages (7s interval) after
+  a citizen couldn't tell a genuine ~40s wait from a hang — civics.js's
+  existing one-time fact card still fires alongside it, unchanged.
+
+**A real, architectural finding worth knowing for all future native
+work**: a long-running fetch (calendar's strategic-plan generation,
+30-45+ seconds; builder.html's headline pre-warming) can resolve with
+`res.ok: true` but a body that fails to parse — reproduced live twice
+("the server sent back something unexpected" on Calendar, "No headlines
+available" after several retries on the headline deck), and could NOT
+be reproduced with an identical direct request outside the native shell
+(worked fine both times). The session's own device logs are full of
+real iOS `NetworkProcess Background Assertion`/`NearSuspended Assertion`
+cycling — strong evidence iOS throttles network activity for an app
+that isn't held strictly foreground, something no prior testing on this
+project (desktop Chrome, curl) could ever have surfaced. Root-caused
+the real profile data by pulling it directly from the app's own WebKit
+LocalStorage sqlite3 file inside the Simulator's container (a real,
+reusable technique for debugging native-only state) rather than
+guessing. Since the exact trigger couldn't be pinned down deterministically,
+and since a parse failure here is provably more likely transient than a
+real data problem (confirmed for Calendar specifically: the server only
+caches a response after successfully parsing it itself, so a retry
+likely hits the 24h cache instantly, not a second real generation),
+both `calendar.html`'s `fetchPlan()` and `builder.html`'s headline
+fetches (`headlines-batch` and the live `/api/headlines` fallback) now
+retry once automatically before surfacing an error. **Worth watching
+for the same signature in any other long-running native fetch this app
+ever adds** — this isn't a one-off, it's a real property of running
+inside iOS specifically.
+
+`strategic-plan.js`'s `max_tokens` also raised 6000→ 16000 and its
+timeout 65s→ 150s the same session, after a real citizen's own
+manifesto (richer than the 8-issue case that justified the prior bump)
+hit truncation again — confirmed via the `claude-api` skill that Sonnet
+5 supports up to 128K `max_tokens` for this kind of request, so 16000
+still leaves real headroom.
+
+**Android**: SDK fully set up this session (Android Studio's first-run
+wizard completed by the user — build-tools 36.0.0, platforms;android-37.0,
+emulator, platform-tools all confirmed present) but **not yet built or
+verified** — `npx cap add android` already happened 20 Sep, needs the
+same real build+install+launch+live-fetch verification pass iOS just
+got, next session.
+
+**Also discussed, not started**: a rough timeline estimate (1-2 more
+weeks of calendar time, dominated by Google Play's forced 14-day/20-
+tester closed-testing window on a new account, not by engineering
+effort) and monetization shape — explicit user framing that a hard
+paywall contradicts the platform's whole premise, so anything built
+should be voluntary. Three real shapes discussed: in-app pay-what-you-
+want IAP (real store cut applies, ~15-30%, unless structured as a
+registered-nonprofit charitable-donation flow); a web-based donation
+page linked from the app instead of native IAP (sidesteps the store cut
+entirely, needs verification against current "reader app" guideline
+exceptions); and the institutional-sponsorship/CiViX-Coin model already
+on this file's own roadmap (13 Sep entry) — orgs donating usage credits
+to subsidize citizens directly, likely a B2B web flow, not native IAP.
+Recommendation given: ship free with zero monetization UI for the
+initial release, design this deliberately once there's real usage to
+learn from, not before submission.
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
