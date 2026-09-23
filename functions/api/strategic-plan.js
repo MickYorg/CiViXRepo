@@ -316,13 +316,19 @@ export async function onRequestPost({ request, env }) {
   // manifesto ran past 45s at max_tokens:6000 (needed to avoid the
   // truncation this max_tokens bump itself was fixing — see the request
   // body's own comment below) and got cut off by this very timeout.
-  // 65s gives real margin above both observed cases. This only ever
-  // costs a citizen wait time on a cache miss (first citizen ever to see
-  // a given manifesto shape) — every repeat view within 24h hits the KV
-  // cache and returns immediately — and calendar.html's own loading
-  // state (plus civics.js's wait-filler) is built to cover a real wait,
+  // 23 Sep 2026: a real citizen's own manifesto — richer still than the
+  // 8-issue case above — hit stop_reason:"max_tokens" again even at
+  // 6000, so both numbers moved together again rather than just one:
+  // max_tokens up to 16000 (well under Sonnet 5's real 128K ceiling for
+  // this endpoint's non-streaming request — see this file's own request
+  // body comment) and the timeout up to 150s to keep matching headroom
+  // above it, on the same reasoning as before — this only ever costs a
+  // citizen wait time on a cache miss, and calendar.html's own loading
+  // state (rotating progress messages as of the same day, replacing a
+  // static line that made a real ~40s wait look like a hang — plus
+  // civics.js's wait-filler) is now genuinely built to cover a longer wait,
   // not just a spinner that reads as broken past a few seconds.
-  const ANTHROPIC_TIMEOUT_MS = 65_000;
+  const ANTHROPIC_TIMEOUT_MS = 150_000;
   let anthropicRes;
   try {
     const controller = new AbortController();
@@ -338,18 +344,22 @@ export async function onRequestPost({ request, env }) {
         // No web_search tool — this is reasoning over data already fetched
         // above, not a live-lookup task (same posture as plain-summary.js).
         //
-        // max_tokens raised 3200 -> 6000 after a real citizen's own
-        // (richer, multi-issue) manifesto hit stop_reason:"max_tokens" and
-        // got truncated mid-JSON even with the 4-6/3-4 item cap in the
-        // prompt — a bigger issue list alone can push a compliant response
-        // past 3200 (more issueMatches text, longer groundedRef titles/
-        // urls for real bills). This budget only matters when the model
-        // actually needs it — generation still stops at its own natural
-        // end, so a request that would've finished at 1800 tokens doesn't
-        // get slower for having more headroom available.
+        // max_tokens raised 3200 -> 6000, then 6000 -> 16000 (23 Sep 2026)
+        // — each bump after a real citizen's own manifesto hit
+        // stop_reason:"max_tokens" and got truncated mid-JSON even with
+        // the 4-6/3-4 item cap in the prompt, because a bigger/richer
+        // issue list alone can push a compliant response well past the
+        // prior ceiling (more issueMatches text, longer groundedRef
+        // titles/urls for real bills). 16000 is still far under Sonnet
+        // 5's real 128K max_tokens ceiling for this kind of (non-
+        // streaming) request, so there's real headroom left if an even
+        // richer manifesto needs it later. This budget only matters when
+        // the model actually needs it — generation still stops at its
+        // own natural end, so a request that would've finished at 1800
+        // tokens doesn't get slower for having more headroom available.
         body: JSON.stringify({
           model: 'claude-sonnet-5',
-          max_tokens: 6000,
+          max_tokens: 16000,
           messages: [{ role: 'user', content: prompt }]
         }),
         signal: controller.signal
