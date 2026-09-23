@@ -19,6 +19,7 @@ rsync -a --delete \
   --exclude ".gitignore" \
   --exclude ".DS_Store" \
   --exclude "dev/" \
+  --exclude "notes/" \
   --exclude "netlify/" \
   --exclude "ios/" \
   --exclude "android/" \
