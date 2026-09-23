@@ -1339,9 +1339,23 @@
     enhanceWatchSummaries(liveEntries);
   }
 
-  // ---- "Add to calendar" stub — CiViX has no rally/event data source
-  // yet, so this adds the bill's own latest legislative-action date as a
-  // plain reminder, labeled honestly as such rather than as an event.
+  // ---- "Add to calendar" — disabled 23 Sep 2026 -----------------------
+  // Found live during Phase 5's audit and confirmed structurally, not
+  // just anecdotally: checked all 100 bills in the live federal pool and
+  // every single latestAction date was already in the past — that's not
+  // a data-quality fluke, "latest action" means the most recent thing
+  // that has ALREADY happened to a bill, so this field can never hold a
+  // future date. A calendar "reminder" built from it was therefore
+  // guaranteed to be useless 100% of the time, no matter how honestly
+  // the disclaimer text described it. The user's call: pull the button
+  // rather than keep offering something that can't work as named, and
+  // leave the date as plain informational text instead (folded into
+  // action-bill-meta below). Real advocacy-relevant reminders (an actual
+  // upcoming vote/hearing date) are a real, separate feature for later —
+  // this app has no such data source for federal bills today; municipal
+  // already has one for meetings via Legistar's Events feed, unrelated
+  // to this ICS code. buildIcs()/downloadIcs() are kept, unused, in case
+  // a real forward-looking date source gets added later.
   function icsEscape(s) {
     return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
   }
@@ -1630,17 +1644,6 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
       `;
     }
 
-    const ics = buildIcs(bill);
-    const calSection = `
-      <div class="action-section">
-        <div class="action-section-title">Add to calendar</div>
-        ${ics
-          ? `<button type="button" class="btn" data-add-ics>Add reminder to calendar</button>
-             <p class="ics-note">Adds the bill's latest legislative action date (${esc(fmtDate((bill.latestAction && bill.latestAction.date) || bill.updateDate))}) as a reminder \u2014 not a confirmed rally or public event, CiViX doesn't have that data yet.</p>`
-          : `<p class="action-empty">No dated activity to add for this bill yet.</p>`}
-      </div>
-    `;
-
     // Hands off to builder.html's Citizen-mode drilldown deck (the same
     // "it's complicated" mechanic) seeded with this bill and the position
     // just declared, instead of duplicating swipe-card UI here \u2014 a
@@ -1655,12 +1658,11 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     el.innerHTML = `
       <button class="action-close" type="button" id="action-close">&#10005; CLOSE</button>
       <div class="action-bill-title">${esc(bill.title)}</div>
-      <div class="action-bill-meta">${esc(label)} \u00b7 Congress ${esc(bill.congress)} \u00b7 ${esc(bill.latestAction ? bill.latestAction.text : '')}</div>
+      <div class="action-bill-meta">${esc(label)} \u00b7 Congress ${esc(bill.congress)} \u00b7 ${esc(bill.latestAction ? bill.latestAction.text : '')}${bill.latestAction && bill.latestAction.date ? ' (' + esc(fmtDate(bill.latestAction.date)) + ')' : ''}</div>
       ${leanSection}
       ${repsSection}
       ${watchSection}
       ${noiseSection}
-      ${calSection}
       ${deeperSection}
     `;
     document.getElementById('action-close').addEventListener('click', closeActionModal);
@@ -2364,8 +2366,6 @@ BODY: <the email body, a few short paragraphs>`;
       reportAction('general', GENERAL_ACTIVE.hits);
       return;
     }
-    if (t.closest('[data-add-ics]') && ACTIVE) { downloadIcs(ACTIVE.bill); return; }
-
     const sendIt = t.closest('[data-send-it]');
     if (sendIt && ACTIVE) {
       const rep = ACTIVE.reps && ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
