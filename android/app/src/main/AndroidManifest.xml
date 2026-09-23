@@ -39,6 +39,14 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- "Never shared, never sold": no FCM token is created until a
+             citizen explicitly opts in via push.js (Capacitor's register()
+             re-enables auto-init at that moment; unregister() disables it
+             again). Analytics collection is also hard-off as a backstop,
+             even though firebase-analytics isn't a dependency. -->
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true" />
     </application>
 
     <!-- Permissions -->

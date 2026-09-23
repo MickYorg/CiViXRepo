@@ -858,9 +858,23 @@ edge-to-edge, so the native bottom nav sat under the gesture bar and the
 StatusBar plugin's background color was ignored. `capacitor.config.json`
 now sets `android.adjustMarginsForEdgeToEdge: "auto"`, and the app theme's
 `windowBackground` is the ink navy (`res/values/colors.xml`) so both
-system-bar strips match. Push still isn't wired on Android: no
-`google-services.json` yet (needs a Firebase project, messaging only, no
-Analytics — the user's step).
+system-bar strips match. **Firebase, same day**: project `civix-deb58` created by the user;
+`android/app/google-services.json` is in place **locally only** —
+gitignored on purpose since this GitHub repo is public (a client key, not
+a true secret, but not worth broadcasting). A fresh clone must re-download
+it from Firebase console → Project settings → Your apps. Verified the
+dependency tree has `firebase-messaging` only, no `firebase-analytics`.
+`AndroidManifest.xml` now sets `firebase_messaging_auto_init_enabled=false`
+(no FCM token is minted at launch, before a citizen opts in — Capacitor's
+`register()`/`unregister()` flip it on/off) plus
+`firebase_analytics_collection_deactivated=true` as a backstop. Verified
+live: clean launch with no token, and a real 142-char FCM token issued on
+an explicit `register()` call. **Still not live**: the
+`workers/push-scheduler` Worker has never been deployed (`wrangler
+deployments list` → "does not exist"), and it needs the
+`FCM_SERVICE_ACCOUNT_JSON` (Firebase → Project settings → Service
+accounts → Generate new private key), `FCM_PROJECT_ID` (`civix-deb58`),
+and `TRIGGER_SECRET` secrets before any push can actually be sent.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;

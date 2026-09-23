@@ -7,3 +7,7 @@ www/
 ios/App/App/public/
 android/app/src/main/assets/public/
 notes/
+
+# Firebase client config: real key, repo is public. Lives only locally
+# (and in whatever CI builds release APKs). See CLAUDE.md, 23 Sep 2026.
+android/app/google-services.json
