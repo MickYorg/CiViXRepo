@@ -454,19 +454,8 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-  /* Phones: tags go on their own row above the synopsis. Side by side,
-     a federal card's two tags ("IN COMMITTEE" + "FEDERAL", ~170px,
-     never shrinking) left the synopsis ~130px of a ~300px card, so it
-     wrapped one or two words per line — the "staircase" the 10 Sep
-     min-width fix above couldn't cure, since that was a real lack of
-     room, not a flex quirk. */
-  @media (max-width: 640px) {
-    .card-top { flex-wrap: wrap; row-gap: 8px; }
-    .card-top > .card-tags, .card-top > .tag { order: -1; }
-    .card-top > .card-synopsis, .card-top > .card-title { flex-basis: 100%; }
-    .focus-headline { flex-wrap: wrap; row-gap: 6px; }
-    .focus-headline > .tag { order: -1; }
-  }
+  /* Phone-width card header layout (tags above the synopsis) lives in
+     phone.css, shared with calendar.html. */
   .title-details {
     margin-bottom: 8px;
   }

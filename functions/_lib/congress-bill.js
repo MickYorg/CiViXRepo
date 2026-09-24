@@ -39,10 +39,20 @@ const STATUS_PATTERNS = [
   { status: 'Became Law', re: /became public law|public law no\./i },
   { status: 'Vetoed', re: /vetoed by (the )?president/i },
   { status: 'To President', re: /presented to president/i },
-  { status: 'Passed Senate', re: /passed senate|passed\/agreed to in senate/i },
-  { status: 'Passed House', re: /passed house|passed\/agreed to in house/i },
-  { status: 'Reported by Committee', re: /committee reported|reported.*committee/i },
-  { status: 'In Committee', re: /referred to (the )?(committee|subcommittee)/i }
+  // Senate simple resolutions are "Submitted in the Senate, considered, and
+  // agreed to" / "Resolution agreed to in Senate" — that is passage.
+  { status: 'Passed Senate', re: /passed senate|passed\/agreed to in senate|agreed to in (the )?senate|considered,? and agreed to/i },
+  // A bill "Received in the Senate" / "Held at the desk" has passed the House.
+  { status: 'Passed House', re: /passed house|passed\/agreed to in house|agreed to in (the )?house|received in the senate|held at the desk/i },
+  // "Placed on the Union/House Calendar" follows a committee report; the
+  // Senate's "Placed on Senate Legislative Calendar" means it's awaiting
+  // floor action (sometimes without going through committee at all).
+  { status: 'Reported by Committee', re: /committee reported|reported.*committee|ordered to be reported|filed written report|placed on the (union|house) calendar/i },
+  { status: 'On Floor Calendar', re: /placed on (the )?senate legislative calendar|placed on (the )?calendar/i },
+  // 24 Sep 2026: this used to require "referred to the committee", so the
+  // House's standard "Referred to the House Committee on …" (and hearings /
+  // markups) fell through to 'Introduced' — ~40% of live bills mislabeled.
+  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
 ];
 function deriveStatus(latestActionText) {
   const text = latestActionText || '';

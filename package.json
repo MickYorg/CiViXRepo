@@ -5,7 +5,11 @@
   "scripts": {
     "build:www": "bash scripts/build-www.sh",
     "cap:sync": "npm run build:www && npx cap sync",
-    "phone-check": "node scripts/phone-check.js"
+    "phone-check": "node scripts/phone-check.js",
+    "test": "node --test 'tests/unit/*.test.js'",
+    "test:live": "node --test 'tests/live/*.test.js'",
+    "test:layout": "node scripts/phone-check.js",
+    "test:all": "npm test && npm run test:layout && npm run test:live"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",

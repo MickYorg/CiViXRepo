@@ -29,4 +29,18 @@
   .topbar .cxm-stop { flex: 1 1 0; padding: 9px 6px; }
   .topbar .mode-label,
   .topbar .cxm-stop { font-size: 11px; }
+
+  /* Card headers (take-action.html, calendar.html): tags go on their own
+     row above the text. Side by side, a card's tags (~170px for
+     "IN COMMITTEE" + "FEDERAL", more with calendar's "REAL ELECTION DATE")
+     never shrink, so the text got squeezed to one or two words per line on
+     Take Action and pushed Calendar wider than the screen. */
+  .card-top { flex-wrap: wrap; row-gap: 8px; }
+  .card-top > .card-tags,
+  .card-top > .tag { order: -1; justify-content: flex-start; flex-shrink: 1; }
+  .card-top > .card-synopsis,
+  .card-top > .card-title { flex-basis: 100%; }
+  .card-tags { flex-wrap: wrap; }
+  .focus-headline { flex-wrap: wrap; row-gap: 6px; }
+  .focus-headline > .tag { order: -1; }
 }

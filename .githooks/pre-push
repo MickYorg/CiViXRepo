@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Runs before every `git push` (enabled by `git config core.hooksPath .githooks`).
+# Blocks the push if something that used to work is broken again.
+#   - offline regression tests: always (a few seconds)
+#   - phone layout check: only when pages/styles changed (a few minutes,
+#     and it loads real data from production)
+# Skip in an emergency with `git push --no-verify`.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+echo "▸ regression tests"
+if ! out=$(npm test --silent 2>&1); then
+  echo "$out" | grep -E "^✖" ; echo "✗ tests failed — run 'npm test' to see why. Push blocked."; exit 1
+fi
+
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+changed=$( [ -n "$upstream" ] && git diff --name-only "$upstream"..HEAD || git diff --name-only HEAD~1..HEAD )
+if echo "$changed" | grep -qE '\.(html|css)$|^(app-shell|mode|usage-ticker|civics|digest|native-fetch)\.js$'; then
+  echo "▸ pages changed — phone layout check"
+  if ! out=$(node scripts/phone-check.js 2>&1); then
+    echo "$out" | grep -E "✗|got worse"; echo "✗ phone layout got worse — see phone-check-out/report.md. Push blocked."; exit 1
+  fi
+fi
+echo "✓ all checks passed"

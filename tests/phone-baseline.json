@@ -1,0 +1,134 @@
+{
+  "splash-new@iphone-se": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "splash-new@iphone-16": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "splash-new@iphone-16-pro-max": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "splash-returning@iphone-se": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "splash-returning@iphone-16": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "splash-returning@iphone-16-pro-max": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "builder-new@iphone-se": {
+    "smallText": 1,
+    "smallTap": 6
+  },
+  "builder-new@iphone-16": {
+    "smallText": 1,
+    "smallTap": 6
+  },
+  "builder-new@iphone-16-pro-max": {
+    "smallText": 1,
+    "smallTap": 6
+  },
+  "builder-citizen@iphone-se": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "builder-citizen@iphone-16": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "builder-citizen@iphone-16-pro-max": {
+    "smallText": 1,
+    "smallTap": 4
+  },
+  "builder-pro@iphone-se": {
+    "smallText": 15,
+    "smallTap": 17
+  },
+  "builder-pro@iphone-16": {
+    "smallText": 15,
+    "smallTap": 17
+  },
+  "builder-pro@iphone-16-pro-max": {
+    "smallText": 15,
+    "smallTap": 15
+  },
+  "take-action@iphone-se": {
+    "smallText": 8,
+    "smallTap": 5
+  },
+  "take-action@iphone-16": {
+    "smallText": 8,
+    "smallTap": 5
+  },
+  "take-action@iphone-16-pro-max": {
+    "smallText": 8,
+    "smallTap": 5
+  },
+  "calendar@iphone-se": {
+    "smallText": 13,
+    "smallTap": 6
+  },
+  "calendar@iphone-16": {
+    "smallText": 13,
+    "smallTap": 6
+  },
+  "calendar@iphone-16-pro-max": {
+    "smallText": 13,
+    "smallTap": 6
+  },
+  "dig@iphone-se": {
+    "smallText": 4,
+    "smallTap": 0
+  },
+  "dig@iphone-16": {
+    "smallText": 4,
+    "smallTap": 0
+  },
+  "dig@iphone-16-pro-max": {
+    "smallText": 4,
+    "smallTap": 0
+  },
+  "send-to-civix@iphone-se": {
+    "smallText": 7,
+    "smallTap": 5
+  },
+  "send-to-civix@iphone-16": {
+    "smallText": 7,
+    "smallTap": 5
+  },
+  "send-to-civix@iphone-16-pro-max": {
+    "smallText": 7,
+    "smallTap": 5
+  },
+  "analytics@iphone-se": {
+    "smallText": 6,
+    "smallTap": 3
+  },
+  "analytics@iphone-16": {
+    "smallText": 6,
+    "smallTap": 3
+  },
+  "analytics@iphone-16-pro-max": {
+    "smallText": 6,
+    "smallTap": 3
+  },
+  "civix101@iphone-se": {
+    "smallText": 3,
+    "smallTap": 2
+  },
+  "civix101@iphone-16": {
+    "smallText": 3,
+    "smallTap": 2
+  },
+  "civix101@iphone-16-pro-max": {
+    "smallText": 3,
+    "smallTap": 2
+  }
+}

@@ -17,7 +17,9 @@
 // matters for anything native (safe areas, the bottom nav, keyboard).
 //
 // Screenshots + report land in phone-check-out/ (gitignored). Exits 1 if
-// any page scrolls sideways — the one failure that's never acceptable.
+// any page scrolls sideways, or if any page has more tiny text / small tap
+// targets than tests/phone-baseline.json allows (the ratchet: pages can
+// improve, never regress). `--update-baseline` accepts the current counts.
 'use strict';
 const http = require('http');
 const https = require('https');
@@ -60,7 +62,9 @@ const PAGES = [
   { name: 'builder-citizen', url: '/builder.html', state: 'medium', mode: 'citizen', wait: 3000 },
   { name: 'builder-pro', url: '/builder.html', state: 'wonk', mode: 'pro', wait: 3000 },
   { name: 'take-action', url: '/take-action.html', state: 'medium', wait: 9000 },
-  { name: 'calendar', url: '/calendar.html', state: 'medium', wait: 4000 },
+  // Calendar's plan is cached for 24h per manifesto after its first (~40s)
+  // generation, so repeat runs render the full plan within a few seconds.
+  { name: 'calendar', url: '/calendar.html', state: 'medium', wait: 7000 },
   { name: 'dig', url: '/dig/index.html', state: 'medium', wait: 3000 },
   { name: 'send-to-civix', url: '/send-to-civix.html', state: 'medium', wait: 3000 },
   { name: 'analytics', url: '/analytics.html', state: 'medium', wait: 3000 },
@@ -120,7 +124,7 @@ async function launchChrome() {
   const proc = spawn(CHROME, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
     '--hide-scrollbars', '--mute-audio', `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${profile}`, 'about:blank',
+    `--user-data-dir=${profile}`, ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank',
   ], { stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     try {
@@ -188,14 +192,23 @@ function audit(minFont, minTap) {
   };
   // An element only really overflows if nothing between it and the page
   // clips or scrolls it (a horizontal chip scroller is fine, by design).
+  // Also skips anything inside a fixed-position overlay (e.g. the civics
+  // popup mid-animation): it can't make the page scroll sideways.
   const clipped = (el) => {
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-      const o = getComputedStyle(p).overflowX;
-      if (o === 'hidden' || o === 'auto' || o === 'scroll' || o === 'clip') return true;
+      const cs = getComputedStyle(p);
+      const o = cs.overflowX;
+      if (o === 'hidden' || o === 'auto' || o === 'scroll' || o === 'clip' || cs.position === 'fixed') return true;
     }
     return false;
   };
-  const overflow = [], smallText = [], smallTap = [];
+  const overflow = [];
+  // Problems are counted per *kind* of element (tag + classes), not per
+  // element, so a page showing 3 bills vs 7 bills today doesn't change the
+  // count; one example of each is kept for the report.
+  const smallText = new Map(), smallTap = new Map();
+  const kind = (el) => el.tagName.toLowerCase() + (el.id ? '#' + el.id : [...el.classList].sort().map((c) => '.' + c).join(''));
+  const note = (map, key, example) => { if (!map.has(key)) map.set(key, example); };
   for (const el of document.body.querySelectorAll('*')) {
     if (!visible(el) || el.closest('.cxs-nav')) continue;
     const r = el.getBoundingClientRect();
@@ -205,17 +218,19 @@ function audit(minFont, minTap) {
     const hasOwnText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     if (hasOwnText) {
       const fs = parseFloat(getComputedStyle(el).fontSize);
-      if (fs < minFont) smallText.push(`${label(el)} is ${fs}px`);
+      if (fs < minFont) note(smallText, `${kind(el)} at ${fs}px`, label(el));
     }
     if (el.matches('button, a.btn, [role=button], select, input:not([type=hidden]), .chip')) {
-      if (r.height < minTap && r.width < 200) smallTap.push(`${label(el)} is ${Math.round(r.width)}×${Math.round(r.height)}px`);
+      if (r.height < minTap && r.width < 200) note(smallTap, `${kind(el)} ${Math.round(r.height)}px tall`, label(el));
     }
   }
   const uniq = (a) => [...new Set(a)];
   // Keep the outermost offenders only — children of an overflowing box are noise.
   return {
     pageWidth: document.documentElement.scrollWidth, viewport: vw,
-    overflow: uniq(overflow).slice(0, 12), smallText: uniq(smallText).slice(0, 25), smallTap: uniq(smallTap).slice(0, 25),
+    overflow: uniq(overflow).slice(0, 12),
+    smallText: [...smallText].map(([k, ex]) => `${k} — e.g. ${ex}`),
+    smallTap: [...smallTap].map(([k, ex]) => `${k} — e.g. ${ex}`),
   };
 }
 
@@ -303,5 +318,29 @@ async function shoot(cdp, page, phone, personas) {
   }
   fs.writeFileSync(path.join(OUT, 'report.md'), lines.join('\n'));
   console.log(`\nScreenshots + report: ${path.relative(process.cwd(), OUT)}/`);
-  process.exit(sideways ? 1 : 0);
+
+  // Ratchet: tests/phone-baseline.json records how many tiny-text /
+  // small-tap problems each page had when last accepted. A page may get
+  // better, never worse. `--update-baseline` accepts the current numbers
+  // (do that deliberately, after looking at the screenshots).
+  const baselinePath = path.join(ROOT, 'tests', 'phone-baseline.json');
+  let baseline = {};
+  try { baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8')); } catch (e) {}
+  let worse = 0;
+  for (const r of report) {
+    if (r.phone === 'laptop') continue;
+    const key = `${r.page}@${r.phone}`;
+    const now = { smallText: r.smallText.length, smallTap: r.smallTap.length };
+    const was = baseline[key];
+    if (args.includes('--update-baseline')) { baseline[key] = now; continue; }
+    if (!was) { console.log(`  (no baseline yet for ${key})`); continue; }
+    for (const k of ['smallText', 'smallTap']) {
+      if (now[k] > was[k]) { worse++; console.log(`✗ ${key}: ${k} got worse (${was[k]} → ${now[k]}) — see phone-check-out/report.md`); }
+    }
+  }
+  if (args.includes('--update-baseline')) {
+    fs.writeFileSync(baselinePath, JSON.stringify(baseline, null, 2) + '\n');
+    console.log('Baseline updated: tests/phone-baseline.json');
+  }
+  process.exit(sideways || worse ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
