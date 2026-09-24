@@ -68,6 +68,7 @@ const PAGES = [
   { name: 'dig', url: '/dig/index.html', state: 'medium', wait: 3000 },
   { name: 'send-to-civix', url: '/send-to-civix.html', state: 'medium', wait: 3000 },
   { name: 'analytics', url: '/analytics.html', state: 'medium', wait: 3000 },
+  { name: 'health', url: '/health.html', state: 'new', wait: 3000 },
   { name: 'civix101', url: '/civix101.html', state: 'new', wait: 1500 },
 ];
 
@@ -293,7 +294,10 @@ async function shoot(cdp, page, phone, personas) {
       for (const phone of phones) {
         const r = await shoot(cdp, page, phone, personas);
         const bad = !phone.laptop && r.pageWidth > r.viewport + 1;
-        if (bad) sideways++;
+        if (bad) {
+          sideways++;
+          if (process.env.GITHUB_ACTIONS) console.log(`::error title=Phone layout: ${page.name}@${phone.name}::page scrolls sideways (${r.pageWidth}px wide on a ${r.viewport}px screen)`);
+        }
         report.push({ page: page.name, phone: phone.name, ...r });
         console.log(`${bad ? '✗' : '✓'} ${page.name} @ ${phone.name}: ` +
           `${bad ? `SCROLLS SIDEWAYS (${r.pageWidth}px on a ${r.viewport}px screen), ` : ''}` +
@@ -335,7 +339,11 @@ async function shoot(cdp, page, phone, personas) {
     if (args.includes('--update-baseline')) { baseline[key] = now; continue; }
     if (!was) { console.log(`  (no baseline yet for ${key})`); continue; }
     for (const k of ['smallText', 'smallTap']) {
-      if (now[k] > was[k]) { worse++; console.log(`✗ ${key}: ${k} got worse (${was[k]} → ${now[k]}) — see phone-check-out/report.md`); }
+      if (now[k] > was[k]) {
+        worse++;
+        console.log(`✗ ${key}: ${k} got worse (${was[k]} → ${now[k]}) — see phone-check-out/report.md`);
+        if (process.env.GITHUB_ACTIONS) console.log(`::error title=Phone layout: ${key}::${k === 'smallText' ? 'more text too small to read' : 'more tap targets too small'} (${was[k]} → ${now[k]})`);
+      }
     }
   }
   if (args.includes('--update-baseline')) {

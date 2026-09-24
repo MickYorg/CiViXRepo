@@ -39,7 +39,7 @@ test('website: the shim does nothing', async () => {
 });
 
 test('every page that calls /api/ loads native-fetch.js in <head>, before its scripts', () => {
-  const pages = ['index.html', 'builder.html', 'take-action.html', 'calendar.html', 'analytics.html', 'send-to-civix.html', 'dig/index.html'];
+  const pages = ['index.html', 'builder.html', 'take-action.html', 'calendar.html', 'analytics.html', 'health.html', 'send-to-civix.html', 'dig/index.html'];
   for (const page of pages) {
     const html = read(page);
     const head = html.slice(0, html.indexOf('</head>'));

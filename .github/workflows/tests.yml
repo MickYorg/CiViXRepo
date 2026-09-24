@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
-      - run: npm test
+      - run: node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/helpers/gh-reporter.mjs --test-reporter-destination=stdout 'tests/unit/*.test.js'
 
   layout:
     runs-on: ubuntu-latest
@@ -43,4 +43,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
-      - run: npm run test:live
+      - run: node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/helpers/gh-reporter.mjs --test-reporter-destination=stdout 'tests/live/*.test.js'
