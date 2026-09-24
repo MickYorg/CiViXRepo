@@ -955,7 +955,13 @@ the 23 Sep "res.ok but unparseable body" failures (not iOS throttling).
   out-of-repo `civix-capture` Worker hardcodes
   `Access-Control-Allow-Origin: https://mycivix.com`, so the Inbox/docket
   (Send to CiViX) fails in the iPhone app until that Worker also allows
-  `capacitor://mycivix.com` — needs the Worker source (not in this repo).
+  `capacitor://mycivix.com` — **fixed same day**: the Worker's source was
+  recovered from the live deployment into `workers/civix-capture/` (the
+  deployed bundle as-is, `no_bundle = true`; bindings in its wrangler.toml,
+  `SENDER_SECRET` stays a Worker secret), `ALLOWED_ORIGIN` is now a
+  comma-separated list with the caller's origin echoed back, and it's
+  redeployed with `cd workers/civix-capture && npx wrangler deploy`. Verified:
+  both origins accepted, unknown origins not, D1 and the secret intact.
 - "Open DIG ↗" launched AAA's app: `target="_blank"` links go to the OS as
   `capacitor://…` URLs, a scheme other Capacitor apps also claim.
   `app-shell.js` now opens same-origin `_blank` links in place (and adds
@@ -2385,9 +2391,8 @@ see "Deliberately not yet done" below for why.
 **Not in this repo at all:**
 - PolTraPro (poltrapro.com) — separate product, own domain, linked from the
   splash. Relationship to CiViX (same family vs. unrelated) not yet decided.
-- The `civix-capture` Cloudflare Worker (docket/filings backend) — separate
-  Worker project, referenced by URL from `send-to-civix.html`/`inbox.html`/
-  `builder.html` but its source isn't checked into this repo. (The Worker's
+- ~~The `civix-capture` Worker source~~ — now in `workers/civix-capture/`
+  (recovered from the live deployment 24 Sep 2026). (The Worker's
   own hostname, `civix-capture.mycivix.workers.dev`, is unrelated to the
   page rename below and was intentionally left as-is.)
 

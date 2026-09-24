@@ -1,0 +1,19 @@
+# civix-capture — see src/index.js header. Bindings mirror the live Worker's
+# settings as of 24 Sep 2026; SENDER_SECRET is a Worker secret (set in the
+# dashboard / `wrangler secret put`), never in this file. Inbound mail reaches
+# this Worker via an Email Routing rule on mycivix.com, configured separately.
+name = "civix-capture"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+no_bundle = true
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://mycivix.com,capacitor://mycivix.com"
+CAPTURE_DOMAIN = "mycivix.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "civix"
+database_id = "f511e702-e584-4f27-8ec7-2080eade8611"
