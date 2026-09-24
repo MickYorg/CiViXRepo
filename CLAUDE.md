@@ -925,6 +925,20 @@ sends via FCM, so the iOS app needs Firebase Messaging added to convert
 APNs → FCM token, plus the Push Notifications capability in Xcode and
 `GoogleService-Info.plist`.
 
+**24 Sep 2026 — named bills still losing the top 3; the 10 Sep "unconditional
+win" fix was only half done.** The citizen's own manifesto on their iPhone
+didn't surface EFTA II or the NDAA. Every server piece checked out live
+(`bill-lookup` -> H.R.9694, `bill-search` -> H.R.8800, bundles identical to
+the repo); running the real `buildTopDigest()` inside the Android app via CDP
+showed both resolving correctly at score 53 but ranked #4/#5, behind three
+`general` entries still scored `1000 + weight`. Now `40 + weight`: above
+ordinary keyword matches, below a resolved named bill (`50 + weight`).
+Separately, `classifyFreeformPriority()` filed "the NDAA" under "Rural
+access" (non-specific); its prompt now states that naming a real bill is
+always specific even when the citation is unknown — verified live. Pushed
+`d6b5860`. The phone app bundles its HTML/JS, so the iPhone needs a fresh
+install from Xcode to pick this up.
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
