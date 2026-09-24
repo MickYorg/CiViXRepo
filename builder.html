@@ -2923,6 +2923,8 @@ First decide: does this already name something clear, specific, and actionable �
 
 If it's specific AND refers to a real piece of U.S. federal legislation — however they actually referred to it: a formal citation ("H.R.1234", "S.421"), an official title, or how people actually talk ("the CHIPS Act", "Obamacare", "the Patriot Act", "NDAA", "the infrastructure bill") — also identify its real bill type/number/Congress if you're genuinely confident which specific bill this is. Leave citation null if you're not confident, if the name could refer to more than one bill (e.g. a bare "NDAA" with no year — there's a new one almost every Congress), or if it isn't federal legislation at all. A wrong guess here is worse than no guess.
 
+Naming a real bill ALWAYS counts as specific, even when you can't pin down its citation — "the NDAA", "NDAA", or an acronym like "EFTA II" is a specific bill, not a vague topic, so keep it as its own topic in their words and never roll it up to a general policy area. Uncertainty about which Congress or number only means citation stays null; it never makes the item non-specific.
+
 Reply with ONLY a JSON object, no markdown fences, no other text:
 {
   "specific": boolean — true only if what they wrote already names something concrete and actionable enough to stand on its own,
