@@ -47,7 +47,14 @@
       '.cxs-tab.is-on{color:var(--ca);}',
       '.cxs-tab-emoji{font-size:18px;line-height:1;}',
       '.cxs-tab-label{font-size:9px;letter-spacing:.04em;text-transform:uppercase;}',
-      'body.cxs-has-nav{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0px)) !important;}'
+      'body.cxs-has-nav{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0px)) !important;}',
+      // Pages' own bottom-pinned bars (splash sticky CTA + Skip/Replay,
+      // builder's Activist step bar) sit at bottom:0 on the website; in the
+      // app they'd hide under this nav, so lift them above it. The nav
+      // already covers the safe area, so they drop their own inset.
+      'body.cxs-has-nav .cta-sticky,body.cxs-has-nav .guided-bar{bottom:calc(58px + env(safe-area-inset-bottom, 0px));padding-bottom:10px;}',
+      'body.cxs-has-nav .transport{bottom:calc(142px + env(safe-area-inset-bottom, 0px));}',
+      ':root.is-resolved body.cxs-has-nav .transport{bottom:auto;}'
     ].join('');
     document.head.appendChild(tag);
   }
