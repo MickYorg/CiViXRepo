@@ -127,7 +127,8 @@ async function launchChrome() {
     '--hide-scrollbars', '--mute-audio', `--remote-debugging-port=${CDP_PORT}`,
     `--user-data-dir=${profile}`, ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank',
   ], { stdio: 'ignore' });
-  for (let i = 0; i < 50; i++) {
+  // Up to 30s: GitHub's CI machines can take well over 10s to start Chrome.
+  for (let i = 0; i < 150; i++) {
     try {
       const list = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json();
       const page = list.find((t) => t.type === 'page');
@@ -351,4 +352,8 @@ async function shoot(cdp, page, phone, personas) {
     console.log('Baseline updated: tests/phone-baseline.json');
   }
   process.exit(sideways || worse ? 1 : 0);
-})().catch((e) => { console.error(e); process.exit(2); });
+})().catch((e) => {
+  console.error(e);
+  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Phone layout check crashed::${String(e && e.message || e).replace(/\r?\n/g, ' ')}`);
+  process.exit(2);
+});

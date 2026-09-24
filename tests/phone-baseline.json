@@ -130,5 +130,17 @@
   "civix101@iphone-16-pro-max": {
     "smallText": 3,
     "smallTap": 2
+  },
+  "health@iphone-se": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "health@iphone-16": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "health@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 1
   }
 }
