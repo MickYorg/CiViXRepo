@@ -98,8 +98,29 @@
     } catch (e) {}
   }
 
+  // Links to CiViX's own pages with target="_blank" (e.g. "Open DIG ↗")
+  // make sense on the website but not in the app: the WebView hands a
+  // new-tab link to the OS, and on iOS that URL is capacitor://mycivix.com/…
+  // — a custom scheme other Capacitor apps on the phone can also claim, so
+  // iOS launched an unrelated app (AAA's) instead of DIG. Open them in place.
+  // Directory links ("dig/") also get an explicit index.html, since the
+  // native asset handlers serve the root index.html for extensionless paths.
+  function wireInternalLinks() {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target !== '_blank') return;
+      var u;
+      try { u = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
+      if (u.origin !== location.origin) return;
+      e.preventDefault();
+      if (/\/$/.test(u.pathname)) u.pathname += 'index.html';
+      location.href = u.href;
+    }, true);
+  }
+
   function init() {
     render();
+    wireInternalLinks();
     wireBackButton();
     wireStatusBar();
   }

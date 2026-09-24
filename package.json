@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build:www": "bash scripts/build-www.sh",
-    "cap:sync": "npm run build:www && npx cap sync"
+    "cap:sync": "npm run build:www && npx cap sync",
+    "phone-check": "node scripts/phone-check.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",

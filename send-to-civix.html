@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Send to CiViX</title>
+<script src="native-fetch.js"></script>
 <meta name="theme-color" content="#14161a">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon-192.png">
@@ -536,7 +537,10 @@
   }
 
   function docketUrl() {
-    return window.location.origin + window.location.pathname + '#' + state.token;
+    // Inside the iOS app location.origin is capacitor://, which a link shared
+    // outside the app can't open — always hand out the public web address.
+    var origin = window.location.protocol === 'capacitor:' ? window.CIVIX_PUBLIC_ORIGIN : window.location.origin;
+    return origin + window.location.pathname + '#' + state.token;
   }
 
   /* ---------------------------------------------------------------

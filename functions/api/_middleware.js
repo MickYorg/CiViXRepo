@@ -1,12 +1,11 @@
 // Cloudflare Pages middleware — wraps every request under functions/api/.
 //
-// Defensive CORS fallback for the native app shell. The primary fix is
-// capacitor.config.json's server.hostname ("mycivix.com"), which makes the
-// bundled app's WebView present its origin as https://mycivix.com so calls
-// to these same-domain Functions are same-origin and need no CORS headers
-// at all. This middleware exists in case that doesn't hold on some WebView/
-// platform combination (or a future Capacitor Live Updates / remote-content
-// mode) — it never needs to matter for it to be worth having.
+// CORS for the native app shell. On iOS this is load-bearing: Capacitor iOS
+// serves the bundled pages at capacitor://mycivix.com (WKWebView won't let an
+// app claim https, so capacitor.config's iosScheme is ignored), and
+// native-fetch.js rewrites relative /api/ calls to https://mycivix.com — so
+// every Function call from the iPhone app is cross-origin and needs these
+// headers. Android runs at https://mycivix.com and stays same-origin.
 //
 // None of these endpoints use cookies or any session-based auth (this app
 // has no accounts system), so allowlisting a small, fixed set of app-shell
@@ -14,6 +13,7 @@
 // existing per-IP rate limits already guard against independently.
 const ALLOWED_ORIGINS = new Set([
   'https://mycivix.com',
+  'capacitor://mycivix.com',
   'capacitor://localhost',
   'https://localhost',
   'http://localhost',

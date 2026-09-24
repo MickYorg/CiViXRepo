@@ -20,6 +20,7 @@ rsync -a --delete \
   --exclude ".DS_Store" \
   --exclude "dev/" \
   --exclude "notes/" \
+  --exclude "phone-check-out/" \
   --exclude "netlify/" \
   --exclude "ios/" \
   --exclude "android/" \

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0A0F1C" id="theme-color-meta">
 <title>CiViX — build your manifesto</title>
+<script src="native-fetch.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -119,6 +120,9 @@
     line-height: 1.5;
   }
   .usage-ticker.usage-ticker-ready { display: flex; }
+  /* The ticker sits outside the page's padded containers, so below its
+     720px max-width it ran edge to edge; give it the same 16px gutter. */
+  @media (max-width: 752px) { .usage-ticker { margin: 16px 16px 0; } }
   .usage-ticker-emoji { flex-shrink: 0; }
   .usage-ticker-text strong { color: var(--amber-ink); }
   .usage-ticker-tagline { color: var(--paper-dim); }
@@ -301,6 +305,13 @@
     letter-spacing: 0.02em;
     color: var(--paper-dim);
     margin: 10px 0 26px;
+  }
+  .citizen-reset { text-align: center; margin: 28px 0 8px; }
+  .citizen-reset-btn {
+    appearance: none; background: none; border: 0; padding: 6px 10px; cursor: pointer;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px;
+    letter-spacing: 0.02em; color: var(--paper-dim); text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .citizen-stage { position: relative; min-height: 420px; }
   .citizen-card-slot { position: relative; }
@@ -989,6 +1000,7 @@
 
   :focus-visible { outline: 2px solid var(--amber-ink); outline-offset: 2px; }
 </style>
+<link rel="stylesheet" href="phone.css">
 </head>
 <body data-pane="build" class="is-entering">
 
@@ -1045,6 +1057,7 @@
     <button type="button" class="citizen-btn citizen-btn-complicated" id="citizen-complicated" aria-label="It's complicated — dig deeper first">&#129300;</button>
     <button type="button" class="citizen-btn citizen-btn-yes" id="citizen-yes" aria-label="Yes, that's me">&#9825;</button>
   </div>
+  <p class="citizen-reset"><button type="button" class="citizen-reset-btn" id="wipe-citizen">Start over from scratch</button></p>
 </div>
 
 <div class="guided-bar" id="guided-bar" hidden>
@@ -2429,9 +2442,25 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
     if (t.closest('#export-manifesto')) { exportManifesto(); return; }
     if (t.closest('#import-manifesto-btn')) { document.getElementById('import-manifesto-file').click(); return; }
 
-    if (t.closest('#wipe')) {
-      if (confirm('Delete your manifesto from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.')) {
+    // #wipe-citizen is the same reset, reachable from Citizen mode (which
+    // hides the Pro-mode .shell holding #wipe) — the in-app equivalent of
+    // the web-only /dev/ persona switcher's "brand new citizen".
+    // Unlike Pro mode's #wipe, it keeps the existing Send to CiViX address
+    // (same reasoning as the persona switcher: a repeatedly-reset tester
+    // shouldn't re-save a new contact and strand an old docket every time),
+    // then restarts at the splash like a genuine first visit.
+    const wipeCitizen = !!t.closest('#wipe-citizen');
+    if (t.closest('#wipe') || wipeCitizen) {
+      const msg = wipeCitizen
+        ? 'Start over from scratch? Your manifesto (priorities, positions, sources) is deleted from this device and you begin again as a brand-new citizen. Your Send to CiViX address stays the same. This cannot be undone.'
+        : 'Delete your manifesto from this device? Priorities, positions, sources, and your Send to CiViX address all go, and a new address is issued. Anything already on your docket stays on the old one, which you will no longer have the address for. This cannot be undone.';
+      if (confirm(msg)) {
         try { localStorage.removeItem(KEY); } catch (e) {}
+        try {
+          localStorage.removeItem('civix-inbox-topics');
+          localStorage.removeItem('civix-dig-legacy-merged');
+          localStorage.removeItem('dig-results-cache');
+        } catch (e) {}
         // Also clear the splash's own memory of you, so returning to the
         // home page after a wipe genuinely looks like a first-ever visit —
         // original wording, Citizen mode, "Build your manifesto" — rather
@@ -2442,7 +2471,9 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
           localStorage.removeItem('civix-splash-seen');
         } catch (e) {}
         P = Object.assign({}, BLANK);
-        save(); renderAll(); ensureDrop(true);
+        save();
+        if (wipeCitizen) { location.href = 'index.html'; return; }
+        renderAll(); ensureDrop(true);
       }
       return;
     }

@@ -1,0 +1,32 @@
+/* phone.css — shared phone-width layout rules, linked from every page with
+   the standard CiViX header. Each page still carries its own inline <style>
+   (see "Design tokens are hand-copied per page" in CLAUDE.md); anything that
+   has to look the same on every page at phone width lives here instead, so a
+   fix lands everywhere at once rather than drifting page by page.
+
+   Check changes with `npm run phone-check` (scripts/phone-check.js), which
+   renders every page at iPhone SE / 16 / 16 Pro Max widths.
+
+   Selectors are prefixed with .topbar on purpose: mode.js injects its own
+   picker styles after this file loads, and pages' inline rules for the same
+   classes vary, so the extra specificity wins at phone width without
+   !important. */
+
+@media (max-width: 560px) {
+  /* Header: logo + theme toggle on the first row, the Citizen/Activist/Pro
+     switch across the full second row. Left to wrap on its own, the toggle
+     (and on some pages the tagline) ended up stranded on a row by itself. */
+  .topbar { flex-wrap: wrap; row-gap: 10px; }
+  .topbar > .mark { order: 1; }
+  .topbar > .topbar-right { order: 2; margin-left: auto; }
+  .topbar > .mode-track,
+  .topbar > #mode-picker { order: 3; flex: 1 1 100%; max-width: none; }
+  .topbar .mark-sub { display: none; }
+
+  /* Mode switch: three equal stops, labels at a readable size (they were
+     8.5-10px) and a taller tap target. */
+  .topbar .mode-stop,
+  .topbar .cxm-stop { flex: 1 1 0; padding: 9px 6px; }
+  .topbar .mode-label,
+  .topbar .cxm-stop { font-size: 11px; }
+}

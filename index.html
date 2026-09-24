@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0A0F1C" id="theme-color-meta">
 <title>CiViX — get informed. get fired up. take action.</title>
+<script src="native-fetch.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -536,25 +537,36 @@
   }
 
   @media (max-width: 560px) {
+    /* Phone: the § mark moves from the margin to an eyebrow above its
+       line. Squeezed into a ~40px margin it printed on top of "get";
+       above the line it costs a little height (plentiful here) and hands
+       the headline the full width instead. */
     :root {
-      --amend-indent: clamp(28px, 10vw, 46px);
-      --rule-inset: clamp(13px, 4.6vw, 24px);
+      --amend-indent: 16px;
+      --rule-inset: 0px;
     }
-    /* The desktop clamp's vw coefficient (7.6vw) barely shrinks on a
-       phone-width viewport, so the longest pre-strike phrase ("get more
-       of the same" — measure() in the script pins it to its own natural
-       pixel width) stays wider than the screen. A lower coefficient here
-       actually shrinks with the viewport instead of hovering near a
-       floor that was tuned for short lines. */
-    .line { font-size: clamp(19px, 6.1vw, 88px); }
-    .sec { font-size: 9.5px; }
+    .sec {
+      position: static;
+      display: block;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    /* Sized so the longest phrase the sequence ever shows ("get more of
+       the same", ~10.2em in Newsreader bold at phone sizes, measured)
+       exactly fits the width left after .wrap's 5vw padding each side and
+       the 16px indent: (90vw - 16px) / 10.2. Anything bigger clips that
+       phrase mid-animation; anything smaller wastes the screen, which is
+       what the old flat 6.1vw did (~24px on an iPhone 16 vs ~33px now). */
+    .line { font-size: calc(8.8vw - 2px); }
+    .amend { margin-bottom: 18px; }
+    .principles { font-size: 11px; }
 
     .resolve { flex-direction: column; align-items: stretch; }
     .cta { width: 100%; }
     .mark-sub { display: none; }
     .line-row { flex-direction: column; align-items: flex-start; }
-    .agent-links { margin-top: 2px; gap: 6px; }
-    .agent-link { font-size: 10px; padding: 4px 9px; }
+    .agent-links { margin-top: 6px; gap: 8px; }
+    .agent-link { font-size: 11px; padding: 8px 13px; min-height: 34px; }
 
     /* Room for the sticky CTA bar so it never covers the resolve block. */
     .wrap { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
@@ -563,7 +575,17 @@
        viewport, so whatever ends up scrolled to the bottom sits right
        behind them. Top-right, under the header, can't collide with
        either the resolve block or the sticky CTA bar. */
-    .transport { top: 66px; bottom: auto; right: clamp(14px, 3vw, 28px); }
+    /* Skip floats just above the sticky CTA while the sequence plays.
+       Once it resolves the sticky bar fades away and Replay drops into
+       the page flow under the content, instead of floating over it. */
+    .transport { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    :root.is-resolved .transport {
+      position: static;
+      justify-content: flex-end;
+      padding: 0 clamp(18px, 5vw, 48px) calc(24px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Header layout at phone width lives in phone.css (shared). */
 
     .cta-sticky {
       display: flex;
@@ -588,6 +610,7 @@
     :root.is-resolved .cta-sticky { opacity: 0; pointer-events: none; }
   }
 </style>
+<link rel="stylesheet" href="phone.css">
 </head>
 <body>
 
