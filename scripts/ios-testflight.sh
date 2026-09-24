@@ -12,6 +12,8 @@
 # (chmod 600 both). Never commit these.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Always leave the working copy in bundled mode, even if a step fails.
+trap 'scripts/ios-live.sh off >/dev/null' EXIT
 source ~/.civix-asc/config
 KEY="$HOME/.civix-asc/AuthKey_${ASC_KEY_ID}.p8"
 [ -f "$KEY" ] || { echo "missing $KEY — see the setup notes at the top of this script"; exit 1; }
@@ -46,10 +48,12 @@ cat > "$OUT/ExportOptions.plist" <<PLIST
 PLIST
 
 echo "▸ uploading to App Store Connect"
+# Export/upload signs with Xcode's own signed-in account (the Account
+# Holder, which may use Apple's cloud-managed distribution certificate); the
+# API key's App Manager role isn't allowed to ("Cloud signing permission
+# error"). If Xcode ever loses its login: Xcode → Settings → Accounts.
 xcodebuild -exportArchive -archivePath "$OUT/App.xcarchive" \
-  -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" "${AUTH[@]}" \
-  | grep -E "EXPORT (SUCCEEDED|FAILED)|Upload|error:"
+  -exportOptionsPlist "$OUT/ExportOptions.plist" -exportPath "$OUT/export" -allowProvisioningUpdates \
+  | grep -E "EXPORT (SUCCEEDED|FAILED)|Upload succeeded|error:"
 
-# Leave the working copy in bundled mode, the safe default.
-scripts/ios-live.sh off
 echo "✓ build $BUILD_NUMBER uploaded — it appears in TestFlight after Apple's processing (usually 5-15 min)"
