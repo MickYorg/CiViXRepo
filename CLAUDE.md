@@ -5,6 +5,27 @@ what you care about, match it against the municipal/state/federal calendar,
 turn it into action. Built mostly through Claude chat/artifact sessions —
 this file exists so a fresh Claude Code session has the context instantly.
 
+## Testing — read this first (added 24 Sep 2026)
+
+Every past fix should be pinned by a test so it can't quietly come back.
+- `npm test` — offline regression tests (seconds). Runs the real
+  `digest.js`, page functions (pulled out of the HTML by
+  `tests/helpers/load.js`), and `functions/_lib` against fixed data; also
+  checks the hand-synced copies (SYNONYMS, stoplists, issue taxonomy)
+  still match. **When you fix a bug, add a test for it in `tests/unit/`.**
+- `npm run test:layout` — `scripts/phone-check.js`: every page at iPhone
+  SE/16/Pro Max with real data; fails on sideways scroll or if a page gets
+  worse than `tests/phone-baseline.json` (a ratchet — improve a page, then
+  `--update-baseline` after looking at the screenshots in `phone-check-out/`).
+  Shared phone-width rules live in `phone.css`.
+- `npm run test:live` — production smoke checks (no AI spend, no email).
+- Automatic: `.githooks/pre-push` blocks a push if tests fail (layout check
+  too when pages changed; enabled via `git config core.hooksPath .githooks`,
+  per clone). `.github/workflows/tests.yml` runs all three on every push and
+  nightly at 7am ET against production; GitHub emails on failure.
+- Changing how a cached value is derived (a prompt, a status rule)? Version
+  its cache key in the same change, or production serves stale results.
+
 ## Current state (as of 10 Sep 2026)
 
 **Pick up here — a standing mandate, not a one-session task.** The user
