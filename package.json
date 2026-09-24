@@ -9,7 +9,9 @@
     "test": "node --test 'tests/unit/*.test.js'",
     "test:live": "node --test 'tests/live/*.test.js'",
     "test:layout": "node scripts/phone-check.js",
-    "test:all": "npm test && npm run test:layout && npm run test:live"
+    "test:all": "npm test && npm run test:layout && npm run test:live",
+    "ios:testflight": "bash scripts/ios-testflight.sh",
+    "ios:live": "bash scripts/ios-live.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",
