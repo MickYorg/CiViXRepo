@@ -140,14 +140,21 @@ are gitignored — public repo — re-download from the Firebase console
 
 ## Open work (priority order)
 
-1. **Streamlining** (in progress 24 Sep 2026): TestFlight builds (no
-   cable), live updates of web content into the app, a Health dashboard
-   page for test results, a nightly investigating agent.
+1. **Streamlining — done 24 Sep 2026.** `civix` startup command;
+   regression suite + pre-push + CI; Health page (`health.html`, reads
+   GitHub from the browser); TestFlight (`npm run ios:testflight`; app
+   6815834665, listing name "mccivix", internal group "Me" gets every
+   build; test builds load the live site via `scripts/ios-live.sh`); the
+   **nightly investigator** routine (claude.ai/code/routines/trig_01FkooSzXG33WVpyozqdqWon,
+   7:30am ET: all green → stops; failures → root cause + fix + test on a
+   `nightly/<date>` branch and PR, never main). Still to build: the App
+   Store half of hybrid live updates (bundled pages + a self-hosted
+   update channel).
 2. **App Store MVP, remaining phases:** audit of the "advocating
    effectively" half (federal reps lookup, docket classification,
    municipal events still unaudited); Privacy Policy + Terms pages (none
-   exist); store metadata and privacy questionnaires; TestFlight / Play
-   internal testing; submission. Ship free, no monetization UI at first.
+   exist); store metadata and privacy questionnaires; Play internal
+   testing (needs an Android device); submission. Ship free, no monetization UI at first.
 3. **Known gaps:** federal "Send it" ends in copy+paste (no congressional
    email source; no CAPTCHA-bypassing form submission, ever); municipal
    covers 8 Legistar cities; ZIP→district is best-effort; small 9-10px
