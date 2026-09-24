@@ -1,0 +1,2613 @@
+> Full dated history of CiViX decisions and fixes, moved out of CLAUDE.md on 24 Sep 2026 so every session doesn't load it. CLAUDE.md is the current briefing; search this file for the why behind something.
+
+# CiViX — project context
+
+CiViX (mycivix.com) is a civic engagement platform: build a private profile of
+what you care about, match it against the municipal/state/federal calendar,
+turn it into action. Built mostly through Claude chat/artifact sessions —
+this file exists so a fresh Claude Code session has the context instantly.
+
+## Testing — read this first (added 24 Sep 2026)
+
+Every past fix should be pinned by a test so it can't quietly come back.
+- `npm test` — offline regression tests (seconds). Runs the real
+  `digest.js`, page functions (pulled out of the HTML by
+  `tests/helpers/load.js`), and `functions/_lib` against fixed data; also
+  checks the hand-synced copies (SYNONYMS, stoplists, issue taxonomy)
+  still match. **When you fix a bug, add a test for it in `tests/unit/`.**
+- `npm run test:layout` — `scripts/phone-check.js`: every page at iPhone
+  SE/16/Pro Max with real data; fails on sideways scroll or if a page gets
+  worse than `tests/phone-baseline.json` (a ratchet — improve a page, then
+  `--update-baseline` after looking at the screenshots in `phone-check-out/`).
+  Shared phone-width rules live in `phone.css`.
+- `npm run test:live` — production smoke checks (no AI spend, no email).
+- Automatic: `.githooks/pre-push` blocks a push if tests fail (layout check
+  too when pages changed; enabled via `git config core.hooksPath .githooks`,
+  per clone). `.github/workflows/tests.yml` runs all three on every push and
+  nightly at 7am ET against production; GitHub emails on failure.
+- Changing how a cached value is derived (a prompt, a status rule)? Version
+  its cache key in the same change, or production serves stale results.
+
+## Current state (as of 10 Sep 2026)
+
+**Pick up here — a standing mandate, not a one-session task.** The user
+stepped back from individual bug reports to name the actual stakes
+directly: CiViX has two core promises — genuinely getting to know a
+citizen, and effectively advocating on their behalf — and isn't yet
+reliably delivering on either. Their own framing: a citizen could get a
+richer, more rewarding experience just Googling a bill than using CiViX
+if it keeps mis-hearing and mis-directing them, and the bar isn't "no
+bugs," it's citizens seeing CiViX as their real go-to resource for
+understanding what's happening, taking a stand, being heard, and making
+things better for themselves and people they care about. They also
+pushed back, fairly, on the pattern itself: this kind of audit has been
+asked for session after session, and one-off patches to whatever bug
+surfaces next haven't been enough.
+
+10 Sep 2026's session tried to answer that by actually walking the core
+loop end to end with real, live data (not just reading code) and fixing
+what it found at the root rather than the symptom — six real,
+structural bugs, not cosmetic ones, all detailed in their own dated
+entries further down: freeform priorities silently collapsing multiple
+typed items into one lossy AI call; classification failures swallowed
+into an unexplained generic fallback; a false-positive bill match caused
+by matching loose keywords against committee-referral boilerplate; a
+fragile JSON parser that broke on a model's own unprompted commentary;
+the exact same Cloudflare-reserved-502-status bug found in Calendar the
+day before, confirmed present in nearly every other backend Function
+including `dig-check.js` itself; and the big one — a scoring rule that
+let any unmatched specific priority unconditionally win the "top 3,"
+which is what made the same bill produce a different result every time
+it was pasted. Real, root-cause fixes for all six are live.
+
+**What this session's audit covered, and what it didn't**: everything
+above is squarely on the "getting to know the citizen" and "matching"
+half of the loop (freeform input handling, classification, bill
+matching, digest ranking). The "advocating effectively" half — actually
+taking action — was not freshly audited this session the same
+rigorous, live-data way; its known gaps are already documented in their
+own entries (federal "Send it" still ends in copy-paste, not a real
+send; no real-time watch alerts, only return-visit diffing; petition/
+rally data is external links, not CiViX's own). Whether those are the
+*right* gaps, or whether the advocacy side has its own version of
+today's "looks done but isn't" bugs, hasn't been checked with the same
+scrutiny. That's the natural next place to point this same kind of
+audit, if picking this mandate back up.
+
+**10 Sep 2026, later same day — false-positive bug the user still saw after
+all the above fixes were live, and a real, unresolved caching blocker
+found underneath it.** The user sent a fresh screenshot showing the exact
+same false-positive matching bug (ceremonial resolutions showing false
+"matched" tags) after all six fixes above were deployed. Verified live
+with a Node simulation using the exact issue strings from the screenshot
+against current production `digest.js` — it produced fully correct
+results, so the deployed code itself is right. Root cause of what the
+user was actually seeing: Cloudflare Pages serves `.js` files with a
+4-hour default browser cache (`Cache-Control: max-age=14400`, confirmed
+via `curl -sI` on `digest.js`/`mode.js`/`civics.js`), and there was no
+`_headers` file in the repo to override it — so a real, deployed fix could
+sit invisible in an already-loaded browser for up to 4 hours, which likely
+explains several earlier "I don't see the fix" moments this session too,
+not just this last one. Added `/_headers` (`/*.js` → `Cache-Control:
+no-cache`, i.e. always revalidate with the server, not "never cache") —
+committed `51cae85`, pushed, confirmed live and working correctly on
+`mycivix.pages.dev` (the Pages project's own domain: `digest.js` there now
+returns `cache-control: no-cache`).
+
+**But — confirmed live the same fix is NOT taking effect on the real
+domain.** `curl -sI https://mycivix.com/digest.js` (even cache-busted with
+a random query string, `cf-cache-status: MISS`) still returns
+`cache-control: max-age=14400`, for the identical file/etag that
+`mycivix.pages.dev` correctly serves as `no-cache`. Since `cf-cache-status`
+was `MISS` (not a stale edge cache hit), this isn't an edge-cache
+propagation lag — Cloudflare went to origin and still got the stale
+header back for the custom domain specifically. That points to a **zone-
+level Cache Rule (or legacy Page Rule) on the `mycivix.com` zone itself**
+— a separate Cloudflare feature from Pages' own `_headers` file — forcing
+a Browser/Edge Cache TTL for static assets that overrides whatever the
+origin (Pages Function) sends, for this domain only. No `CLOUDFLARE_API_TOKEN`
+is available in this environment to inspect or fix this via API, and it's
+a shared-infrastructure/production setting regardless, so it needed the
+user directly.
+
+**Resolved, same day.** The user found and lowered the zone's Browser
+Cache TTL setting (4 hours → 1 second) in the dashboard. First retest
+still showed the same bad top-3 results, which raised a fair question —
+was this actually fixed, or still a bug? Verified both halves live rather
+than guessing: (1) `curl -sI https://mycivix.com/digest.js` now returns
+`cache-control: max-age=1` — the zone change is genuinely live at the
+edge; (2) the live `digest.js` served from `mycivix.com` was downloaded
+and diffed byte-for-byte against the repo's fixed copy — identical,
+confirming the deployed code really is the fixed version, not a stale
+build. The remaining suspect was the user's own browser: a Cloudflare
+TTL change can't reach into a browser tab that already cached an old copy
+under the previous 4-hour rule — that copy stays "fresh" to the browser
+until its own original timer expires regardless of what the server now
+sends, and iPad Safari has no simple hard-refresh gesture to force past
+that the way desktop browsers do. Confirmed exactly this: a Private
+Browsing tab (guaranteed empty cache) showed correct results
+immediately. **Genuinely closed** — the matching code, the `_headers`
+fix, and the zone TTL are all correct and live; any lingering wrong
+result in an already-open regular tab is expected and will clear on its
+own once that tab's old cached copy ages out (now capped at 1 second
+going forward, so this class of bug shouldn't recur).
+
+**10 Sep 2026, later still — official-title display and drafted-tone/
+voice, two real UX fixes.** The citizen flagged that every bill/
+ordinance card was collapsing its official title behind a disclosure
+unconditionally, even for one that's already short and plain (e.g.
+"CHIPS and Science Act") — needless obscuring for exactly the titles
+that don't need it, while naming Connecticut's own bill titles as the
+genuine case that DOES need it (dense, cross-referencing legalese,
+routinely 150+ characters). New shared `titleBlockHtml(title, label,
+url)` in take-action.html (used by `renderCard()`, `renderStateCard()`,
+`focusEntryHtml()`, and `watchCardHtml()` — every place an official
+title renders) shows a title plainly, same visual weight, when it's
+≤90 characters; only past that does it still collapse behind
+"`<label>` — official bill name" the way every card did before. Verified
+live against real examples: "CHIPS and Science Act" (21 chars) and even
+the full NDAA title (55 chars) now display directly; a real 146-character
+CT-style title still collapses. Separately, `functions/api/
+plain-summary.js`'s single summarization prompt got a second, more
+demanding branch for that same >90-character case — the citizen's
+ask to "do our research and boil it down to something that actually
+makes sense... and makes it clear why it's a high priority" for the
+genuinely long/complicated ones. No new data source was added (this
+endpoint still only ever has the bill's own title + latest-action text
+to work from, not a fetched full-text/summary from congress.gov/
+OpenStates/Legistar — a real, honestly-flagged limitation, not solved
+here), but the dense-title prompt now explicitly instructs the model to
+read past cross-referencing legal structure to the real subject matter
+and state who's affected and why it might matter, rather than producing
+a similarly opaque rewrite of the legalese — while still explicitly
+forbidden from inventing specifics the title doesn't support. Kept
+general-audience rather than personalized to any one citizen's own
+matched priority: this cache is shared across every citizen who ever
+looks at this bill (see the endpoint's own 2 Sep 2026 comment), so
+baking in "why this matches YOUR priority in X" would show one
+citizen's personalization to the next citizen who hits the same cached
+entry — a real correctness risk that was caught and avoided, not just a
+style choice. Cache key bumped to `plainsummary:v2:<id>` in the same
+change (per this project's own version-caches-on-prompt-changes
+convention) so summaries already cached under the old prompt regenerate
+once under the new one instead of sitting stale for the full 60-day TTL.
+
+The tone/voice request was the bigger of the two: the citizen said
+every drafted call script/email reads too formal and verbose by
+default, and asked CiViX to learn each citizen's own writing/speaking
+voice over time rather than stay generic forever. New shared
+`voiceInstructionFor(profile)` in take-action.html, threaded into all
+four drafting prompts (federal call+email, general call+email, state
+email — every place `/api/dig-check` gets asked to write something on a
+citizen's behalf), sets a new default tone ("brief and direct... no
+throat-clearing or formal filler") regardless of whether a citizen has
+typed enough yet for a real voice profile, then layers on
+`P.voice.description` once one exists. That description is inferred,
+not asked for directly: builder.html's new `pushVoiceSample(text)` /
+`maybeUpdateVoiceProfile()` capture a citizen's own hand-typed sentences
+(capped at the last 12) at the three genuinely-freeform-text entry
+points — `commitFreeformTopic()` ("anything on your mind?"), the
+`topics-add` chip commit loop, and `showDrilldownMercy()`'s "how do you
+feel about this?" screen — deliberately NOT from a swiped headline's
+talking point or a drilldown facet's AI-generated prompt, since that
+text is CiViX's own phrasing, not the citizen's. Once at least 3 new
+samples have accumulated since the last inference, one `/api/dig-check`
+call asks the model to describe the person's voice (formality, sentence
+length, directness, notable phrasing — explicitly NOT their opinions or
+topics) in a single sentence, stored on the manifesto as
+`P.voice.description` and referenced by every future draft — fire-and-
+forget, same pattern as every other background enrichment call in this
+app, so a failed inference just leaves the house-default tone in place
+rather than erroring visibly. This is a v1: the profile only ever grows
+from freeform typing, nothing yet lets a citizen see or directly edit
+their own inferred voice description, and there's no UI signal that
+CiViX is "listening" for this — worth a follow-up pass once there's
+real usage to see how the inferred descriptions actually read.
+
+**Flagged by the citizen, not yet started — a real roadmap list, kept
+here so it isn't lost.** 10 Sep 2026, mid-session: "remind me we need to
+make a DIG light, and work on incorporating all that good DIG
+functionality into the Citizen flow, and start making the graduate to
+Activist, and earning CiViX coin, and getting the donations,
+sponsorships, and further mocking up the Pro/Org version… we really
+need to harvest/incorporate all the DIG sources and preferences into the
+consolidated manifesto." None of this is built yet. Breaking down what's
+actually being asked for, for whenever this gets picked up:
+- **"DIG light" in the Citizen flow** — DIG today lives on its own page
+  (`dig/index.html`), reads/writes `P.sources` directly (see the 29 Aug
+  2026 entry further down), and is Activist/Pro-coded in practice even
+  though the profile schema is already shared. The ask is a lighter-
+  weight version of DIG's actual stance-checking surfaced inside the
+  Citizen swipe flow itself, not a separate page a citizen has to know
+  to go find.
+- **Citizen → Activist graduation** — a real progression path (not just
+  the existing one-time mode-gate overlay from 2 Sep 2026, which only
+  ever gates a brand-new profile) that surfaces once a citizen's
+  engagement genuinely warrants more depth/control.
+- **CiViX Coin — earning AND spending** — coin-earning already exists in
+  a first form (`civics.js`'s quiz rewards, 2 Sep 2026) but there is
+  still no spend path anywhere in the app; this ask folds coin into the
+  graduation/engagement loop more broadly, not just quiz trivia.
+- **Donations and sponsorships** — entirely new: no monetization
+  mechanism of any kind exists in CiViX today.
+- **Pro/Org mockup, further along** — Pro mode exists today as a UI
+  density/control-level toggle (see `pro-mode-enterprise-direction` in
+  memory: it's expected to read as institutional/enterprise-licensing-
+  ready eventually) but has no actual org/enterprise features (seats,
+  shared org manifestos, billing) mocked up yet.
+- **Consolidating DIG's sources/preferences into the manifesto** — this
+  one's furthest along already: 29 Aug 2026's entry below ("DIG's own
+  source list vs. the profile's § 04 sources — resolved") already merged
+  `P.sources` into one shared list read/written by both DIG and
+  builder.html, including per-topic ratings. What's explicitly still
+  open per that same entry: DIG's own UI copy still says "profile," not
+  "manifesto," and the two apps don't live-sync across tabs. Worth
+  confirming with the citizen whether "harvest/incorporate" means
+  something beyond what that entry already covers, or whether the
+  remaining gap is exactly those two named items.
+
+**13 Sep 2026 — a real, auditable token-spend/transparency system, plus
+two real DIG bugs found live during testing.** Session started from an
+`ANTHROPIC_API_KEY` outage (now documented in its own entry under
+"Required Cloudflare Pages secrets" above — a silent 30-day expiration
+plus, on the replacement, an unscoped-workspace key) and grew into the
+citizen's own standing ask: "I'd like to see a real meaningful dashboard
+with more stats, including real token spend across the platform... in
+the spirit of transparency that is at the heart of the platform... this
+will eventually be part of the pitch for donations, crowdfunding,
+sponsorships (hardcore institutional users donating usage credits to
+common citizens)." That last part raised the bar on this work
+specifically — it's future fundraising collateral, not a vanity number,
+so it had to be real and auditable, not estimated.
+
+- **DIG: two real bugs found live while stress-testing after the key
+  fix.** (1) A "no coverage found" result still showed the model's full
+  2-3 sentence narration of its own failed search — verbose for
+  effectively nothing — and the DEBATE button still ran normally against
+  it, burning a real request against the per-visitor daily cap for a
+  stance that didn't exist. New `hasCoverage(r)` in `dig/index.html`
+  gates both: a short fixed line replaces the verbose narration, and
+  DEBATE is disabled (with an explanatory title) whenever there's
+  nothing to argue for; `runDebate()` also guards itself directly, not
+  just the button. (2) `runDebate()`'s own error handling threw a bare
+  `request failed (429)` instead of reading `dig-check.js`'s real message
+  (e.g. "Daily limit of 30 checks reached... resets at UTC midnight") —
+  same swallowed-error pattern this project has hit before elsewhere, now
+  fixed to match `checkSource()`'s existing handling.
+- **`DIG_DAILY_LIMIT_PER_IP` raised 30 → 100** (a code-level default, no
+  Cloudflare secret exists for this one) — real testers were starting to
+  use DIG, and 30/day was easy to burn through since every source in a
+  check, plus every debate click, counts individually. **Still open**:
+  the *shared* daily budget (`DIG_DAILY_BUDGET_USD`, still $20) wasn't
+  raised alongside it — flagged to the citizen that more testers each
+  pushing toward the new 100-check ceiling could plausibly hit the $20
+  shared cap before any one visitor hits their own limit, but not
+  actioned. Worth revisiting now that the new dashboard (below) shows
+  real spend rather than an estimate.
+- **Dark-mode bill-title links were unreadable, light mode was fine** —
+  root-caused to `titleBlockHtml()`'s short-title path (10 Sep 2026):
+  `.card-title-plain` styled its own text color but never overrode the
+  `<a>` inside it, unlike the long-title path's `.card-title a`. The link
+  fell back to the browser's default blue/visited color — coincidentally
+  legible against the light background, unreadable against dark. Fixed
+  with the same `color: inherit` rule `.card-title a` already had.
+- **A platform-wide usage-celebration ticker** (`usage-ticker.js`, new —
+  shared like `civics.js`/`digest.js`/`mode.js`, no build system to share
+  a component any other way) shown on DIG, Take Action, and builder.html:
+  a real, positively-framed line ("N checks run · N talking points
+  pulled · N actions taken · N manifestos built — citizens are putting
+  CiViX to work"), backed by a new `type: "function"` counter in
+  `platform-stats.js` (a free-form name → count map, same open-set shape
+  as the existing `topics` map). Went through two corrections from the
+  citizen: the first icon (🎉) was flagged as something the app had
+  already moved away from once before (see `avoid-party-emoji` in
+  memory) — swapped for 📈. An all-zero first-ever state shows "Be part
+  of the first wave..." instead of a flat string of zeroes.
+- **Real, per-function token/spend tracking — the actual centerpiece of
+  this session.** `grep -rl api.anthropic.com functions/` confirmed only
+  three Functions ever call Anthropic directly: `dig-check.js`,
+  `plain-summary.js`, `strategic-plan.js` — every other AI-backed feature
+  in the app reuses `dig-check.js`'s own HTTP endpoint. Each of the three
+  had independently duplicated `estimateCost()`/`todayKey()` and wrote
+  only a single aggregate `spent` float to `usage:<date>`, enough to gate
+  the shared daily budget cap but with no record of which feature spent
+  it, no token counts, and no running total. New
+  `functions/_lib/token-stats.js` centralizes this: `recordSpend(kv,
+  feature, usage, dateKey, priorRecord)` keeps the existing budget-cap
+  bookkeeping unchanged and additionally writes a genuine, lifetime
+  `pstats:tokens` map (feature → calls/inputTokens/outputTokens/costUsd).
+  `dig-check.js` now accepts an optional `feature` tag on its request
+  body (defaults to `'other'`, never rejected — backward-compatible with
+  any caller that doesn't pass one); `plain-summary.js`/
+  `strategic-plan.js` record under their own fixed names. Every call site
+  across the app was tagged with its own real feature name — real
+  coverage, not a sample: `dig_check`, `dig_debate`,
+  `dig_source_lookup`, `dig_trending_topics` (`dig/index.html`);
+  `voice_inference`, `inbox_classify`, `headline_boildown`,
+  `freeform_classify`, `drilldown_cards` (`builder.html`);
+  `docket_classify` (`digest.js`); `federal_draft`, `general_draft`,
+  `state_draft` (`take-action.html`); `headline_boildown` again
+  (`headlines-batch.js`'s internal same-origin call); plus
+  `plain_summary` and `strategic_plan` server-side. `platform-stats.js`
+  exposes this as `tokenFeatures` (sorted by real spend) and
+  `tokensSummary` (grand totals). `analytics.html`'s real-data view
+  gained a genuine "Real AI work, in the open" section — total tokens
+  processed, total real $ spent, total AI calls made on citizens'
+  behalf, and a per-feature card list with human-readable labels (a
+  `FEATURE_LABELS` map, not raw snake_case names — this is meant to read
+  as a real dashboard, not a debug dump). `usage-ticker.js` also
+  surfaces the running total inline and links out to the full dashboard
+  from wherever it's shown.
+- **Dates and a spend-over-time chart**, same-day follow-up ask
+  ("add some dates to show how long we've been tracking, and a spend
+  over time tracker"). `recordSpend()` now also writes
+  `pstats:dailySpend` (a date → stats map, bounded to the most recent
+  400 days, never expires — a separate structure from the existing
+  `usage:<date>` budget counter, which still expires after 2 days and
+  only ever holds one float) and `pstats:trackingSince` (written once,
+  the first time any real spend is ever recorded). `analytics.html` shows
+  "Tracking real AI spend since `<date>` (`<N>` days)" plus a plain CSS
+  bar chart of the last 30 tracked days — no charting library, same
+  dependency-free convention as the rest of the app; each bar's exact
+  date/amount shows on hover. Caught and fixed a real bug from verifying
+  this live rather than assuming it worked: `daysTracked` read "2" for a
+  tracking history that started earlier that same day, because
+  `Date.now()` (already past noon UTC) minus midnight UTC on day one
+  rounded a sub-day gap up to a full day. Fixed by truncating both sides
+  to midnight UTC before differencing; confirmed live afterward that a
+  same-day start now correctly reads "1 day."
+- **Verified live throughout, not just deployed**: every stage was
+  confirmed against real production behavior rather than assumed —
+  including one real test call that showed up correctly attributed in
+  `tokenFeatures` immediately after the first deploy, and genuine
+  production traffic (`headline_boildown`, from the live headline
+  pre-warming pipeline, not test calls) showing up correctly tagged on
+  its own, confirming the instrumentation captures real citizen usage,
+  not just this session's own testing.
+- **Explicitly not done this session, worth naming for the next
+  sprint**: the daily-spend history and chart are brand new — there's
+  only ever going to be one real day of trend data until more days
+  actually pass, so the chart won't look like much yet. The donation/
+  crowdfunding/sponsorship mechanism this dashboard is meant to
+  eventually support (see the citizen's own framing above, and the
+  existing "donations, sponsorships" line in the still-not-started
+  roadmap list further up this file) has no code behind it yet — this
+  session built the trustworthy data it would need, not the give-back
+  mechanism itself. And the shared daily budget question flagged above
+  (`DIG_DAILY_BUDGET_USD` staying at $20 while the per-IP ceiling
+  quintupled) is still an open decision, not a resolved one.
+
+**20 Sep 2026 — international-expansion CBA, researched and decided:
+not now, and not France.** The user asked how hard it'd be to adapt
+CiViX beyond its "somewhat myopic" US focus, then asked to zoom out
+further: survey the landscape, name the one or two most adaptable
+alternate jurisdictions, and scope a high-level cost/benefit on going
+international at all — kept here so the research isn't re-done next
+time this comes up. Live-researched (not from memory) each candidate's
+actual open civic-data maturity:
+- **Canada — best structural fit.** OpenNorth's [Represent API](https://represent.opennorth.ca/)
+  returns federal *and* provincial *and* municipal representatives from
+  one postal-code query — closer to a drop-in replacement for CiViX's
+  entire congress.gov + OpenStates + 5calls + Legistar stack than
+  anything else found, and its three-tier shape maps almost 1:1 onto
+  CiViX's existing federal/state/municipal model. English-speaking (no
+  translation cost), officially bilingual infrastructure (a real asset
+  if French were ever revisited later). Real weakness: municipal
+  boundary data is self-reported as covering only ~45 municipalities
+  with open ward data — the same "curated city list" limitation CiViX
+  already lives with today (8 US cities); bill-tracking
+  (OpenParliament.ca) is community-run, not official, and would need a
+  robustness check before being load-bearing.
+- **UK — best "send" infrastructure.** The mySociety ecosystem
+  ([TheyWorkForYou](https://data.mysociety.org/datasets/theyworkforyou-api/) +
+  [WriteToThem](https://www.mysociety.org/2026/07/29/improvements-to-writetothem/))
+  plus the UK Parliament's own official [Bills API](https://bills-api.parliament.uk/)
+  already solves the one gap this file has flagged as *permanent* for
+  US federal — WriteToThem is a real, working "email your MP"
+  mechanism, something 5calls has never had a recipient address for.
+  English-speaking. Real weakness: the UK is unitary-with-devolution,
+  not federal/state/municipal — Scotland/Wales/NI aren't "states" every
+  citizen has one of — so the tier model would need real rethinking,
+  and local-council data has no Legistar-style standard, more
+  fragmented than even Canada's municipal gap.
+- **Also scanned, ranked below those two**: Australia
+  ([TheyVoteForYou](https://www.oaf.org.au/projects/they-vote-for-you/),
+  federal-only, no confirmed state/municipal equivalent); Germany
+  ([abgeordnetenwatch.de](https://www.abgeordnetenwatch.de/api), a
+  genuinely excellent free CC0 federal+state API, offset by real
+  German-language i18n cost and no found municipal equivalent or send
+  mechanism); **France came in weakest of the group** — `data.assemblee-
+  nationale.fr`/NosParlementaires cover only the Assemblée, no confirmed
+  address→rep→email API was found, and the unitary régions/départements/
+  communes structure doesn't map to the three-tier model at all (there's
+  also an unrelated French open-parliament API already branded "CIVIX" —
+  not a blocker, just worth knowing before ever pitching the name there).
+
+  The CBA: going international at all could strengthen the donation/
+  institutional-sponsor pitch already on this file's roadmap ("built
+  once, extensible everywhere" beats "US civic app"), and Canada/UK are
+  the only two candidates cheap enough to prove that thesis rather than
+  assert it, since most of the hard data-sourcing problem is already
+  solved by someone else's free API for those two specifically. But the
+  real cost was never going to be a config flag regardless of country —
+  every one needs its own bill-matching synonym taxonomy, its own
+  election-calendar-facts module (this app's is built on fixed US
+  constitutional dates; every country has different ones), its own
+  "send" mechanism shaped by whatever contact data that country
+  actually publishes, and — per this project's own hard-won
+  verify-live-don't-assume rule — roughly doubles the QA burden per
+  country supported. And the bigger risk: the 10 Sep mandate above is
+  still open — the "advocating effectively" half of the loop was
+  explicitly flagged as not yet audited with the same rigor as
+  matching/classification — so spending a cycle on a second country now
+  risks repeating "looks done but isn't," just in two markets instead
+  of one.
+
+  **Decision: not pursuing international now, and if it's ever picked
+  up, don't lead with France.** If this comes back, the recommended
+  shape is an architecture investment, not a country launch: extract a
+  pluggable jurisdiction-adapter interface (tiers, bill source, rep
+  source, send mechanism, election-calendar rules, synonym taxonomy)
+  and validate it against **Canada first** — cheapest possible second
+  implementation (English, one unified API) and a real forcing function
+  for whether the abstraction is actually general or secretly
+  US-only. UK would be the natural third target specifically to
+  backport a working "send" mechanism into the abstraction. France
+  stays a legitimate stretch goal later — its unitary structure would
+  usefully stress-test the tier model — but shouldn't be the first
+  target given everything above.
+
+**20 Sep 2026, same day — new highest priority: lock down functionality and
+ship a real MVP to the App Store and Google Play.** A significant new
+initiative, tracked here so the next session isn't starting cold — full
+detail lives in the approved plan at
+`~/.claude/plans/jolly-plotting-fountain.md`, this is the summary.
+
+Decided with the user: both iOS and Android, simultaneously, via
+**Capacitor** (wraps the existing static-HTML architecture in a native
+shell rather than a framework rewrite); build real push notifications and
+a native Send-to-CiViX **now**, not deferred (see below for why that
+reverses this file's own prior "not now" stance on push, and how); MVP
+scope is everything that exists today, fully audited, not trimmed; no
+developer accounts existed yet for either store.
+
+A mid-planning sanity check flagged real scope creep worth recording: push
+notifications directly reverse this project's own recorded decision (the
+"Real-time watch alerts" line just above) that real-time alerts needed
+their own dedicated infrastructure project and were deliberately out of
+scope — building them now, bundled into "locking down" existing
+functionality, would have quietly undone that decision rather than
+revisited it on purpose. The user's answer resolved this directly rather
+than dismissing it: push and native Send-to-CiViX are legitimate
+"bells and whistles" for an app meant to carry real app-store trust and
+gravitas, but the manifesto's own core promise — **"never shared, never
+sold"** — has to be a literal engineering constraint on how they're
+built, not marketing copy layered on after. That shaped three concrete
+decisions: push notification banners never name the actual bill/topic
+(generic "open CiViX to see what changed" text only, since the payload
+transits Apple's/Google's infrastructure and can sit on a lock screen
+anyone can glimpse); only FCM's messaging component is used, no bundled
+Firebase Analytics/tracking; and "turn off push" is a real server-side KV
+delete, not a client-side toggle. This is now saved as a standing product
+ethos (`civix-trust-and-frictionless-ethos` in memory) for future feature
+work generally, not just this one.
+
+**Shipped this session (Phase 1-4 of the plan):**
+- Capacitor bring-up: `capacitor.config.json` sets `server.hostname:
+  "mycivix.com"` so the bundled app's WebView origin matches the live
+  domain and every existing Function keeps working with zero backend
+  changes (confirmed via direct inspection that none of the 17 Functions
+  had ever needed CORS headers before — they only served same-origin
+  browser requests). `functions/api/_middleware.js` (new) adds a
+  defensive CORS fallback regardless. `scripts/build-www.sh` packages the
+  site into `www/` for the native shell without introducing a bundler for
+  the website itself — excludes `dev/` (dev-only tooling) and the 9.4MB
+  `civix101-explainer.mp4` (now referenced by `civix101.html` via its
+  live `https://mycivix.com/...` URL instead of a relative path, so it
+  streams rather than bloating the app binary).
+- `app-shell.js` (new, root, same self-guarding-IIFE convention as
+  civics.js/mode.js) — a native bottom nav bar (Home/Manifesto/Take
+  Action/Calendar/DIG), Android back-button handling, and status-bar
+  theming, all gated on `Capacitor.isNativePlatform()` so the exact same
+  bundled HTML serves both the public website (untouched) and the native
+  app (gets the new chrome) from one copy of each page. No SPA rewrite —
+  full-page navigations still work exactly as before.
+- Real push notifications: `functions/api/push-register.js` (device
+  registry, watch-keys-only storage, modeled on `dig-check.js`'s KV
+  rate-limit conventions) + `push.js` (client, explicit contextual opt-in
+  only via a button in `renderWatchingZone()`, never a cold-start OS
+  prompt) + `workers/push-scheduler/` (a standalone Cloudflare Worker —
+  Cron Triggers aren't available to Pages Functions — hourly diff against
+  live federal/state bill data, sends via FCM's HTTP v1 API, deletes a
+  device's record on an invalid-token response). See the "Real-time watch
+  alerts" entry further down (now updated) for the full picture.
+- Native Send-to-CiViX on Android: an `ACTION_SEND` intent-filter plus
+  `MainActivity.java`'s `routeShareIntent()` route an OS share directly
+  into `send-to-civix.html` using the exact same `title`/`text`/`url`
+  query params the existing PWA `share_target` already defines — the
+  receiving page doesn't know or care which path a share came from.
+- A first-pass app icon (`scripts/make-icon.js`, pure SVG geometry
+  rendered via `sharp`/librsvg — no external image-generation tool
+  needed): a navy circle-and-checkmark mark on the existing `--ink`
+  background, deliberately swappable for real brand art later with zero
+  downstream rework. `npx capacitor-assets generate --android` produced
+  the full Android icon/splash size set (123 files) from it.
+
+**Real environment gap found, not yet resolved**: this Mac has no iOS
+toolchain at all — no Xcode, no Homebrew, and macOS's bundled Ruby (2.6)
+is too old for CocoaPods, which `npx cap add ios` needs. The user is
+installing Xcode themselves (which also clears a path to CocoaPods via
+Homebrew) rather than having this session chain-install Homebrew/Ruby/
+CocoaPods directly. The Android side has no equivalent blocker for
+generating/configuring the project (Capacitor's own tooling was enough),
+but actually building/running it still needs Android Studio/SDK + a JDK,
+neither of which is installed either — confirmed, not yet acted on.
+
+**Explicitly not done yet, per the plan's remaining phases**: Phase 5
+(the full live-data audit of the "advocating effectively" half of the
+loop, plus verifying behavior inside the actual native WebView shell —
+not just desktop Chrome), Phase 6 (Privacy Policy/Terms of Service pages
+— neither exists in this repo today — plus store metadata and the
+Apple/Google privacy questionnaires), and Phase 7 (TestFlight/Play
+internal testing, submission) are all still ahead, and Phase 1-4's own
+work has not yet been verified on a real device or even a simulator/
+emulator, since neither toolchain is installed yet on this machine.
+
+**Resolved, kept only as history**: the plain-summary deploy-pipeline stall noted below on
+2 Sep resolved on its own (Cloudflare-side, as suspected) some time before
+this session; `plain-summary.js` has been live and unremarkable since,
+confirmed indirectly by the run of ordinary same-day deploys logged
+between then and now. That note is kept below only as a record of the
+incident, not as an open item.
+
+**Calendar shipped this session and needed real live debugging right
+after — now resolved and confirmed end-to-end.** Sequence:
+`functions/api/strategic-plan.js` + its two `_lib` helpers were already
+sitting in the working tree, fully written but uncommitted, from a
+prior session that stopped before building any frontend for them. This
+session wrote `calendar.html` against that existing backend contract,
+wired it into site nav, fixed a naming collision (see the Calendar
+entry further down), and pushed. Two real bugs surfaced live
+immediately after, both root-caused via `wrangler pages deployment
+tail <deployment-id> --project-name mycivix` against production (the
+real, working way to see a live Pages Function's actual
+wallTime/status/exceptions per request — faster than the dashboard for
+this):
+1. `strategic-plan.js` was returning HTTP 502 for its own controlled
+   error responses, but 502/504/521-526 are Cloudflare-reserved status
+   codes — the edge always discards the origin's body for those and
+   substitutes its own bare "error code: 502" plain-text page, which
+   calendar.html's `res.json()` then failed to parse, surfacing as "Could
+   not reach the server." Fixed: every controlled error path now uses
+   500 instead.
+2. Once real error messages were visible, the actual Anthropic-call
+   latency/sizing became tunable instead of a guessing game: bill-pool
+   caps roughly halved (fed 20->10, state 15->8, municipal bills 10->6,
+   events 10->5) to cut input size, requested item counts trimmed
+   5-7/3-5 -> 4-6/3-4, `max_tokens` raised 4000 -> 6000 (a richer, real
+   8-issue manifesto genuinely needs that much room and was hitting
+   `stop_reason:"max_tokens"` truncation below it), and the server-side
+   timeout raised 25s -> 65s (a real generation for that same rich
+   manifesto took up to ~45s; Cloudflare imposes no fixed subrequest
+   limit, so this only needed to be generous, not clever).
+Confirmed live end-to-end with a realistic 8-issue, multi-jurisdiction
+manifesto: a fresh generation succeeds in ~24s with specific, grounded
+content (e.g. "Testify at CPA affordable housing funds hearing"), and
+an identical repeat request returns from the 24h KV cache in ~0.16s.
+Calendar is genuinely working now, not just deployed.
+
+**22 Sep 2026 — "Hey CiViX" voice assistant, thought through and
+deliberately not started.** The user wanted to talk through a voice-
+assistant feature under that name before committing to anything, so this
+is captured as a roadmap idea with real constraints attached, not a
+started initiative. Three distinct things could hide behind "Hey CiViX,"
+worth distinguishing if this comes back:
+1. **Voice as manifesto input** — speaking instead of typing into the
+   freeform "anything else on your mind?" entry points, which would also
+   feed richer signal into the existing `P.voice` writing-tone inference
+   (`pushVoiceSample()`/`voiceInstructionFor()`, 10 Sep 2026). Note the
+   naming collision if this is ever built: `P.voice` already means
+   *writing tone*, not speech, so a literal voice-input feature needs its
+   own field name.
+2. **Voice as drafted-action output** — reading a drafted call script
+   aloud for rehearsal before a citizen actually dials. This is the one
+   that would land on the still-unaudited "advocating effectively" half
+   of the loop (the open 10 Sep mandate) rather than adding a new
+   surface next to it.
+3. **A real wake-word assistant** — "Hey CiViX, what's happening with
+   the NDAA," answered by voice.
+
+For (3) specifically: a true phone-wide "Hey Siri"-style background
+hotword isn't available to third-party apps on either iOS or Android
+without deep platform-specific workarounds, so any real build would be
+push-to-talk or foreground listening, not a literal always-on wake word
+— "Hey CiViX" could still work as the feature's name/marketing framing
+even if the trigger is a button tap. Whatever gets built has to keep the
+mic constraint literal, the same way the 20 Sep push-notification work
+treated "never shared, never sold" as an engineering constraint, not
+copy: on-device wake-word detection only (e.g. Porcupine), transcription
+via each OS's own on-device speech framework (`Speech` on iOS,
+`SpeechRecognizer` on Android) rather than a cloud STT service, so raw
+audio never leaves the device. The query-handling side would reuse
+existing capability rather than add new backend intelligence — routing
+recognized intents into `bill-lookup.js`/`buildTopDigest()`/
+`classifyFreeformPriority()`, the same pipelines typed input already
+goes through.
+
+Real cost, named but not resolved: this is native-only (needs the
+Capacitor shell, which has no working iOS/Android toolchain on this
+machine yet per the 20 Sep entry) and isn't part of the current MVP
+scope — Phases 5-7 (advocacy-side audit, Privacy/Terms pages, store
+submission) are still the standing priority. If this gets picked up,
+building it before those finish would be the same kind of quiet scope
+slide this file has already flagged once for the DIG-light/coin/Pro-org
+roadmap list (10 Sep 2026) — worth deciding on purpose, not by default,
+when it comes back up.
+
+**22 Sep 2026 — resumed the App Store build; Phase 1-4 committed, Phase 5
+audit started, one real bug found and fixed.** Picked back up from the
+20 Sep session, which had left Phase 1-4's real code sitting uncommitted
+in the working tree. Committed and pushed it (`06c7f8a`) after verifying
+the live deploy didn't regress the public site — confirmed `app-shell.js`
+correctly no-ops when `window.Capacitor` is undefined (the case on the
+real website), and that the new CORS middleware only adds headers for
+allowlisted native-app origins, leaving ordinary browser requests
+untouched. **Toolchain gap is still unresolved**: checked again this
+session — no full Xcode (Command Line Tools only), no Homebrew/
+CocoaPods, no Android Studio/SDK, no JDK. Phase 1's real-device
+verification stays blocked until that's installed.
+
+With native work blocked, started Phase 5 (the "advocating effectively"
+live-data audit) instead, since it needs no native environment — real
+Node/curl tests against production endpoints, same methodology as 10
+Sep's audit:
+- **DIG's DEBATE talking points — real bug found and fixed.**
+  `runDebate()`'s parser (`dig/index.html`) used a naive
+  `text.split('\n')` that kept every non-empty line unconditionally, no
+  check that a line actually started with `POINT:`. Reproduced live
+  against real production output twice, in the same response: an
+  unprompted preamble sentence before the first `POINT:` survived as a
+  bogus extra talking point, and a single point whose text happened to
+  wrap onto its own line (the model formatting a quoted excerpt that
+  way) split into multiple broken sentence fragments instead of staying
+  one item. New `parsePointList(text, prefix)` finds each `PREFIX:`-
+  marked span directly via regex instead of splitting on newlines,
+  collapsing any internal whitespace into one line — verified against
+  the real captured failing response (correctly recovers 6 clean,
+  complete points) plus clean/empty/single-item cases. A first regex
+  attempt had its own bug caught before shipping: the lookahead's `$`
+  matches end-of-*line*, not end-of-string, once `/m` is also on (needed
+  for `^`), so it truncated every point at its own first line break;
+  fixed with `(?![\s\S])` as the real end-of-string test. Pushed
+  (`bca7d44`).
+- **Verified clean, no bugs found**: DIG's main stance-check flow
+  (`checkSource()`/`hasCoverage()`) — the 13 Sep fix correctly gates
+  "no coverage found" results and disables DEBATE for them, confirmed
+  against a real live response where the model again prepended
+  unpromoted narration (the STANCE/SUMMARY regex parser isn't anchored
+  to string start, so it's unaffected). Calendar's `strategic-plan.js`
+  — tested live with a realistic 8-issue, multi-jurisdiction manifesto
+  (Boston ZIP): real grounded data (actual Legistar/malegislature.gov
+  URLs), correct item counts against its own schema (6 tactical, 4
+  strategic, 4 contingency scenarios, all within the 4-6/3-4/2-4
+  ranges the prompt specifies). `send-state-email.js` — reviewed
+  carefully for correctness (server-side recipient re-derivation from
+  `repId`, no PII logging, real rate limiting, 500 not a reserved
+  status) without triggering an actual send, since that's a real,
+  outward-facing email to a real government office — code checks out.
+  The general-advocacy email draft prompt (`generateGeneralDrafts()`)
+  — live-tested, SUBJECT/BODY parsing is a single-value extraction
+  (not the repeated-list-item pattern that caused the DEBATE bug), no
+  issue found.
+- **Not yet covered this pass**: federal reps.js live lookup end-to-end,
+  docket/`classifyDocketItem()`, municipal events, and verifying
+  behavior inside the actual native WebView shell (still blocked on the
+  toolchain regardless). Worth continuing before calling Phase 5 done.
+
+**23 Sep 2026 — the iOS toolchain got fully resolved, Phase 1 verified
+genuinely live on a real Simulator, and that verification immediately
+surfaced two more real bugs (both fixed) plus a real, architectural
+native-specific failure class worth knowing about going forward.**
+
+**Toolchain, resolved with real workarounds worth remembering**: this
+Mac is Intel (`x86_64`, a 2019 MacBook Pro), and both Xcode and Homebrew
+have now fully dropped Intel support in their current releases —
+confirmed live, not assumed. Xcode 27 is `arm64`-only (no Intel slice at
+all); **Xcode 26.6 is the last version that still ships a genuine
+universal binary** (confirmed via `lipo -info`) and is the one to
+install from developer.apple.com/download/applications, not whatever
+the Mac App Store defaults to. Homebrew's own installer now hard-aborts
+on any non-`arm64` Mac (`if [[ "${UNAME_MACHINE}" != "arm64" ]]; then
+abort ...`, no override flag) — worked around by running the installer
+from the last commit before that check was added
+(`7a133dcc74051ee4efc79467ed215dfedf45aea2`), which still installs real
+upstream Homebrew to `/usr/local`. That got Homebrew itself working, but
+`brew install cocoapods` still failed — Homebrew's own `ruby` formula
+pulls in `llvm@22`+`rust` to build itself from source (Ruby's Rust-based
+YJIT), and `llvm@22`'s own formula has a genuinely broken pinned
+checksum for one of its patch files (reproduced twice, identical
+mismatch both times — not a flaky download). Real fix: skip Homebrew's
+own Ruby entirely and `brew install ruby@3.3` instead — a real, still-
+bottled, minimal-dependency formula (just `libyaml`+`openssl@3`, no
+LLVM/Rust) — then `gem install cocoapods` against that Ruby directly.
+Worked cleanly, no compilation needed. **If this exact toolchain wall
+gets hit again on this or another Intel Mac, this whole sequence (Xcode
+26.6, the pre-restriction Homebrew installer commit, `ruby@3.3` instead
+of Homebrew's own `ruby`) is the known-working path — no need to
+re-discover it.**
+
+**Phase 1 (iOS) verified genuinely live, not just "it built"**: real
+Xcode Simulator build succeeded, installed, and launched via `xcrun
+simctl`; confirmed via real screenshots that the splash correctly
+auto-advances into builder.html's Citizen-mode trait deck (matching
+documented behavior) and that `app-shell.js`'s native bottom nav
+renders correctly — its first-ever real test inside an actual native
+Capacitor runtime, since every prior "verification" of it was just
+confirming it correctly no-ops on the public website. Confirmed via
+device logs that real HTTPS fetches to `mycivix.com` succeed with real
+200s from inside the native shell — the actual proof point Phase 1
+needed. `ios/` is now committed (matches `android/`'s own 20 Sep
+commit) — a real, working generated project, not a stub.
+
+**Two more real bugs found live, only reachable once the app was
+actually running natively — both fixed and pushed**:
+- DIG's DEBATE talking-points parser: same-day earlier fix, see above.
+- **Municipal events**: `renderMunicipalEvents()` concatenated
+  Legistar's `EventLocation` field unconditionally into the date/time
+  meta line as if it always held a real room — confirmed live against
+  Boston's raw Legistar API that it sometimes holds a committee
+  hearing's own subject instead ("PILOT Agreements ... Committee
+  Hearing on Docket #1338"), producing a garbled run-on. Fixed with
+  `looksLikeHearingSubject()` — a real location renders inline as
+  before, a hearing subject gets its own "Regarding:" line instead.
+- **Drafted call scripts/emails**: the federal/general call-script
+  prompts had no structural marker at all (unlike the email's existing
+  SUBJECT:/BODY: pattern), so a real, live-captured response showed
+  unprompted preamble text and a markdown `---` divider verbatim to a
+  citizen, in a script meant to be read aloud on a live phone call —
+  plus the same mid-sentence-newline quote-wrapping habit that broke
+  DEBATE. Fixed with a `SCRIPT:` marker (verified live: stopped the
+  preamble outright) plus a shared `cleanDraftText()` cleanup applied to
+  every drafted script/email body. Caught a real regression in the fix
+  itself before shipping — the first version also flattened legitimate
+  signature-block line breaks ("Sincerely,\nA constituent...") into a
+  run-on; fixed to only collapse a break that isn't preceded by a
+  natural pause (comma/colon).
+- **"Add to calendar" disabled outright, not patched**: audited live —
+  100 of 100 real bills in the federal pool had a `latestAction` date in
+  the past, which isn't a data-quality fluke, it's what "latest action"
+  means by construction. A calendar "reminder" built from it was
+  guaranteed useless every time. User's call: pull the button, keep the
+  date as plain informational text. `buildIcs()`/`downloadIcs()` kept,
+  unused, in case a real forward-looking date source ever exists.
+  Calendar's own static "Loading your strategy…" line also got replaced
+  with 5 rotating, real-progress-describing messages (7s interval) after
+  a citizen couldn't tell a genuine ~40s wait from a hang — civics.js's
+  existing one-time fact card still fires alongside it, unchanged.
+
+**A real, architectural finding worth knowing for all future native
+work**: a long-running fetch (calendar's strategic-plan generation,
+30-45+ seconds; builder.html's headline pre-warming) can resolve with
+`res.ok: true` but a body that fails to parse — reproduced live twice
+("the server sent back something unexpected" on Calendar, "No headlines
+available" after several retries on the headline deck), and could NOT
+be reproduced with an identical direct request outside the native shell
+(worked fine both times). The session's own device logs are full of
+real iOS `NetworkProcess Background Assertion`/`NearSuspended Assertion`
+cycling — strong evidence iOS throttles network activity for an app
+that isn't held strictly foreground, something no prior testing on this
+project (desktop Chrome, curl) could ever have surfaced. Root-caused
+the real profile data by pulling it directly from the app's own WebKit
+LocalStorage sqlite3 file inside the Simulator's container (a real,
+reusable technique for debugging native-only state) rather than
+guessing. Since the exact trigger couldn't be pinned down deterministically,
+and since a parse failure here is provably more likely transient than a
+real data problem (confirmed for Calendar specifically: the server only
+caches a response after successfully parsing it itself, so a retry
+likely hits the 24h cache instantly, not a second real generation),
+both `calendar.html`'s `fetchPlan()` and `builder.html`'s headline
+fetches (`headlines-batch` and the live `/api/headlines` fallback) now
+retry once automatically before surfacing an error. **Worth watching
+for the same signature in any other long-running native fetch this app
+ever adds** — this isn't a one-off, it's a real property of running
+inside iOS specifically.
+
+`strategic-plan.js`'s `max_tokens` also raised 6000→ 16000 and its
+timeout 65s→ 150s the same session, after a real citizen's own
+manifesto (richer than the 8-issue case that justified the prior bump)
+hit truncation again — confirmed via the `claude-api` skill that Sonnet
+5 supports up to 128K `max_tokens` for this kind of request, so 16000
+still leaves real headroom.
+
+**Android**: SDK fully set up this session (Android Studio's first-run
+wizard completed by the user — build-tools 36.0.0, platforms;android-37.0,
+emulator, platform-tools all confirmed present) but **not yet built or
+verified** — `npx cap add android` already happened 20 Sep, needs the
+same real build+install+launch+live-fetch verification pass iOS just
+got, next session.
+
+**Also discussed, not started**: a rough timeline estimate (1-2 more
+weeks of calendar time, dominated by Google Play's forced 14-day/20-
+tester closed-testing window on a new account, not by engineering
+effort) and monetization shape — explicit user framing that a hard
+paywall contradicts the platform's whole premise, so anything built
+should be voluntary. Three real shapes discussed: in-app pay-what-you-
+want IAP (real store cut applies, ~15-30%, unless structured as a
+registered-nonprofit charitable-donation flow); a web-based donation
+page linked from the app instead of native IAP (sidesteps the store cut
+entirely, needs verification against current "reader app" guideline
+exceptions); and the institutional-sponsorship/CiViX-Coin model already
+on this file's own roadmap (13 Sep entry) — orgs donating usage credits
+to subsidize citizens directly, likely a B2B web flow, not native IAP.
+Recommendation given: ship free with zero monetization UI for the
+initial release, design this deliberately once there's real usage to
+learn from, not before submission.
+
+**23 Sep 2026, later — Android built and verified live on an emulator;
+one real, Android-only bug that broke every API call, fixed.**
+
+**Toolchain, known-working path on this Intel Mac**: Android Studio's
+bundled JDK is 25, which Gradle 8.11 (pinned by Capacitor 7) can't run
+("Unsupported class file major version 69"). `brew install openjdk@21`
+started source-building glib/harfbuzz (hours on Intel) — abandoned for a
+standalone Temurin JDK 21 tarball from the Adoptium API, unpacked to
+`~/jdks/jdk-21.0.12.1+1` (no deps, user-local). Build with
+`JAVA_HOME=~/jdks/jdk-21.0.12.1+1/Contents/Home ANDROID_HOME=~/Library/Android/sdk
+./gradlew assembleDebug` from `android/`. Android Studio's wizard didn't
+install `cmdline-tools`, so they were fetched manually into
+`~/Library/Android/sdk/cmdline-tools/latest`; an emulator `civix_pixel`
+(API 35 google_apis x86_64, Pixel 6 profile) now exists. Debugging trick
+that worked well: `adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>`
+then Chrome DevTools Protocol `Runtime.evaluate` over its WebSocket —
+real JS evaluation inside the live app WebView, no Android Studio needed.
+
+**The bug**: `server.hostname: "mycivix.com"` makes Capacitor's Android
+local server claim *every* `https://mycivix.com/*` request, `/api/*`
+included — and since those aren't bundled files, its SPA fallback
+answered every Function call with `index.html` (200, `text/html`).
+Every AI/data feature in the app was dead on Android. iOS never hit this
+(WKWebView can't intercept `https`, so iOS was never serving these
+locally). Fixed in `MainActivity.java` with a `BridgeWebViewClient`
+subclass that returns `null` from `shouldInterceptRequest` for `/api/*`
+and any non-bundled file path (e.g. the streamed explainer video),
+handing those to the WebView's real network stack (POST bodies included)
+while bundled pages still load locally — same-origin preserved, no
+JS/CORS changes. Verified live: `/api/dig-stats` returns real JSON, POST
+reaches `dig-check.js`'s own validation, and builder.html's usage ticker
+and Unsplash card photo load real data.
+
+**Also fixed, Android 15 edge-to-edge**: target SDK 35 enforces
+edge-to-edge, so the native bottom nav sat under the gesture bar and the
+StatusBar plugin's background color was ignored. `capacitor.config.json`
+now sets `android.adjustMarginsForEdgeToEdge: "auto"`, and the app theme's
+`windowBackground` is the ink navy (`res/values/colors.xml`) so both
+system-bar strips match. **Firebase, same day**: project `civix-deb58` created by the user;
+`android/app/google-services.json` is in place **locally only** —
+gitignored on purpose since this GitHub repo is public (a client key, not
+a true secret, but not worth broadcasting). A fresh clone must re-download
+it from Firebase console → Project settings → Your apps. Verified the
+dependency tree has `firebase-messaging` only, no `firebase-analytics`.
+`AndroidManifest.xml` now sets `firebase_messaging_auto_init_enabled=false`
+(no FCM token is minted at launch, before a citizen opts in — Capacitor's
+`register()`/`unregister()` flip it on/off) plus
+`firebase_analytics_collection_deactivated=true` as a backstop. Verified
+live: clean launch with no token, and a real 142-char FCM token issued on
+an explicit `register()` call. **Push is live end to end (Android), same day**: `workers/push-scheduler`
+deployed for the first time (`civix-push-scheduler.mycivix.workers.dev`,
+hourly cron) with `FCM_SERVICE_ACCOUNT_JSON` (Firebase service-account
+key, piped straight from file, never committed), `FCM_PROJECT_ID`
+(`civix-deb58`), and `TRIGGER_SECRET` set as Worker secrets. The trigger
+secret's only local copy is `~/.civix-push-trigger-secret` (mode 600) —
+use it as the `X-Trigger-Secret` header on `POST /run` to fire a manual
+run. A manual run returns `{"devices":0,"notified":0}` (nobody has opted
+in yet). Verified the real delivery path without writing test data to
+production KV: a real push sent with the Worker's own `fcm.js`
+`sendPush()` to the emulator's token arrived in the notification shade
+with the generic lock-screen-safe text. Cosmetic follow-up: the
+notification's small icon is a generic circle — Android needs a
+monochrome icon set via the `com.google.firebase.messaging.default_notification_icon`
+manifest meta-data. iOS push still needs an APNs key uploaded to Firebase.
+**The user HAS an active, paid Apple Developer Program account** (stated
+23 Sep 2026 — supersedes the 20 Sep "no developer accounts existed yet"
+line above; don't walk them through enrollment again). The user
+**also has a Google Play Console developer account** (confirmed 23 Sep
+2026); whether it's personal vs. organization (which decides if the
+20-tester/14-day closed-testing rule applies) not yet confirmed. **iOS bundle ID is
+`com.mycivix.ios`, not `com.mycivix.app`** — `com.mycivix.app` turned out
+to be already registered by someone outside the user's Apple team, so the
+user registered `com.mycivix.ios` (Push Notifications capability on,
+Broadcast off) and `ios/App/App.xcodeproj`'s `PRODUCT_BUNDLE_IDENTIFIER`
+was changed to match. Android keeps `com.mycivix.app` (Play's namespace
+is separate), and `capacitor.config.json`'s shared `appId` stays
+`com.mycivix.app` — it doesn't control the iOS bundle ID after
+`cap add ios`. The APNs key was created Team Scoped, Sandbox &
+Production, and uploaded to Firebase in both the Development and
+Production slots. iOS Firebase wiring done the same day: `FirebaseMessaging`
+pod (no Analytics; added under the Podfile's "Add your Pods here", which
+`cap sync` never overwrites); `AppDelegate.swift` calls
+`FirebaseApp.configure()` and implements the
+`didRegisterForRemoteNotificationsWithDeviceToken`/`didFail...` callbacks
+Capacitor's push plugin requires (they were missing entirely before, so
+iOS `register()` could never have resolved), swapping the APNs token for
+an FCM token; `Info.plist` sets `FirebaseMessagingAutoInitEnabled=NO` and
+`FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED=YES`; `App/App.entitlements`
+(`aps-environment`) wired via `CODE_SIGN_ENTITLEMENTS`;
+`GoogleService-Info.plist` bundled as a resource but gitignored (public
+repo, same as Android's). Simulator build succeeds and the app launches.
+**Not yet verified**: an actual iOS push delivery. Automating the iOS
+WebView (via `appium-remote-debugger` against the simulator's
+`webinspectord_sim` socket) failed with a usbmux timeout; next attempt
+should just use Safari → Develop → Simulator on the Mac, or test the
+real opt-in button on a physical iPhone (Apple Team ID is `22Q786NFKQ`, now set as `DEVELOPMENT_TEAM` in the
+App target with Automatic signing. A device build currently fails with
+"No Accounts" until the user signs Xcode into their Apple ID under
+Xcode → Settings → Accounts; after that `-allowProvisioningUpdates`
+can create the development profile for `com.mycivix.ios` itself). iOS push also needs code work:
+Capacitor's iOS push plugin returns a raw APNs token, but the Worker
+sends via FCM, so the iOS app needs Firebase Messaging added to convert
+APNs → FCM token, plus the Push Notifications capability in Xcode and
+`GoogleService-Info.plist`.
+
+**24 Sep 2026 — named bills still losing the top 3; the 10 Sep "unconditional
+win" fix was only half done.** The citizen's own manifesto on their iPhone
+didn't surface EFTA II or the NDAA. Every server piece checked out live
+(`bill-lookup` -> H.R.9694, `bill-search` -> H.R.8800, bundles identical to
+the repo); running the real `buildTopDigest()` inside the Android app via CDP
+showed both resolving correctly at score 53 but ranked #4/#5, behind three
+`general` entries still scored `1000 + weight`. Now `40 + weight`: above
+ordinary keyword matches, below a resolved named bill (`50 + weight`).
+Separately, `classifyFreeformPriority()` filed "the NDAA" under "Rural
+access" (non-specific); its prompt now states that naming a real bill is
+always specific even when the citation is unknown — verified live. Pushed
+`d6b5860`. The phone app bundles its HTML/JS, so the iPhone needs a fresh
+install from Xcode to pick this up.
+
+**24 Sep 2026, later — iOS `/api/*` calls fixed; DIG→AAA bug; phone layout
+pass with a repeatable check.** Root cause (from the real device console):
+Capacitor iOS serves pages at `capacitor://mycivix.com` (WKWebView reserves
+https, so `iosScheme` is ignored), so every relative `fetch('/api/...')` hit
+Capacitor's local asset handler and got bundled HTML back — the iOS twin of
+the 23 Sep Android bug, and the real cause of the iPhone's "no headlines" and
+the 23 Sep "res.ok but unparseable body" failures (not iOS throttling).
+- `native-fetch.js` (new, loaded in `<head>` of every page that fetches):
+  on `capacitor:` only, rewrites same-origin `/api/` fetches to
+  `https://mycivix.com/api/`; `functions/api/_middleware.js` allowlists
+  `capacitor://mycivix.com`. Verified in the Simulator: builder's usage
+  ticker loads live numbers inside the app. `send-to-civix.html`'s shared
+  docket link uses the public origin in-app. **Still broken on iOS**: the
+  out-of-repo `civix-capture` Worker hardcodes
+  `Access-Control-Allow-Origin: https://mycivix.com`, so the Inbox/docket
+  (Send to CiViX) fails in the iPhone app until that Worker also allows
+  `capacitor://mycivix.com` — **fixed same day**: the Worker's source was
+  recovered from the live deployment into `workers/civix-capture/` (the
+  deployed bundle as-is, `no_bundle = true`; bindings in its wrangler.toml,
+  `SENDER_SECRET` stays a Worker secret), `ALLOWED_ORIGIN` is now a
+  comma-separated list with the caller's origin echoed back, and it's
+  redeployed with `cd workers/civix-capture && npx wrangler deploy`. Verified:
+  both origins accepted, unknown origins not, D1 and the secret intact.
+- "Open DIG ↗" launched AAA's app: `target="_blank"` links go to the OS as
+  `capacitor://…` URLs, a scheme other Capacitor apps also claim.
+  `app-shell.js` now opens same-origin `_blank` links in place (and adds
+  `index.html` to directory links, since the native asset handlers serve the
+  root index for extensionless paths). It also lifts page-level bottom bars
+  (splash sticky CTA/Skip, builder's guided bar) above the native tab bar.
+- In-app reset: builder.html's Citizen mode now has "Start over from
+  scratch" (same wipe as Pro's "Delete everything", but keeps the Send to
+  CiViX address like the /dev/ persona switcher, and restarts at the splash).
+- Phone layout: splash headline sized to the screen (`calc(8.8vw - 2px)`,
+  derived from the longest phrase's measured width), § marks moved above
+  lines (they overlapped "get"); Take Action cards stack tags above the
+  synopsis at ≤640px (the real cause of the one-word-per-line "staircase":
+  two tags took ~170px of a ~300px card); new shared **`phone.css`** holds
+  header/mode-switch rules for every page. **`npm run phone-check`**
+  (`scripts/phone-check.js`) renders every page at iPhone SE/16/Pro Max with
+  real data (local files, `/api` proxied to production, system Chrome over
+  CDP — no downloads) and flags sideways scroll, sub-11px text, and small tap
+  targets; `-- --laptop` adds a MacBook reference. Run it after any visual
+  change. Remaining flags worth a follow-up pass: many 9-10px mono labels on
+  builder Pro and analytics.
+- Noticed, not fixed: the test persona's top 3 included an MQ-9 drone bill
+  tagged "Housing affordability" — looks like another loose-keyword false
+  match worth tracing.
+
+No shared build system — every page is a standalone HTML file with its own
+inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
+see "Deliberately not yet done" below for why.
+
+**Real, working — the core loop is wired end-to-end:**
+- `index.html` — animated splash/landing page. Mobile-tuned as of 27 Aug
+  (narrow-viewport overflow fixed, always-visible sticky CTA). As of 31
+  Aug 2026, once the amendment sequence actually plays out (not on Skip,
+  not on a same-day return visit that jumps straight to the resolved
+  state) it auto-advances into `builder.html` ~4.5s after resolving,
+  scheduled through the same `at()`/`timers` mechanism the sequence
+  itself uses so Replay's `reset()` cancels a pending auto-advance for
+  free. Also pings `/api/headlines-batch` fire-and-forget on every load
+  purely to keep builder.html's headline-swipe deck pre-warmed (see
+  below) — never reads the response. **4 Sep 2026**: the mobile sticky
+  CTA bar (added 27 Aug, above) never hid itself once the amendment
+  sequence resolved and the page's own in-flow "Build your manifesto"
+  button (inside `.resolve`) faded in — a citizen who scrolled past that
+  point saw two identical buttons on screen at once, flagged as reading
+  "amateurish." `:root.is-resolved .cta-sticky` now fades the sticky bar
+  out (same 0.7s as `.resolve` fading in) once the in-flow button takes
+  over, so the sticky bar's only job is covering the few seconds before
+  that button exists, not competing with it afterward. Also bumped
+  several mono-label text sizes that floored at 8.5–9.5px on mobile
+  (`.mark-sub`, `.sec`, `.principles`, `.mode-label`) up to a 9.5–10.5px
+  floor — same complaint, "font on mobile seems small" — while leaving
+  the headline (`.line`) and pitch copy, already comfortably sized,
+  untouched.
+- `builder.html` — the "build your profile" flow (ZIP, issues/weights,
+  positions, trusted sources, action authority). Its Inbox (§ 01) now has
+  DIG's full focus-mode treatment: open a filed item, it's auto-placed
+  under a general policy topic via `/api/dig-check`, checked against § 04's
+  sources with DIG's own stance-check prompt (sharing DIG's
+  `dig-results-cache` localStorage key), expandable summaries, 3-star
+  rating that sets the adopted issue's priority weight. Citizen mode's
+  welcome card leads with swiping through 5 real news headlines
+  (`/api/headlines`, a pluggable source-adapter registry, GNews wired up
+  today) instead of trait/category cards — the original 30-second
+  archetype quiz is still there, demoted to a quiet second option below
+  (headlines shipped 31 Aug 2026 as the secondary path and was promoted
+  to primary the same day once it proved out). As of 2 Sep 2026 the
+  welcome card also auto-advances into the headline deck on its own —
+  a 3.8s read-then-act window (the same `AUTO_DISMISS_MS` civics.js's
+  fact popups already use, so it's a timing rhythm a citizen's been
+  trained on elsewhere in the app), then the card dissolves (1s fade)
+  and `startHeadlineMode()` fires, same as tapping the button directly.
+  Picking either button on the card cancels the timer. This pairs with
+  a real fade-in/fade-out across the splash → builder hand-off itself
+  (`index.html`'s `goToBuilder()` now fades the body out over 0.5s before
+  navigating; `builder.html` starts at `opacity:0` and fades in over
+  0.5s on arrival) — previously a bare `location.href` swap with no
+  transition at all, which the citizen flagged as "abrupt." The "done"
+  card got the identical hand-off later the same day: after a flat 4s
+  pause (the citizen's own number here, not the 3.8s civics.js
+  convention — this card has more to read) it auto-advances into
+  take-action.html via a new shared `goToTakeAction()` (fades
+  `<body>` out over 0.5s, then navigates), the same function a manual
+  click on the card's own "Take Action" link now triggers too — one
+  dissolve treatment regardless of what triggered the hand-off, same
+  relationship `goToBuilder()` already has with the splash's own CTA
+  button and its auto-advance. `take-action.html` picked up the matching
+  fade-in (`is-entering`, same double-rAF pattern) so arriving there
+  reads as a continuation of the same transition, not a hard cut at the
+  destination. Both "Fine-tune it (Pro mode)" and "Swipe through more"
+  cancel the pending timer, as does switching mode via the mode-track
+  directly (folded into `applyMode()` itself, not just those two
+  buttons) — otherwise a citizen who'd already moved on to Activist/Pro
+  could still get yanked into take-action.html a few seconds later by a
+  stale timer. Also fixed
+  the same day: `.citizen-privacy-note` had no bottom margin, so the
+  welcome card sat jammed right up against the "Private & secure" line
+  on laptop-width viewports. Each headline is
+  boiled down via `/api/dig-check` into a topic on CiViX's own fixed issue
+  taxonomy (so it matches cleanly against `digest.js`'s existing
+  SYNONYMS), a one-sentence talking point, and a search query for a real
+  stock photo (`/api/headline-image`, Unsplash's Search Photos API,
+  cached in KV, photographer credit shown under the image per Unsplash's
+  API guidelines). This replaced an earlier OpenAI `gpt-image-1`
+  generation attempt (31 Aug 2026) — the citizen explicitly wanted real
+  photos from a public source, not AI-generated illustrations, and search
+  is free where generation had a real per-image cost. **2 Sep 2026**: the
+  talking point stopped being a neutral "what's at stake" summary — the
+  citizen pointed out an ambiguous, hard-to-react-to headline isn't
+  swipeable in any meaningful sense, since it's unclear what agreeing or
+  disagreeing would even mean. The boildown prompt (both copies — see the
+  sync note on `boildownHeadline()` in builder.html and `boildownPrompt()`
+  in `functions/api/headlines-batch.js`) now asks for a genuine,
+  opinionated position statement instead, with an explicit instruction to
+  zoom out to the broader policy area rather than force a confusing stance
+  from tangled/ambiguous specifics. "It's complicated" (unchanged) stays
+  the deliberate way out for anything still genuinely nuanced. A
+  swiped-right headline now also writes that talking point onto the
+  adopted issue's `stance` field (`resolveCitizenCard()`), same as typing
+  one into the "more-priorities" card already did — previously the stance
+  a citizen was actually reacting to was discarded, only the bare topic
+  survived the swipe. The "it's complicated" drilldown facet prompt
+  (`buildDrilldownCards()`) got the same position-statement treatment for
+  consistency, since its facets share this exact code path. A
+  swiped-right headline adopts
+  its topic as a priority exactly like a swiped issue card, so it flows
+  straight into the same zip → done → take-action.html hand-off the quiz
+  path already ends at (see 2 Sep 2026 note below — the done card no
+  longer shows the top-3 digest inline itself) — no separate
+  "propose actions" logic needed. The query sent to `/api/headlines`
+  already biases toward a citizen's existing top 2 priorities when they
+  have any (a first step toward "the manifesto should influence the
+  headlines"); a brand-new citizen just gets the general national feed.
+  Every swipeable card in Citizen mode (trait/category/issue/action/
+  headline alike — the only true swipe-deck UI in the app; DIG's and the
+  Inbox's own "focus mode" card browsers are prev/next paging, not this)
+  also got a third, deliberately smaller "it's complicated" button between
+  skip and yes. Tapping it defers the current card to the end of the deck
+  and inserts 3 AI-drafted facets of that same topic (`/api/dig-check`,
+  text-only — no generated image, to keep cost/latency down for what's
+  meant to be a frequent tap) to react to individually; swiping right on
+  any of them adopts its topic as a priority the same way a headline card
+  does, so agreeing with more facets is a citizen's own way of signaling
+  how much a topic matters without a slider. As of 31 Aug 2026, a
+  drilldown card can no longer be drilled into again — the user flagged
+  the real risk of an unbounded "complicated on a complicated on a
+  complicated" spiral with no natural end. Tapping "it's complicated" on
+  a drilldown card now opens a "give mercy" screen (`showDrilldownMercy()`)
+  instead of generating 3 more facets: type freeform "how do you feel
+  about this" text (added as a priority with that text as its `stance`,
+  same as the "anything else on your mind?" card), or "Not sure — ask me
+  again later," which defers it into a new `P.backlog` array
+  (`deferToBacklog()`) instead of just discarding it. `buildBacklogCards()`
+  pulls a capped batch (3) of deferred facets back into
+  `startCitizenMode()`'s topping-up deck — "sprinkle into another round
+  of manifesto refinement" — consumed from the backlog either way
+  (adopted, skipped, or deferred yet again) so it can't grow unbounded
+  even if a citizen keeps punting on the same facet. This same drilldown mechanic
+  now also has a cold-start entry point (`startSeededDrilldown()`,
+  triggered by `?drilldown=<topic>&stance=<for|against>` on boot): take-action.html's
+  action modal links here once a citizen declares a For/Against position
+  on a bill, so "go deeper on this" doesn't need its own swipe-card UI
+  duplicated in take-action.html — it hands off to the exact same deck,
+  seeded with the bill and stance so the 3 facets build on the position
+  already stated instead of re-litigating it. The trait deck (`TRAITS`)
+  also gained two "posture" cards (31 Aug 2026) — "Direct action" ("We're
+  never going to vote our way out of this") and "Incrementalist" ("Don't
+  let the perfect be the enemy of the good") — a different axis from the
+  existing circumstance traits (renter/parent/veteran/etc.): not what a
+  citizen IS, but how they think change happens. `TRAIT_HINTS` deliberately
+  skips them (theory of change isn't correlated with any issue category);
+  instead `TRAIT_ACTION_HINTS` + `actionBoost()` (mirroring
+  `categoryBoost()`) move the ACTION cards they imply to the front of the
+  action deck — Direct action promotes attend/testify/share, Incrementalist
+  promotes call/email/comment. **2 Sep 2026**: these two only ever
+  surfaced via the archetype quiz, now the secondary path — a citizen
+  going straight through the headline deck (the primary path) never got
+  asked at all, so `TRAIT_ACTION_HINTS` never had anything to act on for
+  them. `sprinklePostureCards()` now inserts both into the headline deck
+  too, spaced roughly a third and two-thirds through however many
+  headlines came back rather than bunched together, and gated the same
+  "ask once, ever" way `jurisdictionLeanCard()` already was — a citizen
+  who's already set either trait (headline deck or quiz, doesn't matter
+  which) doesn't get asked again on a later topping-up visit. As of 31 Aug 2026 the whole
+  headline pipeline (fetch -> boildown -> photo) is also pre-warmed:
+  `functions/api/headlines-batch.js` builds a ready 5-card batch server-
+  side (reusing `/api/dig-check` and `/api/headline-image` via internal
+  same-origin fetches, not duplicated logic) and caches it in KV,
+  stale-while-revalidate — any GET returns whatever's cached instantly and
+  kicks off a background rebuild via `waitUntil()` if it's past its
+  1-hour freshness window, so the caller that trips the rebuild isn't the
+  one who waits on it. `index.html` fire-and-forget pings this endpoint on
+  every load purely to be that background trigger ("ready by the first
+  splash load of the hour"), never reading its response.
+  `startHeadlineMode()` tries this batch first — a warm hit skips the
+  live pipeline entirely with no loading flash and no civics popup (the
+  initial paint is `quiet:true` specifically so an instant hit never
+  shows a wait-filler for a wait that barely happened) — and only falls
+  back to the live multi-step pipeline (unchanged) on a miss. GNews-
+  fetching (`fetchGNews`) and the issue taxonomy list both now live in
+  `functions/_lib/` (`gnews.js`, `issue-taxonomy.js`) so `/api/headlines`
+  and `/api/headlines-batch` share one implementation instead of two
+  copies drifting apart — `issue-taxonomy.js` is a manually-kept-in-sync
+  copy of builder.html's `CATALOG` (client JS and server Functions can't
+  share a module today), flagged in its own file comment. A brand-new
+  citizen (no `P.issues` yet, so no search query) used to always pull
+  GNews's `category=nation` top-headlines — the same narrow slice every
+  time, refreshed hourly by the pre-warm batch but never actually
+  varied. `gnews.js`'s `fetchGNews()` now rotates through six
+  civically-relevant categories (nation, world, business, science,
+  health, environment) keyed off the current UTC hour (31 Aug 2026,
+  citizen asked for "new/refreshed headlines for the initial manifesto
+  build") — same one-request-per-fetch budget, real variety over time
+  instead of a frozen feed.
+
+  **Issue-picker cards, 2 Sep 2026** — the citizen flagged that the
+  topping-up deck's issue-swiping (`buildIssueCards()`, reached after
+  swiping right on a category) showed every issue in that category as
+  its own isolated full-screen swipe card — "do you care about this?
+  yes/no," one at a time, nothing to compare it against. Every issue
+  reads as reasonable alone ("moms and apple pie," the citizen's own
+  words), so a citizen just swiped right on all of them, producing an
+  undifferentiated manifesto with no real signal about what actually
+  matters most. The citizen pointed at the *old* Activist/Pro picker
+  (`renderCatalog()`, §02) as the fix already sitting in the codebase: it
+  shows a whole category's issues as a chip grid on one screen, so a
+  citizen compares options side-by-side instead of approving them one at
+  a time — even though it's technically still multi-select, most people
+  never noticed that and picked more selectively anyway, just from the
+  presentation. `buildIssueCards()` now returns one `issue-picker` card
+  per chosen category (not one per issue) carrying that category's
+  unswiped issues; a new render branch shows them as tappable chips
+  (`.chip`/`.chips`, the exact classes `renderCatalog()` already uses)
+  with each pick committing immediately via `addIssue()`/`removeIssue()`
+  — live, like the Pro-mode picker, not batched behind a "confirm"
+  step — and a **Continue** button to move on once done comparing. Each
+  chip's `title` attribute carries `ISSUE_BLURBS`' existing one-line
+  description as a native hover tooltip, reusing data that would
+  otherwise have gone unused now that individual swipe cards (which
+  showed the blurb inline) are gone. The now-dead `'issue'` card type —
+  `resolveCitizenCard()`'s branch for it, `drilldownSeed()`'s case for
+  it — was removed rather than left unreachable; only `buildIssueCards()`
+  ever constructed one, and nothing constructs it anymore. Scoped to the
+  topping-up deck only, per the citizen's own framing ("assuming users
+  get interested and we promote them to continuously refine") — the
+  firstPass deck still goes through the archetype quiz or headline swipe
+  instead, neither of which uses `buildIssueCards()`.
+  The "done" card's top-3
+  digest also got a "pop" pass (31 Aug 2026): each entry now shows a rank
+  badge (#1 visibly stronger — amber border/background, not just a bigger
+  number), a template-built "why this matches you" line naming the actual
+  matched priorities (no extra AI call — built from data `buildTopDigest`
+  already returns), and stronger CTA copy ("Make your voice heard" +
+  "~2 min — CiViX drafts the call or email for you" for federal entries
+  specifically, since that's the only kind with real assisted drafting
+  today — state/docket keep honest, unembellished copy). **Reverted 2 Sep
+  2026** — see the "done card simplified" note further down: the citizen
+  complained the done card was "getting heavy," so the whole inline digest
+  (rank badges, why-lines, per-entry CTAs — `digestEntryHtml()`,
+  `digestWhyHtml()`, `loadCitizenDigest()`, all deleted) came back out.
+  builder.html no longer calls `digest.js`/`buildTopDigest()` at all —
+  that reveal now lives solely on take-action.html — so builder.html
+  dropped its `<script src="digest.js">` include too.
+
+  **Mode gate, 2 Sep 2026** — the citizen asked for a brand-new visitor
+  (no manifesto yet) to be defaulted and locked into Citizen mode, with
+  Activist/Pro greyed out in the mode-track and gated behind an
+  informational card on click, explicitly scoped as an interim step:
+  "for now let users click thru, eventually it will trigger additional
+  steps." Both `index.html` (splash) and `builder.html` got matching
+  `.mode-gate-overlay` markup/CSS (duplicated, not shared — no build
+  system today) — a small card explaining Activist/Pro build on a
+  manifesto that's already started, with **"Continue anyway"** (always
+  switches, no real gating logic behind it yet — that's the deliberately
+  deferred "additional steps") and **"Stay in Citizen mode"** (dismiss).
+  index.html's lock is a one-shot check at load (`!hasManifesto`, same
+  heuristic it already used) since nothing on that page mutates the
+  profile itself. builder.html's version (`isBrandNew()`, the same
+  5-field emptiness check `loadMode()` already used to pick a default
+  mode) is evaluated live inside `positionModeThumb()` — already the
+  function toggling `.is-on`/positioning the thumb on every mode change,
+  resize, and initial load — so a citizen who swipes in real priorities
+  while still on Citizen mode has the lock visually clear without
+  needing to switch modes first. Not made fully reactive to every
+  in-session swipe (that would mean hooking into `save()`, called on
+  nearly every keystroke) — the gate re-evaluates fresh at click time
+  regardless, so the only cost of that gap is the button occasionally
+  looking locked a beat longer than it functionally is.
+
+  **Headline-swipe quality + freeform-topic overriding, 9 Sep 2026** —
+  the citizen described the (now weeks-old, previously the primary path)
+  headline deck as no longer on point: stale headlines, unclear
+  summaries, low-signal topics, "are we refreshing from current news?"
+  Root-caused to two compounding issues, both fixed:
+  - `headlineQuery()` biased its GNews search by quoting CiViX's own
+    taxonomy label as an exact phrase (`"Climate policy"`) — real
+    reporting almost never contains that literal category-speak string
+    even when it's full of on-topic coverage, so a "personalized" search
+    could come back thin or stuck on an old article that happened to
+    contain the phrase. Now builds terms from `CAL_SYNONYMS`'
+    real-world keywords instead (the same map `keywordsForMatch()` above
+    it already uses for congress.gov bill matching) and drops forced
+    quoting on single words, so GNews does normal keyword matching
+    instead of requiring a near-impossible exact phrase.
+  - A citizen actively refining a real manifesto could still fall
+    through to `functions/api/headlines-batch.js`'s shared, generic,
+    at-most-hourly (often much staler in practice — it only refreshes
+    when *something* pings it) batch, whenever `headlineQuery()`
+    happened to compute empty — the exact "old, nowhere near my
+    manifesto" symptom. `startHeadlineMode()` now reserves that fast
+    path for a genuinely first-time citizen with nothing set yet
+    (`wasFirstPass`, captured before the function's own `firstPass =
+    false` line overwrites it); anyone topping up a manifesto always
+    pays for a live, fresh fetch — biased when there's real signal, and
+    at minimum unbiased-but-current when there isn't.
+
+  **Talking points still ambiguous to swipe on, same day** — even with
+  better source headlines, the citizen flagged a talking point like
+  "policymakers shouldn't X, even though students think otherwise" as
+  genuinely unclear to react to: does swiping right mean agreeing with
+  the stated claim, or siding with the students being dismissed in the
+  same sentence? The "opinionated position statement" instruction never
+  actually forbade embedding an opposing party's view in the same
+  sentence — it only asked for "opinionated," which a compound
+  claim-plus-rebuttal technically satisfies while still being useless to
+  swipe on. All three copies of this instruction (`boildownHeadline()`
+  and `buildDrilldownCards()` in builder.html, `boildownPrompt()` in
+  headlines-batch.js — kept in sync by hand, same convention as
+  `issue-taxonomy.js`) now explicitly forbid any "X, even though/despite
+  Z thinks otherwise" construction, with a concrete good/bad example.
+  **Addressed 10 Sep 2026** — flagged here as an open risk and it turned
+  out to matter: the citizen reported "did we actually fix the headline
+  summaries? I'm not seeing much," and the cause was exactly this.
+  `HEADLINE_BOILDOWN_KEY` renamed to a versioned
+  `civix-headline-boildown-v2` (and `headlines-batch.js`'s server-side
+  `BATCH_KEY` similarly versioned) — a clean break that orphans old
+  cached entries under the old key name rather than requiring every
+  citizen to manually clear localStorage. Bump the version suffix again
+  the next time either boildown prompt changes meaningfully.
+
+  Separately, the citizen typed a specific, current topic tied to a
+  named bill into "anything else on your mind?" and watched CiViX
+  generalize it up into a broad taxonomy bucket, discarding the
+  specificity — flagged as CiViX overriding rather than listening.
+  `classifyFreeformPriority()` (shared by the 'more-priorities' and
+  'topics-add' cards) used to force everything onto the fixed ~40-item
+  taxonomy unconditionally; it now classifies specificity first — a
+  clear, actionable topic is kept in the citizen's own words (`addIssue()`
+  already accepts any name, not just taxonomy strings), and only
+  something genuinely vague or narrow still rolls up to the closest
+  taxonomy category. `renderFreeformConfirm()` and the topics-add chip
+  display both now show which treatment happened (a specific topic reads
+  "Filed under '{topic}' — just as you put it"; a rolled-up one reads
+  "Closest fit: {topic}" with a note explaining the gap) — same
+  "expose the assumption, make it correctable" shape as the take-action
+  For/Against toggle, rather than presenting a guess and a rollup
+  identically.
+
+  **Two more real bugs in the same flow, 10 Sep 2026** — the specificity
+  fix above didn't fully land in practice. First: the citizen asked
+  "where is the list multiple items" — 'more-priorities' ("anything else
+  on your mind?") had always classified its whole textarea as one blob,
+  unlike 'topics-add' ("anything specific on your mind?"), which already
+  split on commas/semicolons/slashes/newlines into separate chips. A
+  citizen listing several distinct things (confirmed: a specific real
+  bill plus other items) only ever got one back, the rest silently
+  discarded with no signal anything was lost. Now splits the same way
+  and walks through each item one at a time via the existing confirm-or-
+  pick screens (`processFreeformItem()`/`advanceFreeformQueue()`, a
+  shared queue) — same per-item UX, now for as many items as were typed.
+  Second, and the more consequential one: the citizen typed an actual
+  bill introduced on congress.gov and watched it get bounced straight to
+  the manual "where does this belong?" picker despite being about as
+  specific as a citizen priority can get. `classifyFreeformPriority()`
+  swallowed every failure — including a real, visible rate-limit or
+  daily-budget message from `digCheckCall()` — into a bare `null`,
+  indistinguishable from the model just returning junk. It couldn't have
+  been the specificity logic misjudging this input; there was no way to
+  tell, because the real reason was never surfaced. Failures now return
+  `{ error: <real message> }` instead of `null`, shown on the picker
+  screen (and as a tooltip on topics-add's manual-pick fallback) so a
+  citizen — and a debugging session — can actually see why, instead of
+  an unexplained punt to manual filing.
+- `take-action.html` — **renamed from `calendar.html` 2 Sep 2026** (file,
+  browser tab `<title>`, `<h1>`, and every internal link/href/comment
+  across `index.html`/`builder.html`/`digest.js` moved with it in the
+  same pass — see `filenames-match-user-facing-names` in memory). The
+  citizen asked to "rebrand everything that is currently calendar to
+  Take Action" — the page's H1 and the splash's own nav button (§03,
+  "get engaged") both now read **"Take Action"** instead of "Calendar."
+  Deliberately scoped to the page's own branding, not the domain concept
+  underneath it: `functions/api/calendar.js` (the congress.gov bill
+  fetcher) keeps its name — it's genuinely fetching a legislative
+  calendar, distinct from what this page is now called — and the real
+  "add to calendar" `.ics`-download feature below is untouched for the
+  same reason. A root `_redirects` file (new, 2 Sep 2026 — this is the
+  first entry in it) 301s `/calendar.html` and `/calendar` to
+  `/take-action.html`, since alpha testers may already have the old URL
+  bookmarked or linked and this is a real, in-use app now, not just
+  `/dev/personas` housekeeping. Federal section is real: `functions/api/calendar.js`
+  pulls recent bills from congress.gov, matched client-side against the
+  profile's declared issues (weighted, hand-authored synonym map). Each
+  matched bill has a **Take action** button opening a modal that looks up
+  the user's reps by ZIP (`functions/api/reps.js`, via the 5calls API),
+  drafts a call script and email (`/api/dig-check` again), offers a
+  click-to-call `tel:` link, and an "add to calendar" `.ics` download
+  using the bill's own latest legislative-action date (explicitly labeled
+  as that, not a confirmed rally/event — no event-data source exists
+  yet). The email side dropped its `mailto:` link (31 Aug 2026) — 5calls'
+  rep data never included an email address to begin with (Congress
+  doesn't publish direct staff addresses for constituent mail), so the
+  link had no recipient and was a dead end, worse on mobile browser-based
+  webmail with no mail-app handler registered at all. Replaced with
+  "Copy email" as the primary action plus an "Open contact form ↗" link
+  to the rep's own official site (`rep.url`, from 5calls) — that's how
+  offices actually take constituent email. `functions/api/calendar.js`
+  also now re-sorts its results by `latestAction`'s own date (31 Aug
+  2026) rather than trusting congress.gov's `sort=updateDate+desc` as a
+  proxy for it — that field gets bumped by any metadata change (a
+  cosponsor added, a text version republished), not just real legislative
+  action, so a bill could lead the list looking recent while the action
+  actually shown was months stale. As of 31 Aug 2026 the modal leads with an
+  explicit **For/Against toggle** instead of silently inferring a
+  direction from free-text stance (which, especially early on, a citizen
+  often hasn't set — the old behavior could hand over a script arguing a
+  side they don't hold, at exactly the moment they're least equipped to
+  notice). Both directions' call+email drafts are generated per-lean and
+  cached in `ACTIVE.drafts.for`/`ACTIVE.drafts.against`, so switching
+  sides once both have been seen is instant, not a re-draft; the first
+  generation still costs one AI call pair, same as before. Toggling also
+  writes `lean: 'for'|'against'` onto every matching `P.issues` entry
+  (`updateManifestoLean()`) — separate from the free-text `stance` field,
+  which stays whatever nuance the citizen wrote there — so this is often
+  the first time an early-manifesto citizen has stated a real direction
+  on a priority they only named in passing while swiping. The modal's
+  initial lean prefers an issue's already-known `lean` if one exists,
+  else defaults to "for". A "Want to go deeper on this?" link hands off
+  to builder.html's seeded-drilldown deck (see above), stance-aware.
+  As of 31 Aug 2026 the page also leads with a **focus zone** — the top-3
+  digest (same `buildTopDigest()` engine as builder.html's) rendered at
+  the very top of the page, before any municipal/state/federal detail.
+  This replaced the previous layout where the top-3 concept didn't exist
+  on this page at all and a citizen had to scroll past all three
+  sections' full lists to find anything actionable ("if I didn't know to
+  scroll down you'd have lost me right there" — the exact complaint this
+  fixes). The federal entry's card gets a **Take action now** button that
+  opens the take-action modal directly (`openActionModalFor(bill, hits)`,
+  split out of `openActionModal(idx)` so it doesn't need the entry to
+  already be present in the detailed Federal list's own `CURRENT` array —
+  `digest.js`'s `billEntry()` now carries the full bill object precisely
+  so this works). State/docket entries fall back to their normal
+  `actionHref` link, same limitation as the detailed lists (state has no
+  take-action flow yet). The municipal/state/federal detail itself is now
+  a collapsed `<details>` ("See everything"), open by default only when
+  arriving via `?focus=<issue-id>` (a different intent — "show me this
+  one issue's filtered detail" — than the focus zone's general top-3).
+  As of 31 Aug 2026, once expanded, each of Municipal/State/Federal is
+  its own independently-collapsible nested `<details>`
+  (`.section-details`) instead of one long undifferentiated wall — a
+  live "N shown" badge (`setSectionCount()`) stays visible in the
+  `<summary>` even while a section is folded away, so collapsing noise
+  doesn't also hide whether there's anything worth reopening it for.
+
+  **General advocacy modal, also 31 Aug 2026**: digest.js's
+  `buildTopDigest()` now synthesizes a `kind: 'general'` entry for a
+  citizen's own high-conviction priority (`weight === 3` *and* a written
+  `stance` — the signal for "typed in deliberately," e.g. via the
+  "anything else on your mind?" card) that has zero matches in the
+  federal/state/docket pool, scored to always rank first — a citizen who
+  bothered to type something in their own words shouldn't see it go
+  nowhere just because no bill happens to touch it yet. Its "Start
+  making noise" CTA opens `openGeneralAdvocacyModal()` (take-action.html) —
+  the same rep-lookup + AI-drafted call/email as the bill-specific
+  modal, minus everything that assumes a bill exists: no For/Against (no
+  bill to be for or against), no ICS date, one draft instead of two
+  per-lean, drafted straight from the citizen's own stance text.
+  Deliberately a separate code path from `openActionModalFor()` rather
+  than threading `bill: null` through the bill-specific rendering.
+  Reachable from take-action.html's focus zone directly
+  (`data-focus-general-action`) or via `?general=<issue-name>` (what
+  builder.html's digest links to, since it can't call take-action.html's
+  JS across pages).
+
+  **Docket entries get the same real CTA, 4 Sep 2026** — a `kind:
+  'docket'` digest entry (something captured via Send to CiViX or the
+  Inbox, then AI-classified and matched against a declared priority —
+  see `classifyDocketItem()`/`fetchDocketItems()` in digest.js) used to
+  fall through to a plain "Open in your docket" link pointing right back
+  at `send-to-civix.html#token` — not a real next step, just a bounce
+  back to where it was already filed, which is what prompted the
+  citizen's own "how is this a take-action item?" question after seeing
+  one rank into the top-3 with an empty "No summary available yet."
+  line. It's matched against the citizen's own priorities exactly like a
+  `general` entry already is, so `focusEntryHtml()`'s CTA now routes
+  `docket` through the same `data-focus-general-action` button ("Start
+  making noise") and `openGeneralAdvocacyModal()`. The two kinds lay
+  their fields out differently, though, so the click handler swaps which
+  field feeds which modal argument rather than reusing `general`'s
+  mapping verbatim: a `general` entry's `title` IS the short topic name
+  and its `summary` is the citizen's typed stance, while a `docket`
+  entry's `title` is the raw captured text itself (what was actually
+  filed — no bare topic string to show) and its `label` is the short
+  topic `classifyDocketItem()` inferred, so the modal opens with
+  `(entry.label, entry.title, entry.hits)` for docket instead. Also
+  fixed the same pass: the focus zone's "No summary available yet."
+  filler under a `general`/`docket` card now only renders when there's
+  real summary text — previously a docket item with an empty capture
+  note showed that line unconditionally, directly beneath a title that
+  already *was* the plain content, which read as broken rather than
+  merely empty.
+
+  **Matching a citizen's own specific words, not just the fixed taxonomy,
+  4 Sep 2026** — the citizen typed several concrete priorities ("release
+  the Epstein files," "defund Flock surveillance," country-of-origin beef
+  labeling) and asked why none of them turned up a real matching bill
+  (naming `S.421`, the American Beef Labeling Act, as one they knew was
+  active) even though the topic was clearly a real, deliberate priority.
+  Two compounding bugs, both fixed:
+  - `digest.js`'s `keywordsFor()` only ever matched a bill's title/latest-
+    action text against the fixed taxonomy topic's own name plus its
+    hand-authored `SYNONYMS` entry — written for the bucket in general
+    ("trade-and-tariffs": tariff/trade/import/export), not for whatever
+    specific proper nouns a citizen's own typed priority actually names.
+    "American Beef Labeling Act" contains neither "tariff" nor "trade,"
+    so it could sit right in the fetched federal-bill pool and still
+    never match. `keywordsFor()` now also extracts >=4-character words
+    from `issue.stance` (the citizen's own typed text) the same way it
+    already did from the topic name itself — a heuristic, not a fix for
+    every case (short words like "war" still fall under the length
+    floor), but it's real signal that didn't exist before.
+  - That fix only works if the specific stance text actually survives —
+    it often didn't. Every call site that sets `iss.stance` (
+    `commitFreeformTopic()`, the `topics-add` card's commit loop,
+    swiping a headline/drilldown card onto an already-adopted topic in
+    `resolveCitizenCard()`) used to overwrite it outright on a collision
+    with whatever was there before. Since the taxonomy is a fixed ~40-
+    item list, two genuinely different priorities landing on the same
+    broad bucket is common — a citizen typing 4 distinct asks in one
+    `topics-add` pass, as this citizen did, could easily see 2-3 of them
+    silently clobber each other, with only the last one's text
+    surviving. New shared `mergeStance(existing, incoming)` helper in
+    builder.html appends ("existing text. Also: new text") instead of
+    replacing, used at all three call sites — every specific thing a
+    citizen has said now survives even when the taxonomy forces it to
+    share a bucket with something else.
+  **Resolved for the cited-bill case, 10 Sep 2026** — this note used to
+  flag `functions/api/calendar.js`'s ~100-most-recently-updated window
+  as a real, harder limitation (a real but currently-dormant bill like
+  S.421 might simply never be in that fetched pool at all, regardless of
+  match quality) and leave it out of scope, since congress.gov's public
+  API has no free-text search endpoint the way its own website does.
+  That's still true for a bill a citizen *describes* without naming —
+  but a citizen who names one by number doesn't need search at all,
+  just a direct lookup, which congress.gov's per-bill detail endpoint
+  does support. See `functions/api/bill-lookup.js` and its own entry
+  further down for the real fix this became once a live, reproducible
+  failure (H.R.9694 dominating a citizen's top-3 for the wrong reason)
+  made the gap concrete instead of theoretical. Still out of scope: a
+  bill described in prose without a citable number (e.g. "that beef
+  labeling bill") still depends on being in the fetched window.
+
+  **False-positive matching from committee-name boilerplate, 10 Sep
+  2026** — the citizen caught a genuinely bad match live: a purely
+  ceremonial resolution ("Expressing support for the recognition of
+  September 7, 2026, as 'Liturgical Dance Day'...") ranked into their
+  real top-3. Root-caused by fetching the actual bill data: its only
+  connection to their manifesto was `latestAction.text` reading
+  "Referred to the House Committee on Oversight and Government Reform"
+  — the bare word "government," pulled from the 4 Sep 2026 fix's loose
+  `nameWords` extraction on the citizen's "Government transparency"
+  priority, happened to appear in a committee's bureaucratic name,
+  nothing to do with the resolution's actual (nonexistent) substance.
+  Congressional committee names are themselves built from generic
+  policy-area words, which makes any bill's latestAction/committee-
+  referral text an unusually bad place to trust bare single-word
+  matches. `matchBills()` (and its two manually-synced copies —
+  `functions/_lib/bill-matching.js` for Calendar,
+  `keywordsForMatch()`/`matchedCountFor()` in builder.html for the "N
+  matched" issue-chip counts) now score curated `SYNONYMS` entries + the
+  issue's own full name against a bill's full text (title + latest
+  action) same as before — those are specific, low-false-positive-risk
+  phrases — but the loose, single-word extraction (still real signal for
+  a citizen's own specific typed priorities) only against the bill's own
+  title now. Verified live against the real HRES 1517 data: the fix
+  correctly drops the match to zero.
+
+  **Fragile AI-JSON parsing, same day** — a second, unrelated bug the
+  same debugging session turned up: typing "H.R.9694 - Epstein Files
+  Transparency Act II" into "anything else on your mind" bounced
+  straight to the manual picker despite being about as specific as a
+  priority can get. Reproduced live against the real classifier: the
+  model correctly judged it specific, but prefixed its JSON with an
+  unprompted reassurance ("This is a real, specific piece of
+  legislation.") that broke the markdown-fence-only stripping every
+  JSON-parsing prompt in this app used — `JSON.parse` has no tolerance
+  for stray prose around the object it's given. New `parseAIJSON()`
+  (builder.html) and its server-side twin (`headlines-batch.js`) now
+  fall back to slicing out the first balanced `{...}`/`[...]` substring
+  when a direct parse fails, instead of giving up — applied to every
+  structured-JSON prompt in the app (`classifyFreeformPriority()`,
+  `boildownHeadline()`, `buildDrilldownCards()`, the pre-warmed headline
+  batch). Confirmed against the exact reproduced failure string that the
+  new parser recovers the correct object.
+
+  **Systemic reserved-502-status bug, same day, found while investigating
+  the above** — auditing every backend Function for the same body-
+  masking bug yesterday's Calendar fix uncovered (502/504/521-526 are
+  Cloudflare-reserved codes; the edge always discards the origin's body
+  for those and substitutes its own generic "error code: NNN" page)
+  turned up the identical pattern in nearly every other Function in this
+  app, not just `strategic-plan.js`: `dig-check.js` (the highest-traffic
+  endpoint by far — powers DIG itself plus every AI-backed feature that
+  reuses it), `plain-summary.js`, `openstates-people.js` and its callers
+  `state-reps.js`/`send-state-email.js`, `state-bills.js`,
+  `headline-image.js`, `calendar.js`, `municipal.js`, `reps.js`,
+  `headlines.js`. All switched to 500 — every one of these endpoints'
+  own real, useful error messages had been silently replaced by
+  Cloudflare's generic page whenever that path actually fired, across
+  the whole app, likely since whichever session first introduced this
+  pattern before it was ever noticed.
+
+  **The real "totally different top-3 every time" bug, same day** — a
+  step back from individual bug reports: the citizen pointed out that
+  pasting the exact same bill name into "anything else on your mind"
+  produced completely different top-3 results run to run, and asked how
+  that was even possible. Traced end to end rather than patched: a
+  specific bill a citizen names becomes a `weight === 3` issue with a
+  written stance; `buildTopDigest()` tries to match it against the
+  fetched federal/state/municipal pools, and if nothing matches, falls
+  back to treating it as a "general priority" scored at `1000 + weight`
+  — a score high enough to unconditionally outrank every real bill
+  match, no matter how strong. Confirmed live that H.R.9694 (the bill
+  the citizen actually pasted) simply isn't in `calendar.js`'s own
+  fetched pool (the ~100 most-recently-updated federal bills) — so it
+  could never be genuinely matched, and instead won the top-3
+  unconditionally every time, for a reason that had nothing to do with
+  its actual importance. Since *which* of a citizen's priorities happen
+  to be unmatched at any given moment varies, the "top 3" was really
+  reporting coverage gaps dressed up as curation, not a stable ranking
+  — which is the literal, mechanical answer to "how is that even
+  possible." Real fix, not a patch: `functions/api/bill-lookup.js` (new)
+  fetches a specifically-cited bill directly from congress.gov's
+  per-bill detail endpoint — no full-text search needed, since the
+  citizen already gave the exact citation — and `digest.js`'s new
+  `parseBillCitation()` recognizes a bill citation in whatever
+  punctuation a citizen actually typed ("H.R.9694", "HR 9694", "hr9694"
+  all resolve). `buildTopDigest()` tries this direct lookup before ever
+  reaching the unconditional-fallback scoring, so a cited bill outside
+  the fetch window still resolves to its own real, stable data and gets
+  weighted fairly like any other federal match — not an automatic,
+  arbitrary #1. Verified live: `/api/bill-lookup?type=hr&number=9694`
+  returns H.R.9694's real title, status, and latest action straight from
+  congress.gov. Bill-shaping logic (`slim()`/`deriveStatus()`/
+  `publicUrl()`) moved out of `calendar.js` into
+  `functions/_lib/congress-bill.js` so the new endpoint doesn't
+  duplicate it. See also the "Resolved for the cited-bill case" note
+  further up this file (originally about `S.421`) — this is that fix.
+
+  **Common-parlance bill names, same day, immediate follow-up** — the
+  citizen pushed further, correctly: the fix above only helps a citizen
+  who already knows and types a formal citation ("H.R.9694") — real
+  people say "the CHIPS Act," "Obamacare," "the Patriot Act," "NDAA."
+  `classifyFreeformPriority()`'s prompt now also asks the model to
+  resolve a popular name/nickname/acronym to its real bill type/number/
+  Congress when genuinely confident, explicitly told to leave it null
+  for anything ambiguous (a bare "NDAA," which has a new bill almost
+  every Congress) or non-federal — a wrong guess is worse than none.
+  Verified live against real legislation: "the CHIPS Act" -> H.R.4346
+  (117th), "the Patriot Act" -> H.R.3162 (107th), "Obamacare" ->
+  H.R.3590 (111th), "the infrastructure bill" -> H.R.3684 (117th) — all
+  four correct against real-world knowledge, all fetch real congress.gov
+  data end to end via the same `bill-lookup.js`. "NDAA" alone correctly
+  came back with no citation rather than guessing a year. The resolved
+  citation is stored directly on the issue (`iss.billCitation`) so
+  `buildTopDigest()` doesn't need to re-ask the AI on every digest
+  rebuild — checked before falling back to `parseBillCitation()`'s regex
+  over whatever literal text a citizen typed. Caught and fixed a
+  self-inflicted bug before shipping this: the first version gated an
+  AI-resolved citation on a keyword-overlap check against the fetched
+  bill's own title — a reasonable-sounding safety net that actually
+  broke the feature's entire reason to exist, since "Obamacare" shares
+  zero words with its real title ("Patient Protection and Affordable
+  Care Act") by definition — that mismatch *is* what a popular name is.
+  Removed; the real safety net is the citizen-facing confirm screen
+  (`renderFreeformConfirm()` now shows "Matched to HR 3590, 111th
+  Congress" before committing, same "expose the assumption" shape as
+  the specific/general note beside it) plus `bill-lookup.js`'s own 404
+  on a citation that doesn't exist at all.
+
+  **Severe false positives in the top-3, confirmed from a real
+  screenshot, same day** — the citizen sent a screenshot showing
+  "Epstein Files Transparency Act II" and "NDAA for Fiscal Year 2027"
+  (both specific issues naming one exact bill) as false "matched
+  priority" tags on three totally unrelated bills. Root cause: a
+  specific-bill issue's own name is full of short, generic words
+  ("transparency," "act," "national") that other bills' titles
+  legitimately contain as whole words too — and that false match marked
+  the issue "already matched," silently blocking the *correct*
+  citation-based lookup from ever running. Fixed by splitting citable
+  issues out of the generic pool-matching pass entirely, before it
+  runs — resolved via direct lookup only, never fed into `matchBills()`'s
+  keyword search. Added a stoplist (national, federal, government, act,
+  authorization, committee, fiscal, year, and similar legislative filler)
+  to the loose keyword extraction in all three manually-synced copies
+  (`digest.js`, `functions/_lib/bill-matching.js`, builder.html's
+  `keywordsForMatch`/`matchedCountFor`) for issues that still fall
+  through to loose matching — a real "no confident match" now beats a
+  wrong one. Also fixed a real gap in the citation-lookup fix two
+  commits earlier: scoring a resolved citation the same as an ordinary
+  keyword match (~1-9 after lean) meant a citizen's own explicitly-named
+  bill could still lose a tie to a pile of incidental matches for a
+  *different* priority and never appear in their own top-3 — `+50` base
+  score now guarantees it clears any realistic tie.
+
+  **"Of course we mean the current NDAA" — bare acronym resolution,
+  same day** — the citizen pushed back, fairly, on treating a bare
+  "NDAA" as unresolvable: in common usage "the NDAA" always means
+  whichever one is currently active, and the right fix is finding that
+  real bill, not shrugging. First attempt searched `buildTopDigest()`'s
+  own already-fetched federal pool for a title match — confirmed live
+  this didn't work either: the real, current NDAA isn't in that
+  ~100-item window on a given day. Second attempt, `bill-search.js` (new),
+  searched a single 250-item page (congress.gov's own per-request max)
+  — confirmed live that STILL wasn't enough; a bill this major can rank
+  well outside the top 250 "most recently touched" on a quiet week
+  between its own floor actions, with thousands of smaller bills getting
+  routine metadata touches ahead of it. Final version pages 6 requests
+  deep in parallel (1,500 bills total) — confirmed live this actually
+  finds it: H.R.8800, "National Defense Authorization Act for Fiscal
+  Year 2027," real data, real status. `digest.js`'s
+  `recurringBillPatternFor()`/`lookupRecurringBillDirect()` recognize a
+  bare "NDAA" mention and try this search before ever falling back to
+  the general-priority placeholder, scored the same `+50` way a formally
+  cited bill is. `RECURRING_BILL_PATTERNS` is a small, extensible list —
+  NDAA is the one actually reported live so far, not the only one this
+  mechanism could ever cover.
+
+  **Headline deck restructured: top 3 of the day, then targeted, same
+  day** — per explicit request, `startHeadlineMode()` no longer treats
+  "unbiased general news" and "manifesto-personalized search" as
+  either/or (previously any citizen with real signal got ONLY the
+  biased search, never genuinely prominent general news). Now always
+  fetches up to 3 unbiased "today's top stories" first (prefers the
+  pre-warmed batch — `headlines-batch.js` is exactly built for this —
+  falling back to a live unbiased fetch only if it's cold), followed by
+  up to 5 manifesto-targeted headlines (the existing biased search,
+  still only when there's real signal to bias with). Each card carries a
+  visible section eyebrow ("Today's top story" / "Matches your
+  manifesto") so the shift in tone partway through the deck is legible
+  rather than a silent change of character.
+
+  Citizen mode's bill cards (31 Aug 2026) now lead with a plain-language
+  synopsis (`digest.js`'s `plainSummarize`, already shared with
+  builder.html's digest) instead of the official bill title — the title
+  collapses into a small `<details>` disclosure — and matched priorities
+  render as named links back into `builder.html?focus=<issue-id>` (§03,
+  scrolled to and briefly highlighted) instead of a bare "matches N"
+  count. **2 Sep 2026: extended to every mode and every list on the
+  page** — the citizen expected this everywhere, not just Citizen mode.
+  `renderCard()` (federal) and `renderStateCard()` (state, also reused
+  by municipal) no longer branch on mode at all for this: every card
+  leads with the synopsis (`.card-synopsis`, renamed off `.citizen-*`)
+  and collapses the official name behind `.title-details`, an ambiguous
+  or hard-to-parse official title included — Activist/Pro previously got
+  the plain-language rewrite too (`enhancePlainSummaries()` always
+  fetched it) but had it buried in the card body below the raw legalese
+  title instead of leading with it. The **focus zone itself** (the top-3
+  "results reveal," the very first thing on the page) got the same
+  treatment in `focusEntryHtml()` — it was leading with `e.title` (the
+  raw `bill.title`) above the already-plain `e.summary` the whole time,
+  the same mismatch in the page's most prominent spot. Scoped to
+  federal/state/municipal entries only (`e.title` is real legalese there,
+  via `digest.js`'s shared `billEntry()`); `general`/`docket` entries
+  keep their original layout since `e.title` is already plain there (a
+  citizen's own priority name or filing title) — nothing official to
+  hide. Every card (all three detailed lists, all three modes, plus the
+  focus zone) also gained a **"Send to DIG ↗"** link (`digUrl()`, new,
+  mirrors builder.html's Inbox's own `digUrl()`/`?topic=` convention
+  exactly) — pre-fills DIG's topic field with the bill/priority title,
+  never auto-runs the check, so it's free to offer everywhere.
+
+  **Focus-zone width, 9 Sep 2026 (second pass)** — the citizen flagged
+  the top-3 cards as regressed: on an iPad in landscape they showed as 3
+  thin columns of cramped, hard-to-read text with dead space on both
+  sides of the page. Root cause: `.wrap`'s 900px cap meant a
+  1024-1194px-wide tablet viewport still only got 900px of content, and
+  the focus-zone grid (`auto-fit, minmax(260px, 1fr)`, from an earlier
+  4 Sep 2026 pass — see commit `380c68c`) computed 3 columns inside that
+  narrow width regardless, squeezing each one down to its 260px floor.
+  `.wrap` widened to 1100px and the grid's floor raised to 280px, working
+  together so 3 columns now only form with genuinely comfortable room
+  (~300-360px each), collapsing to fewer/1 column exactly as before on
+  anything narrower. `.dek` and other text elements already cap their
+  own line length in `ch` units independent of `.wrap`, so widening it
+  doesn't affect prose readability — only how much room cards get.
+
+  **Focus-zone formatting, 10 Sep 2026 (third pass) — the real bug,
+  found from an actual screenshot** — the 9 Sep width fix hadn't
+  actually solved it: the citizen sent a real iPad screenshot showing
+  the federal cards' synopsis text wrapped almost one word per line
+  (a "staircase"), while the state card beside it wrapped normally.
+  That inconsistency was the real tell — not a column-width problem at
+  all. Root cause: inside `.card-top`'s flex row, `.card-synopsis` had
+  no `flex-grow`/`min-width` override, while its sibling `.card-tags`
+  carries `flex-shrink:0` (fixed, never gives space back). Federal cards
+  alone get a second tag (the status pill — state/municipal don't have
+  one, see the status-tag note below) next to the jurisdiction tag, so
+  their tags group claims more space; the flex algorithm put all the
+  shrinking pressure on the synopsis span alone, collapsing it toward
+  its own content-minimum width. `.card-synopsis` now gets `flex: 1 1
+  auto; min-width: 0;` so it claims its actual remaining row width
+  instead — this is shared CSS, so the fix applies everywhere
+  `.card-synopsis` renders (focus zone and the detailed lists alike),
+  not just the one spot photographed. Separately, once text wrapping was
+  legible, the citizen still didn't want the top-3 side by side at all
+  ("there isn't enough real estate for that") — `.focus-zone` dropped
+  the two-pass-old multi-column grid entirely and went back to plain
+  full-width stacked cards; the widened `.wrap` from the 9 Sep pass
+  still helps here since these are full-width blocks, not a fixed
+  column measure.
+  State section is also real: `functions/api/state-bills.js` resolves the
+  profile's ZIP to a state (via Zippopotam.us, free/keyless) and pulls
+  matched bills from OpenStates, the same "one API covers all 50
+  legislatures" role congress.gov plays federally.
+
+  **State Take Action is real, including a genuine one-button send (31
+  Aug 2026)** — the citizen pushed on "do we have info needed to do 1
+  button press email my rep?" for federal specifically. The honest
+  answer for federal stayed no (see the "Send it" entry above: no real
+  recipient email from 5calls, and most official contact forms run
+  CAPTCHA/bot-detection that auto-submission would have to defeat — a
+  line that isn't getting crossed regardless of authorization). But
+  checking OpenStates' actual schema turned up something federal doesn't
+  have: state legislators' `Person` object carries a real, often-
+  published `email` field. That's a genuine recipient, which is what a
+  real send needs and federal doesn't have.
+  - `functions/_lib/openstates-people.js` — shared resolver: ZIP →
+    lat/lng (Zippopotam, cached under `zipgeo:<zip>`) → OpenStates'
+    `/people.geo?lat=&lng=` (which returns both state legislators *and*
+    members of Congress for a point — filtered here to
+    `jurisdiction.classification === 'state'` only, so federal
+    representation stays on 5calls as its one canonical source rather
+    than growing a second, divergent one). Returns `{id, name, party,
+    chamber, chamberLabel, district, email, phone, url}` per legislator.
+  - `functions/api/state-reps.js` — thin `GET ?zip=` wrapper around the
+    resolver, for the frontend's rep picker.
+  - `functions/api/send-state-email.js` — the actual send, via Resend.
+    Never trusts a client-supplied recipient: `to` is re-derived
+    server-side from `repId` by re-running the same resolver, so this
+    can't become an open relay to arbitrary addresses. Rate-limited two
+    ways (global daily cap under Resend's free-tier ceiling, plus a
+    per-IP daily cap), mirroring dig-check.js's existing counter
+    pattern. Nothing in the request — name, address, email, message
+    text — is written to KV or logged; the only thing this function
+    persists is the rate-limit counters.
+  - take-action.html: state bill cards get a real **Take action** button
+    (`STATE_ACTIVE`, `openStateActionModal()`/`renderStateActionCard()`,
+    mirroring the federal/general modals' architecture). A citizen's
+    name + mailing address (+ optional email, so the office can reply to
+    an actual person) are collected **contextually**, inline, the first
+    time a real send is about to happen — not upfront in the manifesto,
+    per the citizen's explicit "permit required on a case-by-case basis"
+    framing — and stored only in `civix-profile.identity`
+    (localStorage). This is a deliberate, one-time reversal of the
+    "we never ask for your address" stance noted elsewhere in this file,
+    scoped narrowly to state-legislator email and gated by real,
+    visible consent: the compose view always shows exactly who it's
+    addressed to ("To: `<rep email>`") right next to the Send button, so
+    each send is its own explicit act, and "forget my info" clears the
+    stored identity outright. Identity leaves the browser exactly once
+    per send, in the POST to `/api/send-state-email` — never persisted
+    server-side (see that file's own comment). On success the modal
+    shows a genuine "✓ Sent to `<rep>`'s office" — accurate this time,
+    unlike federal's "Send it," because it really was relayed by email.
+    A "Copy instead" fallback stays available for anyone who'd rather
+    not use the real-send path. State bills also gained the same watch
+    toggle and "Beyond email" (petition/rally/organize) section as
+    federal/general, via the shared `toggleWatch()`/`checkWatchlistUpdates()`
+    machinery (now generalized to take a `kind`/`keyFn` pair instead of
+    being federal-only).
+  - **New required secret**: `RESEND_API_KEY` (see "Required Cloudflare
+    Pages secrets" below) — needs mycivix.com verified as a sending
+    domain in Resend's dashboard (DNS records added at the registrar,
+    something only the account holder can do) before real sends work;
+    without it the endpoint fails cleanly with a clear server-side
+    error, verified locally.
+  Municipal is now real for a curated
+  list of cities (31 Aug 2026): `functions/api/municipal.js` resolves the
+  profile's ZIP to a city (Zippopotam.us, same as state) and, for any city
+  confirmed to run Legistar (Granicus' legislative platform — hundreds of
+  cities do, but it's per-city, no unified API), pulls real matters from
+  its free/keyless Web API. Live today: Boston, Seattle, Baltimore,
+  Nashville, Phoenix, Charlotte NC, St. Paul, Pittsburgh — verified
+  individually, not assumed (several bigger cities, e.g. NYC/Philly, are
+  on Legistar but require a per-jurisdiction token so were left out; SF/
+  San Antonio/Miami-Dade/Denver returned stale or sandbox data and were
+  also left out). A ZIP outside the list gets an honest "not covered yet"
+  message instead of fake sample content. Grow `CITY_CLIENTS` in
+  `municipal.js` one verified city at a time. No Take Action button yet,
+  same reasoning as State used to be. **Two real bugs fixed 2 Sep 2026,
+  both from municipal reusing `renderStateCard()`/the focus zone's shared
+  CTA logic without being fully accounted for once state grew a real
+  action flow**: (1) the detailed municipal list's card was calling
+  `renderStateCard()` with the pre-`idx`-parameter argument count — once
+  state's real Take Action button added `idx` as a new positional
+  parameter, municipal's calls silently shifted `mode` into `idx` and
+  `'Municipal'` into `mode`, so every municipal card showed a **State**
+  tag chip instead of Municipal and its "Take action" button quietly did
+  nothing when clicked (indexing into `STATE_CURRENT` with a mode string).
+  (2) The focus zone's own CTA ternary had no branch for `kind ===
+  'municipal'` — it fell through to `e.actionHref`, which for a municipal
+  entry is `take-action.html?focus=`, the *exact* URL a citizen arriving
+  via a `?focus=` deep link is already on. Clicking "Take a look" just
+  reloaded the same focus zone showing the same broken link again — a
+  real infinite loop, the identical class of dead-end state's own
+  fallback caused until 31 Aug 2026 (see below), just never fixed for
+  municipal because nobody had hit it yet. Both fixed with a real,
+  honest destination instead of a button that looked live: `renderStateCard()`
+  now shows "View on your city's site ↗" (linking `bill.url`, the real
+  Legistar detail page) whenever `tag === 'Municipal'`, in both the
+  detailed list and the focus zone. Legistar has no "public comment open" flag and
+  no direct public URL field on a Matter (constructed from the known
+  `{client}.legistar.com/LegislationDetail.aspx?ID=...` pattern instead).
+  As of 31 Aug 2026, `municipal.js` also pulls Legistar's `Events`
+  endpoint (upcoming town halls, council sessions, committee hearings —
+  real "show up" opportunities, the first piece of "beyond legislative"
+  content in the app) alongside `Matters`, filtered to today-forward,
+  ordered soonest-first. Deliberately **not** matched/scored against a
+  citizen's priorities the way bills are — an Event has no policy-topic
+  text worth keyword-matching (`EventBodyName` is just "City Council" or
+  "Planning Commission"), so take-action.html renders it as a plain
+  chronological "what's coming up in your city" list instead
+  (`renderMunicipalEvents()`, `#municipal-events`, right below the
+  Matters list). Best-effort and independent of the Matters fetch — a
+  citizen still sees matched legislation even if the Events endpoint
+  hiccups. Verified live against Boston: real upcoming meetings with
+  correct dates/times/locations, working links to both the meeting page
+  and its agenda PDF.
+
+  **"Beyond legislative" roadmap** (31 Aug 2026, user asked for rallies/
+  demonstrations/town halls/hearings/speeches/press conferences,
+  regulatory comment periods, elections/ballot measures, executive
+  actions, and local non-legislative decisions — local meetings via
+  Legistar Events, above, is the first of these shipped). Remaining,
+  roughly in order of feasibility:
+  - **Executive actions** — Federal Register has a solid, free, well-
+    documented API (executive orders, presidential documents),
+    comparable effort to the congress.gov integration.
+  - **Regulatory comment periods** — regulations.gov has a comparable
+    free federal API.
+  - **Elections & ballot measures** — needs source research first; the
+    obvious free option (Google's Civic Information API) has had parts
+    deprecated, so confirm what's actually still live before committing.
+  - **Rallies/demonstrations/speeches/press conferences** — no
+    structured public API tracks these comprehensively. Most likely
+    path is piggybacking on the existing GNews headline pipeline rather
+    than a dedicated source, and coverage would be inherently spottier
+    than the structured-data sources above.
+
+  **Jurisdiction lean, 31 Aug 2026**: the citizen asked for CiViX to
+  ascertain "the citizen's lean on municipal, state, federal" during
+  manifesto seeding and refine it further from real actions taken, not
+  just ask once and forget. `builder.html` gained a one-time swipe card
+  (`jurisdiction-lean` type, "Where do you want your voice heard most?" —
+  City Hall / state capitol / Washington, or "They all matter equally to
+  me") inserted right after the ZIP card in every deck-construction path
+  (firstPass quiz, topping-up, headline deck, seeded-drilldown), gated by
+  `jurisdictionLeanCard()` so it's asked exactly once per profile —
+  `setJurisdictionLean()` writes `P.jurisdictionLean = {municipal, state,
+  federal}` (default weight 1 each, chosen level bumped to 3; all stay 1
+  on skip). This is also what finally pulled municipal into the top-3
+  digest: `digest.js`'s `buildTopDigest()` never fetched municipal at all
+  before today (only federal/state/docket) — it now calls the new
+  `fetchMunicipalBills()` alongside the others and applies
+  `P.jurisdictionLean` as a score multiplier across all three bill-derived
+  kinds (`general`/`docket` entries are left alone — the lean is about
+  which level of government, not about typed-in priorities or filings).
+  The lean also refines itself from real behavior, not just the one-time
+  card: `take-action.html`'s `bumpJurisdictionLean()` nudges the relevant
+  level up by 0.5 every time a citizen actually takes action through it —
+  `openActionModalFor()`/`openGeneralAdvocacyModal()` bump `'federal'`,
+  and (since 31 Aug 2026, once state gained its own real take-action
+  flow — see "State Take Action is real" below) `openStateActionModal()`
+  bumps `'state'`. Municipal still has no take-action flow, so nothing
+  bumps that level yet.
+- `calendar.html` — **new 9 Sep 2026**, "Calendar": a multi-year civic
+  strategy page, distinct from take-action.html's "what's actionable
+  right now" — this is a map, not a to-do list. Backed by
+  `functions/api/strategic-plan.js` (the actual name reuse is
+  deliberate: `calendar.html` was retired 2 Sep 2026 in favor of
+  "Take Action," and this is a genuinely different feature that earns
+  the name back — see the naming-collision note below).
+  - **Backend, written in a prior session, found sitting complete and
+    uncommitted in the working tree at the start of this one**:
+    `functions/api/strategic-plan.js` makes ONE Claude call per distinct
+    manifesto (content-hashed, 24h KV cache, same daily-`$`-budget and
+    per-IP-rate-limit pattern as `dig-check.js`/`plain-summary.js`) to
+    produce a structured plan: originally 6-10 `tactical` (near-term)
+    items and 4-8 `strategic` (longer-term) items (trimmed same-day to
+    4-6/3-4 — see the Calendar live-debugging note near the top of this
+    file), each citing real manifesto
+    issue names, plus a `contingencyFocus` ranking of a fixed 6-scenario
+    catalog (economic crash, armed conflict, cyberattack, climate
+    disaster, public-health emergency, electoral/constitutional crisis)
+    by relevance to this citizen. Gathers real data first (internal
+    same-origin fetches to `/api/calendar`, `/api/state-bills`,
+    `/api/municipal`, trimmed/ranked against the manifesto by
+    `functions/_lib/bill-matching.js` — a manually-synced server copy of
+    digest.js's own matching heuristic, same convention
+    `issue-taxonomy.js` already documents) and grounds every strategic
+    goal against real, deterministic federal election-calendar facts
+    (`functions/_lib/election-dates.js` — general election dates,
+    Congress numbering/convene dates, inauguration dates, all computed
+    from fixed constitutional/statutory rules, never estimated or
+    fetched) rather than letting the model guess at dates. A explicit
+    prompt guardrail keeps any accountability/removal-themed strategic
+    goal framed around the office/seat/cycle and real civic process,
+    never naming or attacking a real person. The model is NOT trusted
+    to invent the `contingencyFocus` scenarios' own content — only to
+    rank which of a fixed, hand-authored catalog matters most to this
+    citizen (see below).
+  - **Frontend, built this session** against that existing contract:
+    fetches the plan once (POST with `issues`/`traits`/
+    `jurisdictionLean`/`zip`, mirroring the profile shape every other
+    page already sends), then renders it as near-term/long-term card
+    lists plus the real election-facts strip, with a "Refresh strategy"
+    button (`force:true`) for a manual regenerate. The 6 contingency
+    scenarios' full 3-5-item action lists are hand-written directly in
+    `calendar.html` (a manually-synced copy of the backend's own
+    id/name/one-line-framing catalog, same convention as
+    `issue-taxonomy.js`) — civic-process playbooks like "contact your
+    reps before the bill text locks in," never AI-generated, per the
+    backend's own prompt comment that this content lives only in the
+    frontend. Each item's `actionHref` (not part of the model's JSON
+    schema) is built client-side by matching `issueMatches[0]` back to
+    the citizen's own `P.issues` entry and linking
+    `take-action.html?focus=<issue-id>` — the same deep-link convention
+    builder.html's digest links already use. "Effort" and "jurisdiction"
+    are pure client-side chip filters over the one cached plan (no
+    re-fetch); the prior session's backend comment additionally
+    described a "time" and "detail" slider that this pass scoped down to
+    the tactical/long-term section split (already a real time-horizon
+    distinction) and a per-card `<details>` disclosure for
+    rationale/grounding, rather than building two more standalone
+    controls — a deliberate scope call, not an oversight.
+  - **Naming collision found and fixed**: the root `_redirects` file
+    (added 2 Sep 2026 for the calendar.html → take-action.html rename)
+    was silently 301-redirecting this brand-new page away to
+    take-action.html the moment it existed. Confirmed with the user
+    directly rather than guessing: chose to drop the old redirect and
+    let `calendar.html` mean this new feature going forward, over
+    renaming the new page to dodge the collision — `_redirects` deleted
+    (it held nothing else). Anyone with the old bookmark now lands on
+    the real Calendar feature instead of a 404, which reads as a
+    reasonable outcome even though it isn't the take-action.html content
+    that link used to mean.
+  - Wired into site nav both directions: index.html's § 03 "get engaged"
+    row gained a `Calendar` link alongside Take Action/Connect/CiViL DIS,
+    and take-action.html gained a `dek-link` ("Want the bigger picture?")
+    pointing into `calendar.html`, mirroring the one `calendar.html` has
+    pointing back.
+  - Verified via a local `wrangler pages dev` run before shipping: every
+    touched page (index/take-action/calendar) serves 200 with the
+    redirect gone, the new nav links resolve, the strategic-plan endpoint
+    routes correctly and fails cleanly on a missing local
+    `ANTHROPIC_API_KEY`. That local pass didn't catch two real bugs that
+    only showed up live (a Cloudflare-reserved-status-code body-masking
+    issue, and Anthropic-call latency/sizing) — both fixed and confirmed
+    resolved end-to-end the same session; see the Calendar live-debugging
+    note near the top of this file for the full incident. Every fix was
+    root-caused via live `wrangler pages deployment tail <deployment-id>
+    --project-name mycivix` output (not the Cloudflare dashboard) — that
+    command, pointed at a specific deployment ID from `wrangler pages
+    deployment list --project-name mycivix`, is the real, working way to
+    see a live production Pages Function's actual
+    wallTime/status/exceptions for a specific request, and is faster than
+    the dashboard for this kind of debugging.
+- `civics.js` — the shared "teachable moment" popup (word-of-the-day
+  facts + quote-matching quizzes), included on every page. **Paused on
+  builder.html specifically, 10 Sep 2026** — the citizen flagged it as
+  interrupting the builder flow rather than adding to it, floating a
+  non-interrupting "chyron" (ticker/banner) as the better long-term
+  shape to revisit later, not something to build now. builder.html
+  simply doesn't load `civics.js` any more; every one of its ~10 call
+  sites already guards with `if (window.CivicsEngine)`, so they all
+  silently no-op rather than needing individual changes — a one-line,
+  fully reversible pause (restore the `<script>` tag to bring it back).
+  civics.js itself, and every other page's use of it, is untouched. As
+  of 31 Aug
+  2026, a `fact` card auto-dissolves on its own ~3.8s after showing
+  (manual "Got it"/backdrop-click still skip it immediately) — it's pure
+  information, no interaction needed, so it shouldn't require a click to
+  go away. The fade-out itself is a full 1s (`DISMISS_ANIM_MS`, same
+  path for manual and auto dismiss) rather than the original 0.35s snap —
+  it needs to visibly dissolve, not just vanish, so the citizen's eye
+  eases back into whatever was underneath instead of the card just
+  disappearing. The interactive quiz card deliberately does NOT auto-dismiss.
+  New `CivicsEngine.showDuringWait()` entry point shows a fact (never the
+  quiz) specifically to fill a real network/AI wait elsewhere in the app —
+  still respects the existing cooldown (so it won't stack a second popup
+  right after an ambient one), but skips the random show-chance gate since
+  the caller already knows a wait is genuinely happening. Wired into:
+  builder.html's headline-swipe loading, its "it's complicated" drilldown
+  loading, its top-3 digest loading, take-action.html's action-modal rep
+  lookup/drafting, and municipal's live fetch. `FACTS` gained six new
+  entries (31 Aug 2026, citizen asked for "info cards on electoral
+  college and convention of states and a few of the more obscure
+  aspects" of the system): Electoral College, Article V convention
+  (worded around the actual constitutional mechanism — "Convention of
+  States" is one modern campaign's name for triggering it, noted as such
+  rather than treated as the official term, to keep the card neutral),
+  faithless elector, gerrymander, and cloture.
+
+  **2 Sep 2026, four fixes/additions in one pass:**
+  - **Theme bug fixed** — the popup's light/dark color pair was gated on
+    `@media (prefers-color-scheme:dark)` (the OS setting) instead of the
+    site's own `data-theme` toggle, and the two color sets were paired
+    backwards against that condition to begin with. Now keyed off
+    `:root[data-theme="light"] .cx-card` — matches index.html/
+    builder.html/take-action.html's own toggle exactly. `dig/index.html`
+    never sets `data-theme` (it's a fixed dark UI by design), so this
+    rule simply never matches there and the default dark colors apply,
+    same as always.
+  - **Fades lengthened** — the citizen asked for "longer, more gradual"
+    dissolves generally, "so the user knows it's going away on its own."
+    `DISMISS_ANIM_MS` 1000ms → 1800ms (kept in sync with the `cx-fade-out`
+    keyframe duration, which has to match or the overlay lingers/gets cut
+    mid-fade), `cx-fade-in` 0.3s → 0.5s. The same request also bumped
+    every page-level dissolve built earlier the same day: `index.html`/
+    `builder.html`/`take-action.html`'s shared `opacity` transition
+    0.5s → 1s, `goToBuilder()`/`goToTakeAction()`'s matching navigation
+    delay 500ms → 1000ms, and the welcome card's own inline fade
+    1s → 1.6s (with its paired `startHeadlineMode()` delay bumped to
+    match). `AUTO_DISMISS_MS`/`WELCOME_AUTO_ADVANCE_MS`/
+    `DONE_AUTO_ADVANCE_MS` (the *wait* before a fade starts) are
+    untouched — only the fade animations themselves got longer.
+  - **Backdrop-click dismiss added to the quiz card** — the fact card
+    already closed on a backdrop click; the quiz card didn't (clicking
+    outside it did nothing). Added the same `e.target === overlay` check
+    at the top of the quiz's own click handler, working the same whether
+    mid-match or already revealed — distinct from "Skip," which jumps to
+    the reveal rather than closing the whole card.
+  - **CiViX Coin, the first version** — the citizen asked to start
+    tracking a reward for correct quiz answers now, deferring what it's
+    actually spendable on ("we'll figure out where to use it later").
+    `civix-civics`' persisted state gained a `coins` field; `reveal()`
+    awards `COIN_PER_CORRECT` (5, arbitrary/tunable) per correctly-matched
+    quote, shown inline on the score line plus a running total, both only
+    when nonzero. `CivicsEngine.getCoins()` is the public read — earn-only
+    for now, no spend path exists anywhere in the app yet, by design.
+- `dig/index.html` + `functions/api/dig-check.js` + `dig-stats.js` — DIG,
+  an AI stance-checker across news/commentary sources. Real backend: daily
+  spend cap, per-IP rate limit, anonymous usage stats.
+
+  **Anonymous aggregate platform stats, 2 Sep 2026** — the citizen asked
+  for real usage numbers, "as long as they are anonymous," to sit
+  alongside the mocked-up results pages rather than replace them outright
+  — this followed a full holistic platform review that flagged
+  `analytics.html`/`civix-track.html` as 100% fabricated content with no
+  backend behind either. New `functions/api/platform-stats.js` extends
+  `dig-stats.js`'s own already-proven contract (KV counter maps, nothing
+  tied to a visitor/session/IP/device, fails open) to the rest of the
+  app: `manifestos` (profiles that have ever crossed from empty to real
+  content, fired once via a `P.statsReported` flag persisted on the
+  profile itself — same "count once, ever" pattern
+  `jurisdictionLeanCard()` already used), `levels` (completed actions —
+  a real send, or a drafted call/email actually copied — by
+  federal/state/municipal/general), and `topics` (which matched
+  priority/issue names those actions were actually about — reusing
+  `ACTIVE.hits`/`GENERAL_ACTIVE.hits`/`STATE_ACTIVE.hits`, the exact
+  topic names `digest.js`'s own matching already produces, not a
+  separate taxonomy — the citizen's own ask to "use the existing
+  matching logic"). Instrumented at every real terminal action in
+  take-action.html: federal `data-send-it`/`data-copy-call`/
+  `data-copy-email`, general's equivalents, state's `data-copy-state`
+  and the confirmed-success branch of `sendStateEmail()` — deliberately
+  *not* on modal-open (`bumpJurisdictionLean()` already tracks that,
+  locally, for a different purpose) and *not* on watch-adds (a weaker
+  signal than actually taking action).
+
+  `analytics.html` got a real/sample toggle — the same pill-track visual
+  language as the Citizen/Activist/Pro mode picker, "a pretty standard
+  and expected design element" per the citizen's own framing — defaulting
+  to **Real data**, which shows honest zeroes and a "no real usage yet"
+  note rather than any fabricated placeholder once there's nothing to
+  show; the old mocked content is still there, fully intact, one tap away
+  behind **Sample data**, now explicitly labeled as sample rather than
+  presented as if it were live. `civix-track.html` is *personal*, not
+  aggregate — its real numbers belong on the citizen's own device
+  (`P.actions`, the watchlist, DIG history), not a server call — and was
+  deliberately left out of this pass; it needs a different mechanism, not
+  this one.
+- `send-to-civix.html` / `inbox.html` + `manifest.webmanifest` + `sw.js` —
+  "Send to CiViX", an installable PWA share-target backed by a real
+  Cloudflare Worker (`civix-capture.mycivix.workers.dev`, not in this
+  repo) for the docket/filings API that both pages and `builder.html`'s
+  Inbox read from. It also has a second, install-free path (the `.addr`
+  panel): a real per-docket email address a citizen can save as a
+  contact and then Share → Mail to from literally any app, no PWA
+  install required — this is the one actually worth promoting as "clear
+  and easy," since PWA share-target requires an install nothing in the
+  app currently prompts for. As of 31 Aug 2026 the page also leads with
+  a `.value-note` explaining *why* to do this (there was previously zero
+  explanatory copy anywhere on this page, just mechanism).
+
+  A first attempt at surfacing this in builder.html's Citizen mode (a
+  `.citizen-send-note` callout tacked onto the bottom of the "done" card,
+  below the top-3 digest) turned out to be exactly the "feels bolted-on,
+  after the fact" problem it was trying to fix, per live user testing the
+  same day — found by name via a fresh, from-scratch Citizen-mode run.
+  Replaced with a real guided step: every path through Citizen mode
+  (headline swipe, the 30-second quiz, topping-up, and take-action.html's
+  seeded-drilldown handoff) now inserts a `{ type: 'more-priorities' }`
+  card right before `done` — "Anything else on your mind?" — offering
+  freeform text (classified onto the issue taxonomy the same way a
+  headline is, via `classifyFreeformPriority()`, and written into both
+  `addIssue()` *and* that issue's `stance` field, since typed text is
+  itself a stance) alongside the real Send to CiViX handoff, in context,
+  instead of a footnote after the reveal.
+
+  **Confirm-or-correct, 2 Sep 2026** — the citizen said this card "feels
+  like we are not adding to the manifesto" — typed text used to get
+  classified onto one of the ~40 taxonomy topics and committed silently,
+  no visibility into what CiViX filed it under, no way to say "that's
+  wrong," and (the real bug underneath the feeling) `classifyFreeformPriority()`'s
+  exact-string match meant any AI response that didn't match the taxonomy
+  string byte-for-byte — different casing, trailing punctuation — silently
+  discarded the whole typed thought with the card just advancing anyway.
+  Fixed both: the match is now case-insensitive with a fallback, and
+  landing a topic (guessed or not) now shows it before committing —
+  `renderFreeformConfirm()` ("Filed under **{topic}**?" / "Yes, that's it"
+  / "Not quite — choose the topic myself"), falling to
+  `renderFreeformPicker()` (the full catalog, grouped, reusing `.chip`/
+  `.cat` styling from Pro mode's own picker) either on rejection or when
+  classification failed outright — a citizen's own choice always wins
+  over the AI's guess, and a failed guess no longer means the thought
+  just vanishes. `commitFreeformTopic()` does the actual
+  `addIssue()`/`weight`/`stance` write either way, then
+  `renderFreeformDone()` confirms it landed and points at where to
+  actually see something come of it: "Filed under **{topic}**. We'll
+  surface matching actions for it on Take Action." — closing the loop
+  instead of silently cutting to the next card. All three are new
+  screens swapped into `citizen-card-slot` directly, same pattern
+  `showDrilldownMercy()` already used, not new entries in the deck array
+  itself. The done card's own CTAs were
+  also rebalanced once the digest could be the single, undistracted
+  focus: "See everything" demoted from primary to secondary styling, and
+  a `.citizen-digest-nudge` line ("Pick one above and go — most take
+  under 5 minutes") added once real results load, actively pushing
+  toward acting on one of the top 3 rather than just displaying them.
+  **Reverted 2 Sep 2026** along with the rest of the inline digest — the
+  done card's link into take-action.html (relabeled **"Take Action"**,
+  see below) is primary-styled again, since it's once more the card's
+  single next step rather than one option next to a digest already doing
+  the convincing.
+
+  **Watchdog mockup: watchlist, one-tap send, "beyond calls & email," 31
+  Aug 2026** — the citizen asked for CiViX to prove out its "personal
+  advocate" pitch: "you say the word, I fire off this email and it
+  lands... I watch the topic and remind and alert... they will not slip
+  something through in the middle of the night without you knowing."
+  Explicitly asked to mock up the flow now and build it out fully later.
+  Shipped honestly rather than as a pure mock where it could be: a real
+  persisted **watchlist** (`P.watching`, `toggleWatch()`/`findWatch()`)
+  reachable via a "🐕 Watch this bill/topic" toggle in both the bill-
+  specific and general-advocacy action modals, surfaced in a new
+  "Watching" panel above the collapsed detail sections. There's no
+  accounts system, notification backend, or scheduled job in this
+  architecture, so real push alerts aren't buildable today — but
+  `checkWatchlistUpdates()` does a **real** comparison (not a mock)
+  against `/api/calendar`'s own recent-activity fetch, which the page
+  already runs on every load: if a watched bill's `latestAction` date
+  has moved since it was added to the watchlist, a "🔔 Updated since you
+  started watching" badge shows in the panel. **2 Sep 2026**: the panel
+  used to just show a frozen title snapshot from whenever an item was
+  first watched (literally `"HR 1234: <raw official title>"`, no plain
+  language at all) in its own bespoke `.watching-card` layout — the
+  citizen asked for "common name of bills, with all the same look and
+  feel of the new take-action cards." `checkWatchlistUpdates()` now also
+  populates a `WATCH_LIVE` map (bill data from whichever fetch —
+  federal/state — currently covers that watched item) alongside the
+  existing update-diffing it already did, and `watchCardHtml()` renders
+  a real synopsis-leads/official-name-collapsed card, identical in
+  structure to `renderCard()`/`renderStateCard()`, when live data is
+  available. Falls back to the old plain-title-snapshot card (still
+  restyled to the shared `.card` look, just without the synopsis/collapse
+  machinery) when it isn't — either a `general` watch (no bill behind it
+  to begin with) or a federal/state watched bill that's aged out of its
+  fetch's ~100-bill recent-activity window this visit. `enhanceWatchSummaries()`
+  mirrors `enhancePlainSummaries()` exactly but targets a
+  `watch-body-<key>` DOM id instead of `body-<billId>`, since a bill can
+  be both watched and separately visible in the main list at the same
+  time — same element id in both places would collide. The
+  `plainSummarize()` cache key stays the bill's own natural id either
+  way, so a bill still only ever costs one AI call total, not one for the
+  main list and a second for its watch card (and, as of the server-cache
+  rework further down, not one per browser either).
+
+  **Bill status, also 2 Sep 2026** — the citizen asked to pull the bill's
+  actual status from congress.gov and show it on take-action cards and
+  watch cards alike. congress.gov's list endpoint has no categorical
+  status/stage field, only `latestAction.text` free text — calling the
+  per-bill *detail* endpoint for a real one would mean up to 100 extra
+  congress.gov requests every hourly cache refresh. `functions/api/
+  calendar.js`'s new `deriveStatus()` instead pattern-matches
+  `latestAction.text` against congress.gov's own bill-tracker stage names
+  (Introduced → In Committee → Passed House/Senate → To President →
+  Became Law, Vetoed as a branch), most-advanced-first since
+  `latestAction` only ever reflects the single most recent action. Framed
+  in its own code comment as a heuristic read of the latest action, not a
+  guaranteed-authoritative field. Federal-only — deliberately not
+  extended to state (OpenStates) or municipal (Legistar) in this pass,
+  since the citizen named congress.gov specifically and neither of those
+  sources was investigated for an equivalent field; a real gray
+  `.status-tag` chip shows next to the jurisdiction tag wherever a
+  federal bill's card renders (`renderCard()`, `focusEntryHtml()`,
+  `watchCardHtml()`).
+
+  **Dead CTAs on enacted bills, and celebrating watched wins, 10 Sep
+  2026** — the citizen pointed out a real gap `deriveStatus()` made
+  possible but never used: a federal bill already signed into law
+  ("Became Law") still showed a live "Take action" button, a genuine
+  dead end since there's nothing left to lobby for. New `isEnacted(bill)`
+  gates that CTA everywhere it renders (`renderCard()`, `focusEntryHtml()`)
+  — an enacted bill now shows "✅ Already signed into law" instead.
+  State/municipal aren't touched (no status field to check, same
+  limitation the status-tag feature above already has). The citizen's
+  own framing: this shouldn't apply to a bill on the *watchlist* the same
+  way — a watched bill becoming law is a win, not a dead end, and should
+  be "celebrated and counted on the stats." `watchCardHtml()` now shows a
+  real celebration banner ("🎉 This one became law!") instead of the
+  routine "updated" badge once a watched federal bill's live status flips
+  to enacted, persisted via a `won` flag written directly onto the watch
+  item (`markWatchWon()`) so it's counted exactly once, ever, the same
+  "count once" shape `P.statsReported` already used for manifestos.
+  `platform-stats.js` gained a genuinely separate `type: "win"` counter
+  pair (`winsTotal`, `winTopics`) rather than folding wins into the
+  existing action `levels`/`topics` counters — a win is an outcome, not
+  an action the citizen took, and conflating the two would muddy both.
+  Federal watch items now also carry their matched-priority `hits` at
+  watch-time (`openActionModalFor()`'s `toggleWatch()` call) purely so a
+  future win can be attributed to a real topic — existing watches from
+  before this shipped just report a bare win with no topic breakdown,
+  rather than guessing one. `analytics.html`'s real-data view shows the
+  new total ("🎉 Watched bills that became law") and a per-topic
+  breakdown alongside the existing stats.
+
+  **Shared server-side summary cache, 2 Sep 2026** — the citizen hit
+  DIG's 30/day per-IP `/api/dig-check` limit on what they thought was
+  their first DIG use in days. Root cause: that limit is shared across
+  every feature calling `/api/dig-check`, not just DIG's own UI, and
+  `digest.js`'s `plainSummarize()` (the plain-language rewrite behind
+  every bill card's synopsis, everywhere it renders) had no server-side
+  cache at all — only a per-browser localStorage one. A citizen's first
+  visit to take-action.html could burn through a dozen-plus individual
+  calls summarizing bills nobody's browser had ever asked about before,
+  and every *other* citizen's own first visit to those same popular bills
+  repeated the exact same spend independently. New
+  `functions/api/plain-summary.js` fixes this properly rather than just
+  raising the limit: a KV cache keyed by bill id, shared across every
+  visitor, 60-day TTL. `plainSummarize()` now checks its local cache
+  first (unchanged — an instant repeat view costs nothing), then calls
+  this endpoint instead of building a raw prompt for `/api/dig-check`
+  directly. Deliberately **not** rate-limited per-IP the way
+  `/api/dig-check` is — a cache miss here is a rare, system-wide event
+  (the first citizen anywhere to see a given bill), not personal usage
+  that should compete against that visitor's own quota for interactive
+  features elsewhere (Inbox, drafting, DIG itself). Still shares
+  `/api/dig-check`'s own overall daily `$` budget (same `usage:<date>` KV
+  key) — real Anthropic spend either way, bounded by the same cap
+  regardless of which endpoint spent it. Cache is keyed by bill id alone,
+  same staleness tradeoff `plainSummarize()` already accepted before this
+  existed: a cached summary can go mildly stale once a bill's
+  `latestAction` moves on to something new, and this doesn't
+  auto-regenerate for that.
+  Every piece of copy says
+  "flags changes when you visit," never "alerted" or "sent" — the gap
+  between what's real (persisted list + return-visit diffing) and what's
+  still aspirational (real-time push) is deliberate and stated plainly,
+  not glossed over. Similarly, **"Send it"** replaces the old two-step
+  "Copy email" + "Open contact form" pair with one button
+  (`fireOff()`) that does both — copies the draft and opens the rep's
+  contact form in one tap — but the button copy still says "Copied —
+  paste it in," not "Sent": 5calls never returns a real recipient email
+  address to send to, and auto-submitting a third-party government
+  contact form on a citizen's behalf isn't something to do invisibly.
+  Full one-tap *delivery* would need either a real recipient address
+  (offices don't publish one) or scripted form-submission (fragile,
+  and not something to build without the citizen watching it happen) —
+  flagged here as unsolved, not silently declared done. A new **"Beyond
+  calls & email"** section in both modals hands off to real external
+  tools instead of fabricating CiViX's own data for action types it
+  explicitly deferred before (see "Petition and rally/event actions" in
+  "The core loop" below): a Change.org search link and a Mobilize.us
+  search link, both prefilled with the bill title or topic, plus an
+  "Organize your own meeting" toggle that expands a short, genuinely
+  useful static checklist (space, notice period, RSVP, inviting the
+  rep's office, following up in writing) rather than pretending to have
+  event data CiViX doesn't have.
+
+  **Fixed a real dead end, also 31 Aug 2026**: this page's own "Adopt"
+  button used to just PATCH the filing's server-side `state` straight to
+  `'adopted'` — the *exact* field builder.html's real Inbox flow
+  (`adoptFiling()`) uses to mean "this became an actual manifesto
+  priority." But this button had no access to the manifesto and never
+  called `addIssue()`; it only flipped the flag. Net effect: both
+  builder.html's Inbox (`loadInbox()` filters to `state === 'docket'`)
+  and `digest.js`'s docket matching (`fetchDocketItems()`, same filter)
+  stopped seeing the item — "Adopt" silently made a filing invisible to
+  every real downstream use, with no confirmation, no link back into the
+  app, nothing. Fixed by replacing the button with a real link
+  (`builder.html?openInbox=<filing-id>`) straight into that item's Inbox
+  focus mode — the actual Prioritize/Push-to-actions/Strike decision —
+  instead of a fake local toggle. builder.html's boot sequence gained a
+  matching `?openInbox=` handler (forces Pro mode, since Inbox lives in
+  the `.shell` Citizen mode hides; polls briefly for `INBOX` to load
+  before opening focus mode, since it's populated asynchronously). The
+  "Adopted" tab and its underlying state value are unchanged and still
+  meaningful — they just can no longer be set directly from this page,
+  only by actually going through the real flow.
+
+**Placeholders (styled to match, no real functionality):**
+- `connect.html`, `civil-dis.html`, `civix-track.html`
+- `analytics.html` — **partially real as of 2 Sep 2026**, see the
+  "Anonymous aggregate stats" entry above; the sample content is still
+  there behind a toggle, honestly labeled, not deleted.
+
+**Not in this repo at all:**
+- PolTraPro (poltrapro.com) — separate product, own domain, linked from the
+  splash. Relationship to CiViX (same family vs. unrelated) not yet decided.
+- ~~The `civix-capture` Worker source~~ — now in `workers/civix-capture/`
+  (recovered from the live deployment 24 Sep 2026). (The Worker's
+  own hostname, `civix-capture.mycivix.workers.dev`, is unrelated to the
+  page rename below and was intentionally left as-is.)
+
+## Required Cloudflare Pages secrets
+
+Set per-environment (Production + Preview) in the dashboard, never in
+`wrangler.toml` — see the Netlify migration note below for why a new
+deployment (not just "Retry deployment") is required after adding one:
+
+- `ANTHROPIC_API_KEY` — powers `/api/dig-check` (DIG's checks, and the
+  Inbox/calendar-action AI drafting, which reuse the same endpoint). **Two
+  real outages hit this key, 13 Sep 2026, worth knowing before the next
+  rotation**: (1) the previous key had been created in Anthropic Console
+  with a 30-day expiration set, which lapsed silently with no warning —
+  when creating a replacement, set expiration to "No expiration," not
+  another fixed window. (2) The first replacement key was created
+  **unscoped from any workspace** — Console allows this, but an unscoped
+  key makes every Anthropic API call fail with `invalid_request_error:
+  "This API key is not scoped to a workspace..."` unless the request adds
+  an `anthropic-workspace-id` header, which `dig-check.js` doesn't send.
+  Fixed by recreating the key scoped to the actual workspace (Console's
+  key-creation screen has a workspace picker) rather than adding header
+  plumbing. Confirmed live end-to-end after both fixes: `/api/dig-check`
+  returned a real completion from `claude-sonnet-5`.
+- `CONGRESS_API_KEY` — powers `/api/calendar` (free, api.congress.gov/sign-up).
+- `FIVECALLS_API_TOKEN` — powers `/api/reps` (free, 5calls.org/representatives-api/).
+- `OPENSTATES_API_KEY` — powers `/api/state-bills` and `/api/state-reps`
+  (free, openstates.org/api/register).
+- `RESEND_API_KEY` — powers `/api/send-state-email`, the real one-button
+  state-legislator send (free tier, 100/day — resend.com). **Also
+  requires mycivix.com to be added and verified as a sending domain in
+  Resend's dashboard** (DNS records added at the domain registrar) before
+  real sends succeed — an API key alone isn't enough here, unlike every
+  other secret in this list. Optional tuning vars: `EMAIL_DAILY_LIMIT`
+  (default 80, headroom under Resend's 100/day cap), `EMAIL_DAILY_LIMIT_PER_IP`
+  (default 5), `EMAIL_FROM` (default `CiViX <noreply@mycivix.com>`).
+- `GNEWS_API_KEY` — powers `/api/headlines` for builder.html's headline-
+  swipe path (free tier, 100 req/day, allows production use — gnews.io).
+- `UNSPLASH_ACCESS_KEY` — powers `/api/headline-image`, finding a real
+  stock photo for each swiped headline via Unsplash's Search Photos API
+  (free — unsplash.com/oauth/applications, register an app to get an
+  Access Key). Free/demo tier caps at 50 requests/hour; apply for
+  Unsplash's Production tier once real traffic needs more. Optional
+  tuning var: `PHOTO_DAILY_LIMIT_PER_IP` (default 40, protects the shared
+  hourly quota from one visitor).
+
+## Netlify → Cloudflare migration — done
+
+The site moved hosting from Netlify to Cloudflare and the backend port is
+complete and verified live. `functions/api/dig-check.js` and
+`functions/api/dig-stats.js` are the Cloudflare Pages Functions equivalents
+of the old `netlify/functions/*.js`, using Workers KV (`DIG_KV`) instead of
+`@netlify/blobs`. `wrangler.toml` scopes KV bindings explicitly per
+environment (`env.preview` / `env.production`, no root-level fallback) —
+an earlier attempt with a root `[[kv_namespaces]]` block plus a production
+override left Production silently resolving to the preview namespace even
+after a fresh deploy; explicit scoping on both sides fixed it.
+
+Verified live 25 Aug 2026: `mycivix.com/dig/` returns 200, and
+`/api/dig-stats` returns real accumulated data (sources, topics, ratings).
+The old `netlify.toml` / `netlify/functions/*.js` files were confirmed
+unreferenced elsewhere in the repo and deleted 27 Aug 2026 — migration is
+fully closed out.
+
+**Adding a new Pages secret needs an actual new deployment, not a
+retry.** Hit this 27 Aug 2026 adding `CONGRESS_API_KEY`: saving it in the
+dashboard and clicking "Retry deployment" on the latest build still left
+the function reporting the var as missing, because Retry reuses that
+deployment's original environment snapshot rather than the project's
+current variables. An empty commit (or any new push) forces a real new
+build, which does pick it up.
+
+## Known housekeeping debt
+
+- **Git history exists now** — `git init` happened, the repo is on GitHub
+  with `main` tracking `origin/main`, and the working tree is clean as of
+  25 Aug 2026 (10 commits). The old "no git history" debt is resolved.
+- **Design tokens are hand-copied per page**, and have already drifted:
+  `index.html`/`take-action.html`/`builder.html` share one token system (navy/
+  paper/amber, Newsreader + IBM Plex Mono); `send-to-civix.html` runs a
+  visibly different one (different amber, different fonts — JetBrains Mono + Source
+  Serif 4). Worth extracting into one shared stylesheet all pages `<link>` to.
+- `package.json` is still named `dig-selfhosted` — a leftover from before the
+  folder held more than one tool.
+- **`civix-profile.token` vs. `civix.token` desync — fixed going forward,
+  31 Aug 2026** (found 30 Aug 2026 while verifying the digest's Send-to-
+  CiViX integration against the live site). `builder.html`/`digest.js`
+  mint/read a docket token off `civix-profile.token`; `send-to-civix.html`
+  minted/read its own, completely separate `civix.token` — the two were
+  independently generated, so they could diverge (confirmed live in the
+  user's own browser). Net effect: a citizen's real Send-to-CiViX filings
+  wouldn't surface in the "top 3" digest unless the two tokens happened to
+  match. Fixed by having each page's token-read path check the other's
+  storage location first and adopt it if present (`ensureDrop()` in
+  builder.html; `readToken()` in send-to-civix.html), rather than always
+  minting independently — whichever page runs first mints the real token,
+  the other adopts it. **Forward-looking only**: a citizen who already has
+  two diverged tokens from before this fix isn't retroactively merged —
+  the two dockets may already hold different server-side items, and
+  there's no merge endpoint in the (out-of-repo) Worker to reconcile them.
+  If the user has already hit this on their own device, it needs manual
+  reconciliation (e.g. clearing one of the two stored tokens), not
+  something to do to their real data without asking first.
+
+## Deliberately not yet done
+
+Holding off on a bundler/framework on purpose — nothing here needs
+client-side routing or shared component state yet. The real trigger to
+revisit that is a logged-in profile that needs to be read on more than one
+page; that's genuine shared state and the point where a framework starts
+paying for itself.
+
+## The core loop — status and what's next
+
+The splash's pitch — profile → matched to civic calendar → action you
+control — is now proven end-to-end for federal, and the calendar-matching
+half also covers state. The natural next moves, in roughly the order
+they'd pay off, are:
+
+- **Municipal calendar data — no longer sample content, but only for 8
+  cities so far** (Boston, Seattle, Baltimore, Nashville, Phoenix,
+  Charlotte NC, St. Paul, Pittsburgh — see `functions/api/municipal.js`).
+  No unified public API exists the way congress.gov/OpenStates do
+  federally/per-state; Legistar covers this list but is per-city, so
+  growing coverage means verifying and adding one city's client slug at a
+  time, not a single source swap.
+- **~~State Take Action~~ — resolved 31 Aug 2026.** State bills now have
+  a real Take Action modal with drafting *and* a genuine one-button send
+  (via OpenStates' legislator `email` field + Resend) — see the
+  "State Take Action is real" entry above. Built via a new OpenStates
+  geo lookup (`functions/_lib/openstates-people.js`) rather than
+  extending reps.js's federal-only 5calls data, since 5calls doesn't
+  cover state legislators at all today.
+- **Petition and rally/event actions — partially real as of 31 Aug
+  2026.** The action modals' new "Beyond calls & email" section (see
+  take-action.html's entry above) hands off to Change.org/Mobilize.us
+  search links today rather than CiViX's own data — real external
+  tools, not fake results, but still not a curated petition partner or
+  a local-events feed of CiViX's own. That remains the real gap here.
+- **Real-time watch alerts — shipped 20 Sep 2026** as part of the app-store
+  MVP push (see that dated entry further up). `functions/api/
+  push-register.js` + the standalone `workers/push-scheduler/` Cloudflare
+  Worker (Cron Triggers aren't available to Pages Functions, hence a
+  sibling Worker rather than another Function) now do real, hourly,
+  server-side diffing against a device's registered watchlist and send an
+  actual push via FCM (bridges to APNs for iOS too) — this line used to
+  say that needed its own dedicated infrastructure project and wasn't
+  small; it turned out to be exactly that scope, and this session built
+  it. Native-app-only (`push.js`, gated on `Capacitor.isNativePlatform()`)
+  — the public website's return-visit diffing (`checkWatchlistUpdates()`)
+  is unchanged and still the only mechanism there.
+- **Federal "Send it" still ends in a copy+paste, not a real send** —
+  take-action.html's `fireOff()` (see entry above) removed a manual step but
+  not the fundamental blocker: 5calls has no real recipient email address
+  to send to, and CiViX won't auto-submit third-party government contact
+  forms (most run CAPTCHA/bot-detection) on a citizen's behalf. This is
+  now a real, permanent asymmetry rather than a temporary gap: state
+  gained a genuine one-button send on 31 Aug 2026 (OpenStates publishes
+  real legislator emails; Congress doesn't), and federal likely never
+  will unless a public source of real congressional staff emails
+  appears — solving it via scripted form-filling isn't happening,
+  CAPTCHA-bypass is off the table regardless of authorization.
+- **ZIP-only rep lookup is best-effort** — 5calls resolves a ZIP to a
+  district, but ZIPs don't map 1:1 to congressional districts, so it can
+  be wrong for a split ZIP. Precise lookup would mean asking for a full
+  address; `builder.html`'s manifesto itself still never asks (still
+  ZIP-only there) — the 31 Aug 2026 state-email feature asks for a
+  mailing address, but narrowly, contextually in take-action.html's state
+  action modal, only from someone about to actually send, and stored
+  local-only (see "State Take Action is real" above). Whether to also
+  use that address to sharpen federal district resolution is a separate
+  decision not made here — today it's used only for signing state
+  emails, nothing else.
+- **~~DIG's own source list vs. the profile's § 04 sources~~ — resolved
+  29 Aug 2026.** DIG now reads and writes `P.sources` directly (the same
+  `civix-profile` localStorage key `builder.html` uses) instead of its own
+  separate `dig-sources` key — one shared list, no sync step. DIG's
+  per-source rating also moved onto the shared source object
+  (`P.sources[i].ratings[topic] = { quality: 'accurate'|'off', stars: 1-5,
+  at }`), rekeyed per-topic instead of one ambiguous global value per
+  source, so rating a source's coverage of one topic can no longer
+  silently overwrite its rating on a different topic. `sourceTrust()` in
+  both files derives a "general trust" score as the average across
+  whatever topics a source has been rated on, rather than that being a
+  separate manual rating to maintain. DIG's focus card also now shows
+  "your stance" (read from the Manifesto's § 03, best-effort name match)
+  next to "their stance" it detected, instead of relying on a single
+  like/dislike to carry both "well covered" and "I agree" at once. A
+  one-time migration in `builder.html`'s boot brings in anything still
+  sitting in a pre-merge `dig-sources` list. DIG's header back-link now
+  points at `builder.html` ("← Your Manifesto") instead of the splash.
+  Not done in this pass: DIG's own UI copy still says "profile" (not yet
+  renamed to "manifesto"), and the two apps don't live-sync across tabs —
+  last write wins if both are open at once, same latent limitation
+  `builder.html` already had with itself.
