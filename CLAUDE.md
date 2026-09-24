@@ -939,24 +939,47 @@ always specific even when the citation is unknown — verified live. Pushed
 `d6b5860`. The phone app bundles its HTML/JS, so the iPhone needs a fresh
 install from Xcode to pick this up.
 
-**24 Sep 2026, later — ROOT CAUSE FOUND, NOT YET FIXED: no `/api/*` call has
-ever worked in the iOS app.** Captured the real device console
-(`xcrun devicectl device process launch --device <id> --terminate-existing
---console com.mycivix.ios`): the app loads at `capacitor://mycivix.com`, not
-`https://mycivix.com` — Capacitor iOS ignores `iosScheme: "https"` (WKWebView
-reserves http/https). So every relative `fetch('/api/...')` hits Capacitor's
-own local asset handler, which answers with bundled HTML — the iOS twin of the
-Android bug fixed 23 Sep. This, not "iOS network throttling," explains the
-23 Sep "res.ok but unparseable body" failures, the iPhone's "no headlines,"
-and very likely EFTA II/NDAA never showing on the phone (the ranking fix
-above is real but separate). Planned fix: in native iOS, rewrite relative
-`/api/` fetches to `https://mycivix.com/api/` (a fetch shim that must load
-before any page script fetches — app-shell.js currently loads at the end of
-body) and add `capacitor://mycivix.com` to `functions/api/_middleware.js`'s
-`ALLOWED_ORIGINS`; verify on the real iPhone via the same console capture.
-Also asked for: an in-app "start over from scratch" reset (the web-only
-`/dev/` persona switcher isn't in the app bundle). The user is **Apple-only
-for now** — no Android device yet to finish Play account verification.
+**24 Sep 2026, later — iOS `/api/*` calls fixed; DIG→AAA bug; phone layout
+pass with a repeatable check.** Root cause (from the real device console):
+Capacitor iOS serves pages at `capacitor://mycivix.com` (WKWebView reserves
+https, so `iosScheme` is ignored), so every relative `fetch('/api/...')` hit
+Capacitor's local asset handler and got bundled HTML back — the iOS twin of
+the 23 Sep Android bug, and the real cause of the iPhone's "no headlines" and
+the 23 Sep "res.ok but unparseable body" failures (not iOS throttling).
+- `native-fetch.js` (new, loaded in `<head>` of every page that fetches):
+  on `capacitor:` only, rewrites same-origin `/api/` fetches to
+  `https://mycivix.com/api/`; `functions/api/_middleware.js` allowlists
+  `capacitor://mycivix.com`. Verified in the Simulator: builder's usage
+  ticker loads live numbers inside the app. `send-to-civix.html`'s shared
+  docket link uses the public origin in-app. **Still broken on iOS**: the
+  out-of-repo `civix-capture` Worker hardcodes
+  `Access-Control-Allow-Origin: https://mycivix.com`, so the Inbox/docket
+  (Send to CiViX) fails in the iPhone app until that Worker also allows
+  `capacitor://mycivix.com` — needs the Worker source (not in this repo).
+- "Open DIG ↗" launched AAA's app: `target="_blank"` links go to the OS as
+  `capacitor://…` URLs, a scheme other Capacitor apps also claim.
+  `app-shell.js` now opens same-origin `_blank` links in place (and adds
+  `index.html` to directory links, since the native asset handlers serve the
+  root index for extensionless paths). It also lifts page-level bottom bars
+  (splash sticky CTA/Skip, builder's guided bar) above the native tab bar.
+- In-app reset: builder.html's Citizen mode now has "Start over from
+  scratch" (same wipe as Pro's "Delete everything", but keeps the Send to
+  CiViX address like the /dev/ persona switcher, and restarts at the splash).
+- Phone layout: splash headline sized to the screen (`calc(8.8vw - 2px)`,
+  derived from the longest phrase's measured width), § marks moved above
+  lines (they overlapped "get"); Take Action cards stack tags above the
+  synopsis at ≤640px (the real cause of the one-word-per-line "staircase":
+  two tags took ~170px of a ~300px card); new shared **`phone.css`** holds
+  header/mode-switch rules for every page. **`npm run phone-check`**
+  (`scripts/phone-check.js`) renders every page at iPhone SE/16/Pro Max with
+  real data (local files, `/api` proxied to production, system Chrome over
+  CDP — no downloads) and flags sideways scroll, sub-11px text, and small tap
+  targets; `-- --laptop` adds a MacBook reference. Run it after any visual
+  change. Remaining flags worth a follow-up pass: many 9-10px mono labels on
+  builder Pro and analytics.
+- Noticed, not fixed: the test persona's top 3 included an MQ-9 drone bill
+  tagged "Housing affordability" — looks like another loose-keyword false
+  match worth tracing.
 
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
