@@ -939,6 +939,25 @@ always specific even when the citation is unknown — verified live. Pushed
 `d6b5860`. The phone app bundles its HTML/JS, so the iPhone needs a fresh
 install from Xcode to pick this up.
 
+**24 Sep 2026, later — ROOT CAUSE FOUND, NOT YET FIXED: no `/api/*` call has
+ever worked in the iOS app.** Captured the real device console
+(`xcrun devicectl device process launch --device <id> --terminate-existing
+--console com.mycivix.ios`): the app loads at `capacitor://mycivix.com`, not
+`https://mycivix.com` — Capacitor iOS ignores `iosScheme: "https"` (WKWebView
+reserves http/https). So every relative `fetch('/api/...')` hits Capacitor's
+own local asset handler, which answers with bundled HTML — the iOS twin of the
+Android bug fixed 23 Sep. This, not "iOS network throttling," explains the
+23 Sep "res.ok but unparseable body" failures, the iPhone's "no headlines,"
+and very likely EFTA II/NDAA never showing on the phone (the ranking fix
+above is real but separate). Planned fix: in native iOS, rewrite relative
+`/api/` fetches to `https://mycivix.com/api/` (a fetch shim that must load
+before any page script fetches — app-shell.js currently loads at the end of
+body) and add `capacitor://mycivix.com` to `functions/api/_middleware.js`'s
+`ALLOWED_ORIGINS`; verify on the real iPhone via the same console capture.
+Also asked for: an in-app "start over from scratch" reset (the web-only
+`/dev/` persona switcher isn't in the app bundle). The user is **Apple-only
+for now** — no Android device yet to finish Play account verification.
+
 No shared build system — every page is a standalone HTML file with its own
 inline `<style>`/`<script>`, no bundler, no framework. That's fine for now;
 see "Deliberately not yet done" below for why.
