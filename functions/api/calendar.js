@@ -13,7 +13,9 @@
 
 import { slim } from '../_lib/congress-bill.js';
 
-const CACHE_KEY = 'calendar:bills:latest';
+// v2 (24 Sep 2026): deriveStatus() rules changed; bump whenever they do
+// so an hour of stale status labels isn't served after a fix.
+const CACHE_KEY = 'calendar:bills:v2';
 const CACHE_TTL_SECONDS = 60 * 60; // 1 hour: fresh enough for a legislative calendar
 const BILL_LIMIT = 100;
 
