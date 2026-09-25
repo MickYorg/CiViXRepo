@@ -287,6 +287,9 @@ async function shoot(cdp, page, phone, personas) {
   const cdp = await connect(chrome.wsUrl);
   await cdp.send('Page.enable');
   await cdp.send('Network.enable');
+  // Test runs load pages as brand-new citizens; never let them create real
+  // Send to CiViX dockets (or file anything) on the production capture server.
+  await cdp.send('Network.setBlockedURLs', { urls: ['*civix-capture.mycivix.workers.dev/api/docket*', '*civix-capture.mycivix.workers.dev/api/filing*'] });
 
   const report = [];
   let sideways = 0;
