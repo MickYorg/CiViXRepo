@@ -147,6 +147,27 @@ export async function run(env, opts = {}) {
   return { devices: devices.length, notified: notifiedCount, results };
 }
 
+// First-time confirmation (25 Sep 2026): the moment a citizen turns alerts
+// on, push.js asks for one immediate, generic alert so they see what one
+// looks like and know it works. Once per device, ever (pushwelcomed:*), and
+// never names a bill, same lock-screen rule as every other alert.
+const WELCOME_TITLE = 'CiViX alerts are on';
+const WELCOME_BODY = "When a bill you're watching changes, you'll get a note like this. Tap it to see what moved.";
+export async function welcome(env, token, opts = {}) {
+  const kv = env.DIG_KV;
+  const send = opts.send || sendPush;
+  const device = token && await kv.get('pushdevice:' + token, { type: 'json' });
+  if (!device) return { status: 404, body: { error: { message: 'Device not registered.' } } };
+  const flag = 'pushwelcomed:' + token;
+  if (await kv.get(flag)) return { status: 200, body: { sent: false, already: true } };
+  let serviceAccount = null;
+  try { serviceAccount = env.FCM_SERVICE_ACCOUNT_JSON ? JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON) : null; } catch (e) {}
+  if (!serviceAccount || !env.FCM_PROJECT_ID) return { status: 500, body: { error: { message: 'Alerts are not configured on the server.' } } };
+  const result = await send(serviceAccount, env.FCM_PROJECT_ID, token, WELCOME_TITLE, WELCOME_BODY);
+  if (result.ok) await kv.put(flag, '1', { expirationTtl: 60 * 60 * 24 * 365 });
+  return { status: result.ok ? 200 : 500, body: { sent: !!result.ok } };
+}
+
 // "Simulate an update" (test builds only; see take-action.html's
 // pushRowHtml()): the app first rewinds one watched bill's
 // lastSeenActionDate and re-registers, then calls this. Clearing the
@@ -180,7 +201,7 @@ export default {
   // anyone who finds the Worker's URL.
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/simulate') {
+    if (url.pathname === '/simulate' || url.pathname === '/welcome') {
       const origin = request.headers.get('Origin') || '';
       const cors = ['https://mycivix.com', 'capacitor://mycivix.com'].includes(origin)
         ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Vary': 'Origin' }
@@ -189,7 +210,7 @@ export default {
       if (request.method !== 'POST') return new Response('not found', { status: 404 });
       let token = '';
       try { token = String((await request.json()).token || '').slice(0, 4096); } catch (e) {}
-      const { status, body } = await simulate(env, token);
+      const { status, body } = url.pathname === '/welcome' ? await welcome(env, token) : await simulate(env, token);
       return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/run' && env.TRIGGER_SECRET && request.headers.get('X-Trigger-Secret') === env.TRIGGER_SECRET) {

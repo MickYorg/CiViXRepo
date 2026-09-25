@@ -100,3 +100,13 @@ test('watch keys parse back into a bill citation', async () => {
   assert.equal(JSON.stringify(parseFederalWatchKey('federal:119:HR9694')), JSON.stringify({ congress: '119', type: 'hr', number: '9694' }));
   assert.equal(parseFederalWatchKey('general:Housing'), null);
 });
+
+test('turning alerts on sends one confirmation alert, once per device', async () => {
+  const { welcome } = await mod();
+  const kv = fakeKV({ 'pushdevice:tok1': device([]) });
+  const n = net();
+  assert.equal((await welcome(env(kv), 'tok1', n)).body.sent, true);
+  assert.match(n.sent[0].title, /alerts are on/i);
+  await welcome(env(kv), 'tok1', n);
+  assert.equal(n.sent.length, 1, 'not repeated on re-registration');
+});

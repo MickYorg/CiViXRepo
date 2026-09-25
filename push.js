@@ -13,6 +13,7 @@
   if (window.CivixPush) return;
 
   var TOKEN_KEY = 'civix-push-token';
+  var PUSH_SCHEDULER = 'https://civix-push-scheduler.mycivix.workers.dev';
   var PROFILE_KEY = 'civix-profile';
 
   function isNative() {
@@ -63,7 +64,14 @@
     listenersWired = true;
     P.addListener('registration', function (data) {
       if (!data || !data.value) return;
-      register(data.value);
+      // Once registered, ask for the one-time "alerts are on" confirmation
+      // (workers/push-scheduler welcome(); it no-ops if already sent).
+      Promise.resolve(register(data.value)).then(function () {
+        return fetch(PUSH_SCHEDULER + '/welcome', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: data.value })
+        });
+      }).catch(function () {});
       // The token arrives after requestPermission() resolves; let the page
       // redraw so it shows "alerts are on" instead of "Get notified".
       try { window.dispatchEvent(new Event('civix-push-registered')); } catch (e) {}
