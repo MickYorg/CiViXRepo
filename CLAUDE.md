@@ -149,7 +149,11 @@ are gitignored — public repo — re-download from the Firebase console
    build; test builds load the live site via `scripts/ios-live.sh`); the
    **nightly investigator** routine (claude.ai/code/routines/trig_01FkooSzXG33WVpyozqdqWon,
    7:45am ET, after the 7:17am CI run: all green → stops; failures → root cause + fix + test on a
-   `nightly/<date>` branch and PR, never main). Still to build: the App
+   `nightly/<date>` branch and PR, never main); and listening **briefs**
+   (daily 8:05am ET except Monday, weekly Monday, quarterly on the 1st of
+   Jan/Apr/Jul/Oct: rotating creative formats, delivered as a private page
+   plus a push to the phone; routines "CiViX daily/weekly/quarterly
+   brief"). Still to build: the App
    Store half of hybrid live updates (bundled pages + a self-hosted
    update channel).
 2. **App Store MVP, remaining phases:** audit of the "advocating
