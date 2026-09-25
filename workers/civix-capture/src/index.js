@@ -4105,7 +4105,10 @@ var index_default = {
       }
       if (url.pathname === "/api/filings" && request.method === "POST") {
         const body = await request.json();
-        const r = await fileItem(env, token, { ...body, source: "web" });
+        // Where it came from (25 Sep 2026): the iPhone share sheet, Siri and
+        // Android shares say so; anything else counts as the web page.
+        const source = ["ios-share", "siri", "android-share"].includes(body.source) ? body.source : "web";
+        const r = await fileItem(env, token, { ...body, source });
         return json(r);
       }
       if (url.pathname === "/api/filing" && request.method === "PATCH") {

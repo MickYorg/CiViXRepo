@@ -59,3 +59,20 @@ test('app shell opens CiViX links in place instead of handing them to iOS (DIG â
   assert.match(src, /a\.target !== '_blank'/);
   assert.match(src, /u\.origin !== location\.origin/);
 });
+
+test('Send to CiViX: the JS bridge and the Swift plugin agree on names', () => {
+  const swift = read('ios/App/App/CivixShared.swift');
+  const shell = read('app-shell.js');
+  assert.match(swift, /jsName = "CivixShared"/);
+  assert.match(swift, /name: "syncDocketToken"/);
+  assert.match(shell, /Plugins\.CivixShared/);
+  assert.match(shell, /syncDocketToken\(\{ token:/);
+  assert.match(read('ios/App/App/Base.lproj/Main.storyboard'), /customClass="MainViewController"/, 'plugin is registered by MainViewController');
+});
+
+test('Send to CiViX: app and share extension share one App Group', () => {
+  const group = /group\.com\.mycivix\.ios/;
+  assert.match(read('ios/App/App/App.entitlements'), group);
+  assert.match(read('ios/App/ShareExtension/ShareExtension.entitlements'), group);
+  assert.match(read('ios/App/Shared/CivixCapture.swift'), /appGroup = "group\.com\.mycivix\.ios"/);
+});

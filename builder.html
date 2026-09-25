@@ -1521,6 +1521,8 @@
       P.drop = address;
       try { localStorage.setItem('civix.token', token); } catch (e) {}
       save();
+      // In the app, hand the (possibly new) address to the share sheet/Siri.
+      if (window.CivixShell && window.CivixShell.syncDocketToken) window.CivixShell.syncDocketToken();
       renderAll();
       loadInbox();
     } catch (e) {

@@ -125,8 +125,30 @@
     }, true);
   }
 
+  // Send to CiViX (native share sheet + Siri) files into the same docket
+  // as the web app. Whichever side already has the citizen's docket token
+  // wins; the native side can have one first if the citizen shared before
+  // ever opening the builder (CivixCapture creates it). builder.html's
+  // ensureDrop() adopts civix.token when it has none.
+  function webDocketToken() {
+    try {
+      var p = JSON.parse(localStorage.getItem('civix-profile') || 'null');
+      return (p && p.token) || localStorage.getItem('civix.token') || '';
+    } catch (e) { return ''; }
+  }
+  function syncDocketToken() {
+    var P = window.Capacitor.Plugins && window.Capacitor.Plugins.CivixShared;
+    if (!P || !P.syncDocketToken) return Promise.resolve();
+    return P.syncDocketToken({ token: webDocketToken() }).then(function (r) {
+      if (r && r.token && !webDocketToken()) {
+        try { localStorage.setItem('civix.token', r.token); } catch (e) {}
+      }
+    }).catch(function () {});
+  }
+
   function init() {
     render();
+    syncDocketToken();
     wireInternalLinks();
     wireBackButton();
     wireStatusBar();
@@ -138,5 +160,5 @@
     init();
   }
 
-  window.CivixShell = { active: true, TABS: TABS };
+  window.CivixShell = { active: true, TABS: TABS, syncDocketToken: syncDocketToken };
 })();

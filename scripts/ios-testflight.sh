@@ -30,10 +30,13 @@ AUTH=(-allowProvisioningUpdates
   -authenticationKeyID "$ASC_KEY_ID"
   -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
+# Archive signs with Xcode's own account too: new pieces (the share
+# extension's bundle ID, the App Group) need registering, which the API
+# key's App Manager role may not be allowed to do.
 echo "▸ archiving build $BUILD_NUMBER"
 xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$OUT/App.xcarchive" \
-  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" "${AUTH[@]}" archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" -allowProvisioningUpdates archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
 
 cat > "$OUT/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
