@@ -51,3 +51,11 @@ test('the prompt includes what was sent and the citizen\'s own words, and never 
   assert.match(p, /my kids/);
   assert.match(p, /never guess a citation/);
 });
+
+test('a reply split around citations (line breaks inside strings) still parses', async () => {
+  const { parseDig } = await mod();
+  const broken = JSON.stringify(good).replace('restrict data brokers', 'restrict\ndata brokers');
+  const d = parseDig(broken);
+  assert.ok(d, 'parsed');
+  assert.match(d.summary, /restrict data brokers/);
+});

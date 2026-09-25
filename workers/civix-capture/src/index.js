@@ -4183,11 +4183,19 @@ var index_default = {
         return json({ ok: true });
       }
       if (url.pathname === "/api/filing/dig" && request.method === "POST") {
-        const { id } = await request.json();
-        const own = await env.DB.prepare("SELECT id FROM filings WHERE id = ? AND token = ?").bind(id, token).first();
+        const { id, now } = await request.json();
+        const own = await env.DB.prepare("SELECT id, dig_state, dig_at FROM filings WHERE id = ? AND token = ?").bind(id, token).first();
         if (!own) return json({ error: "no such filing" }, 404);
-        await queueDig(env, id);
-        return json({ ok: true, dig_state: "queued" });
+        if (!now) { await queueDig(env, id); return json({ ok: true, dig_state: "queued" }); }
+        // now: dig while the app waits (the Take Action feed does this for
+        // queued items, so results don't depend on the scheduled job).
+        // Skip if another request is already mid-dig on it.
+        if (own.dig_state === "digging" && Date.now() - own.dig_at < 2 * 60000) return json({ ok: true, dig_state: "digging" });
+        await digInto(env, id);
+        const row = await env.DB.prepare("SELECT dig, dig_state FROM filings WHERE id = ?").bind(id).first();
+        let dig = null;
+        try { dig = row.dig ? JSON.parse(row.dig) : null; } catch (e) {}
+        return json({ ok: true, dig_state: row.dig_state, dig });
       }
       if (url.pathname === "/api/filing" && request.method === "DELETE") {
         const { id } = await request.json();

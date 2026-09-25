@@ -252,6 +252,27 @@
      .wrap from the same pass still does real work here on its own,
      since these are full-width blocks, not a fixed column measure. */
   .focus-zone { margin-bottom: 8px; display: flex; flex-direction: column; gap: 12px; }
+  /* "Sent to CiViX" feed (25 Sep 2026): what the citizen captured from the
+     share sheet / Siri / email, and what CiViX found out about it. */
+  .sent-zone { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+  .sent-zone:empty { display: none; }
+  .sent-card { border: 1px solid var(--amber); border-radius: 12px; padding: 16px 18px; background: var(--ink-raised); }
+  .sent-eyebrow { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-dim); margin: 0 0 6px; }
+  .sent-headline { font-weight: 700; font-size: 19px; line-height: 1.3; margin: 0 0 6px; }
+  .sent-summary { font-size: 15.5px; line-height: 1.55; color: var(--paper); margin: 0 0 10px; }
+  .sent-sent { font-size: 14px; line-height: 1.5; color: var(--paper-dim); margin: 0 0 8px; }
+  .sent-claims { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .sent-claims li { font-size: 14px; line-height: 1.45; color: var(--paper-dim); }
+  .claim-tag { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 20px; padding: 2px 8px; margin-right: 6px; border: 1px solid var(--line); color: var(--paper); }
+  .claim-tag.accurate { border-color: #5BB67A; color: #5BB67A; }
+  .claim-tag.misleading { border-color: var(--amber); color: var(--amber-ink); }
+  .claim-tag.false { border-color: var(--strike); color: var(--strike); }
+  .sent-moves { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
+  .sent-move { text-align: left; }
+  .sent-move .why { display: block; font-size: 13px; opacity: 0.85; margin-top: 2px; font-weight: 400; }
+  .sent-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; }
+  .sent-foot a, .sent-foot button { color: var(--amber-ink); background: none; border: 0; padding: 6px 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .sent-digging { font-size: 14px; color: var(--amber-ink); margin: 0 0 6px; }
   .focus-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -778,6 +799,8 @@
   <h1>Take Action</h1>
   <p class="dek">Municipal, state, and federal legislative activity, matched against what's actually in your manifesto — with a clear next step for each.</p>
   <p class="dek-link"><a href="calendar.html">Want the bigger picture? See your multi-year strategy &#8594;</a></p>
+
+  <div class="sent-zone" id="sent-zone"></div>
 
   <div id="usage-ticker" class="usage-ticker"></div>
 
@@ -2535,6 +2558,17 @@ BODY: <the email body, a few short paragraphs>`;
       window.CivixPush.requestPermission().then(renderWatchingZone);
       return;
     }
+    const sentMove = t.closest('[data-sent-move]');
+    if (sentMove) {
+      const [i, mi] = sentMove.dataset.sentMove.split(':').map(Number);
+      const it = SENT_ITEMS[i];
+      if (it && it.dig && it.dig.moves[mi]) runSentMove(it, it.dig.moves[mi]);
+      return;
+    }
+    const sentDone = t.closest('[data-sent-done]');
+    if (sentDone) { const it = SENT_ITEMS[Number(sentDone.dataset.sentDone)]; if (it) markSentDone(it); return; }
+    const sentRetry = t.closest('[data-sent-retry]');
+    if (sentRetry) { const it = SENT_ITEMS[Number(sentRetry.dataset.sentRetry)]; if (it) retrySentDig(it); return; }
     if (t.closest('[data-push-simulate]') && window.CivixPush) { simulateWatchUpdate(); return; }
     if (t.closest('[data-push-undo]')) { undoSimulatedUpdate(); return; }
     if (t.closest('[data-push-disable]') && window.CivixPush) {
@@ -2952,6 +2986,135 @@ BODY: <the email body, a few short paragraphs>`;
       </div>`;
   }
 
+  // ---- "Sent to CiViX" feed ---------------------------------------------
+  // What the citizen sent in (share sheet, Siri, email, web) and what CiViX
+  // dug up about it (workers/civix-capture queues each filing for
+  // functions/api/capture-dig.js). Items being dug show a waiting state and
+  // the feed re-polls until they're ready.
+  const CAPTURE_API = 'https://civix-capture.mycivix.workers.dev';
+  let SENT_ITEMS = [];
+  let SENT_POLL = null;
+  function docketToken() {
+    const p = loadRawProfile();
+    try { return (p && p.token) || localStorage.getItem('civix.token') || ''; } catch (e) { return ''; }
+  }
+  function sentSourceLabel(it) {
+    const via = { 'ios-share': 'Shared', siri: 'Via Siri', mail: 'Emailed', web: 'Sent', 'android-share': 'Shared' }[it.source] || 'Sent';
+    const where = it.host ? (/^(x|twitter)\.com$/.test(it.host.replace(/^www\./, '')) ? 'X' : it.host.replace(/^www\./, '')) : '';
+    const mins = Math.round((Date.now() - it.at) / 60000);
+    const ago = mins < 60 ? `${Math.max(mins, 1)} min ago` : mins < 2880 ? `${Math.round(mins / 60)} hr ago` : `${Math.round(mins / 1440)} days ago`;
+    return [via + (where ? ' from ' + where : ''), ago].join(' · ');
+  }
+  function sentCardHtml(it, idx) {
+    const d = it.dig && !it.dig.error ? it.dig : null;
+    const pending = it.dig_state === 'queued' || it.dig_state === 'digging' || (!d && it.dig_state === '');
+    let body;
+    if (d) {
+      const claims = (d.claims || []).map(c =>
+        `<li><span class="claim-tag ${esc(c.assessment)}">${esc(c.assessment)}</span>${esc(c.claim)}${c.note ? ` <em>${esc(c.note)}</em>` : ''}</li>`).join('');
+      const moves = (d.moves || []).map((m, mi) =>
+        `<button type="button" class="btn ${mi === 0 ? 'btn-primary' : ''} sent-move" data-sent-move="${idx}:${mi}">${esc(m.title)}${m.why ? `<span class="why">${esc(m.why)}</span>` : ''}</button>`).join('');
+      const sources = (d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title || 'Source')} &#8599;</a>`).join('');
+      body = `<h3 class="sent-headline">${esc(d.headline)}</h3>
+        <p class="sent-summary">${esc(d.summary)}</p>
+        ${claims ? `<ul class="sent-claims">${claims}</ul>` : ''}
+        <div class="sent-moves">${moves}</div>
+        <div class="sent-foot">${sources}<a href="${esc(digUrl(d.headline))}">Send to DIG &#8599;</a><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+    } else if (pending) {
+      body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX is digging into this&hellip; usually a minute or two.</p>
+        <div class="sent-foot"><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+    } else {
+      const why = (it.dig && it.dig.error) || 'Something went wrong.';
+      body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX couldn’t dig into this yet: ${esc(why)}</p>
+        <div class="sent-foot"><button type="button" data-sent-retry="${idx}">Try again</button><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+    }
+    return `<div class="sent-card"><p class="sent-eyebrow">${esc(sentSourceLabel(it))}</p>${body}</div>`;
+  }
+  function renderSentZone() {
+    const zone = document.getElementById('sent-zone');
+    if (!zone) return;
+    if (!SENT_ITEMS.length) { zone.innerHTML = ''; return; }
+    zone.innerHTML = `<p class="focus-label">Sent to CiViX</p>` + SENT_ITEMS.map(sentCardHtml).join('');
+  }
+  async function loadSentZone() {
+    const token = docketToken();
+    if (!token) return;
+    try {
+      const r = await fetch(`${CAPTURE_API}/api/filings?token=${encodeURIComponent(token)}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      const cutoff = Date.now() - 30 * 864e5;
+      SENT_ITEMS = (data.items || []).filter(it => it.state !== 'done' && it.at > cutoff).slice(0, 5);
+    } catch (e) { return; }
+    renderSentZone();
+    clearTimeout(SENT_POLL);
+    // Dig queued items now, one at a time, while the page is open; the
+    // server's scheduled job covers the app being closed.
+    const next = SENT_ITEMS.find(it => it.dig_state === 'queued');
+    if (next && !SENT_DIGGING) { digSentNow(next); return; }
+    if (SENT_ITEMS.some(it => it.dig_state === 'queued' || it.dig_state === 'digging')) SENT_POLL = setTimeout(loadSentZone, 20000);
+  }
+  let SENT_DIGGING = false;
+  async function digSentNow(it) {
+    SENT_DIGGING = true;
+    it.dig_state = 'digging';
+    renderSentZone();
+    try {
+      await fetch(`${CAPTURE_API}/api/filing/dig?token=${encodeURIComponent(docketToken())}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: it.id, now: true })
+      });
+    } catch (e) {}
+    SENT_DIGGING = false;
+    loadSentZone();
+  }
+  function billCitationParts(citation) {
+    const m = /^\s*(H\.?\s*J\.?\s*Res|S\.?\s*J\.?\s*Res|H\.?\s*Con\.?\s*Res|S\.?\s*Con\.?\s*Res|H\.?\s*Res|S\.?\s*Res|H\.?\s*R|S)\.?\s*(\d+)/i.exec(citation || '');
+    return m ? { type: m[1].replace(/[\s.]/g, '').toLowerCase(), number: m[2] } : null;
+  }
+  async function runSentMove(it, move) {
+    const d = it.dig;
+    const topic = d.topic || d.headline;
+    const note = /Why it matters to me: ([^\n]+)/.exec(it.note || '');
+    const stance = (note ? note[1] + ' ' : '') + d.headline;
+    if (move.action === 'call' || move.action === 'email') {
+      const c = d.bill && d.level === 'federal' && billCitationParts(d.bill.citation);
+      if (c) {
+        try {
+          const r = await fetch(`/api/bill-lookup?type=${c.type}&number=${c.number}${d.bill.congress ? '&congress=' + d.bill.congress : ''}`);
+          const b = r.ok ? await r.json() : null;
+          if (b && b.bill) { openActionModalFor(b.bill, [topic]); return; }
+        } catch (e) {}
+      }
+      openGeneralAdvocacyModal(topic, stance, [topic]);
+      return;
+    }
+    if (move.action === 'share' && navigator.share) {
+      try { await navigator.share({ title: d.headline, text: d.summary, url: it.url || (d.sources[0] && d.sources[0].url) || undefined }); } catch (e) {}
+      return;
+    }
+    const src = (d.sources || [])[0];
+    window.open(src ? src.url : digUrl(d.headline), '_blank', 'noopener');
+  }
+  async function markSentDone(it) {
+    SENT_ITEMS = SENT_ITEMS.filter(x => x !== it);
+    renderSentZone();
+    try {
+      await fetch(`${CAPTURE_API}/api/filing?token=${encodeURIComponent(docketToken())}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: it.id, state: 'done' })
+      });
+    } catch (e) {}
+  }
+  async function retrySentDig(it) {
+    it.dig_state = 'queued'; it.dig = null;
+    renderSentZone();
+    try {
+      await fetch(`${CAPTURE_API}/api/filing/dig?token=${encodeURIComponent(docketToken())}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: it.id })
+      });
+    } catch (e) {}
+    clearTimeout(SENT_POLL); SENT_POLL = setTimeout(loadSentZone, 20000);
+  }
+
   async function loadFocusZone() {
     const zone = document.getElementById('focus-zone');
     if (!zone || !window.CivixDigest) return;
@@ -3149,6 +3312,7 @@ BODY: <the email body, a few short paragraphs>`;
   }
 
   renderWatchingZone();
+  loadSentZone();
   boot();
   bootState();
   bootMunicipal();

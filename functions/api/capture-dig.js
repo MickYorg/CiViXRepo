@@ -83,14 +83,27 @@ Reply with ONLY a JSON object, no prose before or after, in this shape:
 Rules: claims at most 3 (empty list if nothing checkable). moves: 1 to 3, most effective first (a constituent call to their own representative usually beats an email; an open public comment period or upcoming vote/hearing is the highest-leverage moment). Only include a bill if you actually found one; never guess a citation. sources: up to 3 real URLs you used. If what they sent has no civic angle at all, say so plainly in the summary and give one "learn" move.`;
 }
 
+// Raw line breaks inside a JSON string are invalid; turn them into spaces
+// (only inside strings, tracking quotes and escapes).
+function softenNewlinesInStrings(s) {
+  let out = '', inStr = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr && c === '\\') { out += c + (s[i + 1] || ''); i++; continue; }
+    if (c === '"') inStr = !inStr;
+    out += inStr && (c === '\n' || c === '\r') ? ' ' : c;
+  }
+  return out;
+}
+
 export function parseDig(raw) {
   const s = String(raw || '').trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
   let obj;
-  try { obj = JSON.parse(s); } catch (e) {
-    const a = s.indexOf('{'), b = s.lastIndexOf('}');
-    if (a === -1 || b <= a) return null;
-    try { obj = JSON.parse(s.slice(a, b + 1)); } catch (e2) { return null; }
-  }
+  const attempt = (t) => { try { return JSON.parse(t); } catch (e) { return undefined; } };
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  const slice = a !== -1 && b > a ? s.slice(a, b + 1) : s;
+  obj = attempt(s) ?? attempt(slice) ?? attempt(softenNewlinesInStrings(slice));
+  if (obj === undefined) return null;
   if (!obj || typeof obj.headline !== 'string' || typeof obj.summary !== 'string') return null;
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   return {
@@ -154,7 +167,9 @@ export async function onRequestPost({ request, env }) {
   if (kv) { try { await recordSpend(kv, 'capture_dig', parsed.usage, dateKey, record); } catch (e) {} }
   if (!res.ok) return json({ error: { message: (parsed.error && parsed.error.message) || `Anthropic HTTP ${res.status}` } }, 500);
 
-  const text = (parsed.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+  // With web search, the reply arrives as several text blocks split around
+  // citations, sometimes mid-string: join them with nothing, not newlines.
+  const text = (parsed.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
   const dig = parseDig(text);
   if (!dig) return json({ error: { message: 'Couldn’t read the analysis' } }, 500);
   return json({ dig, at: Date.now() });
