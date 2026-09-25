@@ -3076,7 +3076,10 @@ BODY: <the email body, a few short paragraphs>`;
     const topic = d.topic || d.headline;
     const note = /Why it matters to me: ([^\n]+)/.exec(it.note || '');
     const stance = (note ? note[1] + ' ' : '') + d.headline;
-    if (move.action === 'call' || move.action === 'email') {
+    // Only moves aimed at elected officials open the rep call/email window;
+    // "call your pediatrician" is a call, but not to a representative.
+    const toOfficial = /senator|representative|congress|legislat|lawmaker|council|governor|mayor|elected|official|member of/i.test(move.target + ' ' + move.title);
+    if ((move.action === 'call' || move.action === 'email') && toOfficial) {
       const c = d.bill && d.level === 'federal' && billCitationParts(d.bill.citation);
       if (c) {
         try {
