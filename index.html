@@ -582,7 +582,8 @@
     :root.is-resolved .transport {
       position: static;
       justify-content: flex-end;
-      padding: 0 clamp(18px, 5vw, 48px) calc(24px + env(safe-area-inset-bottom, 0px));
+      /* clears the pinned Build-your-manifesto bar, which now stays */
+      padding: 0 clamp(18px, 5vw, 48px) calc(88px + env(safe-area-inset-bottom, 0px));
     }
 
     /* Header layout at phone width lives in phone.css (shared). */
@@ -599,18 +600,16 @@
       transition: opacity 0.7s ease;
     }
     .cta-sticky .cta { width: 100%; margin: 0; }
-    /* This bar's whole job is covering the ~7s before .resolve's own
-       in-flow CTA appears (see the comment above) — once that happens,
-       leaving this one pinned at the bottom too just puts two identical
-       "Build your manifesto" buttons on screen at once. Fades out in
-       step with .resolve fading in (same 0.7s), rather than either
-       button being the "real" one and the other a leftover. Still
-       `display: flex` (not none) so it keeps occupying its own fixed
-       layer instead of the page reflowing under it. */
-    :root.is-resolved .cta-sticky { opacity: 0; pointer-events: none; }
+    /* 25 Sep 2026: on phones the pinned bar is THE button, before and
+       after the sequence resolves. Handing off to .resolve's in-flow
+       button left it far below the fold (under the app's tab bar), so
+       the in-flow one is hidden here instead — still exactly one
+       "Build your manifesto" on screen, never two. */
+    .resolve .cta { display: none; }
   }
 </style>
 <link rel="stylesheet" href="phone.css">
+<link rel="stylesheet" href="topbar.css">
 </head>
 <body>
 

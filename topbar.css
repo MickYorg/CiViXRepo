@@ -1,0 +1,52 @@
+/* topbar.css — the one standard CiViX header, shared by every page that has
+   one (25 Sep 2026, the citizen's spec): CiViX (home) far left, the
+   Citizen/Activist/Pro switch centered, light/dark toggle far right, all on
+   one line at every width. Pages still carry their own colors/tokens; this
+   file only owns the header's layout, so it can't drift page by page again.
+
+   Two switch implementations exist and both are covered: the splash and
+   builder's own inline .mode-track/.mode-stop/.mode-label, and mode.js's
+   injected .cxm-track/.cxm-stop/.cxm-label (#mode-picker). Selectors are
+   prefixed with .topbar for specificity over pages' inline rules and
+   mode.js's injected styles, without !important. */
+
+.topbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px clamp(18px, 5vw, 48px);
+}
+.topbar > .mark { flex: 0 0 auto; order: 1; }
+.topbar > .mode-track,
+.topbar > #mode-picker {
+  order: 2;
+  flex: 0 1 460px;
+  min-width: 0;
+  margin: 0 auto;
+}
+.topbar > .topbar-right { flex: 0 0 auto; order: 3; margin-left: 0; }
+/* Three items only: the tagline and builder's transient "Saved" flag don't
+   belong in the standard header. */
+.topbar .mark-sub { display: none; }
+
+@media (max-width: 560px) {
+  .topbar { gap: 8px; }
+  /* On a phone three full labels don't fit next to the logo and toggle, so
+     the current mode shows its label and the other two show their icon;
+     tapping one reveals its label. Labels stay readable to screen readers
+     (and each stop keeps its title tooltip). */
+  .topbar .mode-stop,
+  .topbar .cxm-stop { flex: 0 0 auto; padding: 9px 10px; min-height: 40px; }
+  .topbar .mode-track,
+  .topbar .cxm-track { justify-content: center; gap: 2px; }
+  .topbar .mode-stop:not(.is-on) .mode-label,
+  .topbar .cxm-stop:not(.is-on) .cxm-label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .topbar .mode-label,
+  .topbar .cxm-stop { font-size: 11px; }
+  .topbar .saved-flag { display: none; }
+}

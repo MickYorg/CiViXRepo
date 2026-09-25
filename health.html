@@ -174,11 +174,13 @@
   }
 </style>
 <link rel="stylesheet" href="phone.css">
+<link rel="stylesheet" href="topbar.css">
 </head>
 <body>
 
 <header class="topbar">
   <a class="mark" href="index.html">C<em>i</em>V<em>i</em>X</a>
+  <div id="mode-picker"></div>
   <div class="topbar-right">
     <span class="mark-sub">A platform for civic engagement</span>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
@@ -325,6 +327,11 @@
     el.innerHTML = '<p class="msg">Couldn\u2019t load results right now (' + esc(e.message) + ').</p>';
   });
 })();
+</script>
+<script src="mode.js"></script>
+<script>
+  // Standard header: the Citizen/Activist/Pro switch (topbar.css).
+  if (window.CivixMode) window.CivixMode.renderPicker(document.getElementById('mode-picker'), {});
 </script>
 </body>
 </html>

@@ -140,11 +140,13 @@
   .play-overlay[hidden] { display: none; }
 </style>
 <link rel="stylesheet" href="phone.css">
+<link rel="stylesheet" href="topbar.css">
 </head>
 <body>
 
 <header class="topbar">
   <a class="mark" href="index.html">C<em>i</em>V<em>i</em>X</a>
+  <div id="mode-picker"></div>
   <div class="topbar-right">
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -286,6 +288,11 @@
     decksEl.innerHTML = '';
   }
 })();
+</script>
+<script src="mode.js"></script>
+<script>
+  // Standard header: the Citizen/Activist/Pro switch (topbar.css).
+  if (window.CivixMode) window.CivixMode.renderPicker(document.getElementById('mode-picker'), {});
 </script>
 </body>
 </html>

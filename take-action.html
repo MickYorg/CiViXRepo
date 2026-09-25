@@ -753,6 +753,7 @@
   .home-link:hover { background: var(--amber-wash); }
 </style>
 <link rel="stylesheet" href="phone.css">
+<link rel="stylesheet" href="topbar.css">
 </head>
 <body class="is-entering">
 
@@ -1304,7 +1305,7 @@
     // `w.won` is the persisted, once-ever flag from checkWatchlistUpdates()/
     // markWatchWon() — real across return visits, not just this one.
     const winBanner = w.won
-      ? `<div class="watch-win-banner">&#127881; This one became law!</div><p class="watch-win-note">You were watching — CiViX counted this as a win in the platform's anonymous, aggregate stats.</p>`
+      ? `<div class="watch-win-banner">&#127963;&#65039; This one became law!</div><p class="watch-win-note">You were watching — CiViX counted this as a win in the platform's anonymous, aggregate stats.</p>`
       : '';
     const updatedBadge = (!w.won && WATCH_UPDATES[w.key]) ? `<span class="watching-badge">Updated since you started watching</span>` : '';
     const digBtn = `<a class="btn" href="${esc(digUrl(w.title))}" target="_blank" rel="noopener">Send to DIG &#8599;</a>`;
