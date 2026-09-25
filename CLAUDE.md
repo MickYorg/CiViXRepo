@@ -131,6 +131,13 @@ are gitignored — public repo — re-download from the Firebase console
 
 ## Working with this user
 
+- **`notes/` is the one place for every listening text** (gitignored, never
+  shipped). Every summary/plan text file goes there, and the scheduled
+  briefs (published in the cloud as private pages) get copied into
+  `notes/briefs/` as plain text: at the start of each session, list the
+  user's artifacts titled "CiViX … brief", and save any not yet in
+  `notes/briefs/` as `YYYY-MM-DD-<daily|weekly|quarterly>-<frame>.txt`.
+
 - Often off-grid on a boat (solar, slow internet): flag big downloads and
   long builds first. Starts sessions with `civix` (shell function:
   `claude --continue --remote-control`; `civix new` for a fresh one).
