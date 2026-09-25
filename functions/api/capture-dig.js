@@ -153,7 +153,9 @@ export async function onRequestPost({ request, env }) {
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 2000,
+        // Search calls and reasoning count against this too; 2000 ran out
+        // mid-answer on a real capture (25 Sep 2026).
+        max_tokens: 8000,
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
         messages: [{ role: 'user', content: buildPrompt({ ...item, source }) }],
       }),
