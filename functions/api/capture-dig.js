@@ -171,6 +171,11 @@ export async function onRequestPost({ request, env }) {
   // citations, sometimes mid-string: join them with nothing, not newlines.
   const text = (parsed.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
   const dig = parseDig(text);
-  if (!dig) return json({ error: { message: 'Couldn’t read the analysis' } }, 500);
+  if (!dig) {
+    // Enough to diagnose without dumping the whole reply.
+    const blocks = (parsed.content || []).map((b) => b.type).join(',');
+    console.log('capture-dig parse failure', parsed.stop_reason, blocks, text.length, JSON.stringify(text.slice(0, 300)), JSON.stringify(text.slice(-200)));
+    return json({ error: { message: `Couldn’t read the analysis (${parsed.stop_reason}, ${text.length} chars)` } }, 500);
+  }
   return json({ dig, at: Date.now() });
 }
