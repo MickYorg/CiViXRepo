@@ -8,7 +8,9 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: '0 11 * * *'   # 7am Eastern
+    # Off the hour on purpose: GitHub delays/drops top-of-hour schedules
+    # under load (the 11:00 UTC run was skipped on 25 Sep 2026).
+    - cron: '17 11 * * *'   # 7:17am Eastern (6:17 in winter)
   workflow_dispatch:
 
 jobs:
