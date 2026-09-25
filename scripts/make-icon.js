@@ -1,59 +1,72 @@
-// One-off script (not part of any build pipeline) that renders a first-pass
-// CiViX app icon from plain SVG using sharp/librsvg, already a transitive
-// dependency of @capacitor/assets. Geometric, no text/fonts, so it stays
-// legible at small sizes and avoids any font-availability issues at render
-// time. Swap assets/icon.png (and re-run @capacitor/assets) for real brand
-// art later — nothing downstream needs to change.
-const sharp = require('sharp');
+// Renders the CiViX app icon: the splash page's wordmark ("CiViX" in
+// Newsreader bold — C, V, X in the splash's off-white, both i's in amber)
+// on the splash's navy. Rendered by the Chrome already on this Mac so the
+// real web font is used (librsvg can't load Google Fonts), then the
+// platform icon sets are generated from it:
+//
+//   node scripts/make-icon.js && npx capacitor-assets generate --ios --android
+//
+// Writes assets/icon.png (iOS + fallback: wordmark on navy),
+// assets/icon-foreground.png (Android adaptive foreground: wordmark on
+// transparent, inside the adaptive-icon safe zone),
+// assets/icon-background.png (plain navy) and assets/splash(-dark).png
+// (launch screen: the wordmark, smaller, on navy). The first-pass geometric icon
+// (amber ring + check) lives in git history.
+'use strict';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
-const INK = '#0A0F1C';
-const AMBER = '#E0A93F';
+const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const INK = '#0A0F1C';      // splash --ink (dark theme)
+const PAPER = '#ECEAE2';    // splash --paper: the wordmark's C, V, X
+const AMBER = '#E0A93F';    // splash --amber-ink: the i's
+const OUT = path.resolve(__dirname, '..', 'assets');
+const SIZE = 1024;
 
-// Solid navy square — the base icon and the Android adaptive-icon background.
-const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
-  <rect width="1024" height="1024" fill="${INK}"/>
-</svg>`;
-
-// Amber ring (a civic seal / coin, echoing CiViX Coin) with a checkmark cut
-// through the middle (echoing "take a stand, get heard"). Pure geometry.
-function markSvg(size, cx, cy, scale) {
-  const r = 300 * scale;
-  const ringWidth = 70 * scale;
-  const checkStroke = 70 * scale;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${AMBER}" stroke-width="${ringWidth}"/>
-    <path d="M ${cx - 150 * scale} ${cy + 10 * scale} L ${cx - 40 * scale} ${cy + 130 * scale} L ${cx + 170 * scale} ${cy - 140 * scale}"
-      fill="none" stroke="${AMBER}" stroke-width="${checkStroke}" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
+// widthShare: how much of the canvas width the wordmark spans.
+function page({ background, widthShare, size = SIZE }) {
+  return `<!doctype html><html><head>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,700&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: ${size}px; height: ${size}px; background: ${background}; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  .mark { font-family: 'Newsreader', serif; font-weight: 700; letter-spacing: -0.01em;
+          color: ${PAPER}; white-space: nowrap; line-height: 1; font-size: 100px;
+          /* optical centering: serif cap height sits a touch high */
+          transform: translateY(12%); }
+  .mark em { font-style: normal; color: ${AMBER}; }
+</style></head><body>
+<div class="mark" id="m">C<em>i</em>V<em>i</em>X</div>
+<script>
+  document.fonts.ready.then(() => {
+    const m = document.getElementById('m');
+    m.style.fontSize = (100 * ${size * widthShare} / m.getBoundingClientRect().width) + 'px';
+  });
+</script></body></html>`;
 }
 
-const outDir = path.join(__dirname, '..', 'assets');
-
-async function main() {
-  // Full icon: navy background + centered mark (for iOS / legacy Android / store listing).
-  const bg = sharp(Buffer.from(bgSvg));
-  const mark = Buffer.from(markSvg(1024, 512, 512, 1));
-  await bg.clone().composite([{ input: mark, top: 0, left: 0 }]).png().toFile(path.join(outDir, 'icon.png'));
-
-  // Adaptive icon halves — foreground mark is scaled down and kept within
-  // the ~66% safe zone Android's adaptive-icon mask actually shows.
-  await sharp(Buffer.from(bgSvg)).png().toFile(path.join(outDir, 'icon-background.png'));
-  const fgTransparent = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
-    ${markSvg(1024, 512, 512, 0.62).replace(/^<svg[^>]*>|<\/svg>$/g, '')}
-  </svg>`;
-  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: Buffer.from(fgTransparent), top: 0, left: 0 }])
-    .png().toFile(path.join(outDir, 'icon-foreground.png'));
-
-  // Splash — same mark, smaller, centered on a full-bleed navy field.
-  const splashSize = 2732;
-  const splashBg = `<svg xmlns="http://www.w3.org/2000/svg" width="${splashSize}" height="${splashSize}"><rect width="${splashSize}" height="${splashSize}" fill="${INK}"/></svg>`;
-  const splashMark = Buffer.from(markSvg(splashSize, splashSize / 2, splashSize / 2, 1));
-  await sharp(Buffer.from(splashBg)).composite([{ input: splashMark, top: 0, left: 0 }]).png().toFile(path.join(outDir, 'splash.png'));
-
-  console.log('Icon assets written to', outDir);
+function render(name, opts, transparent) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'civix-icon-'));
+  const html = path.join(dir, 'icon.html');
+  fs.writeFileSync(html, page(opts));
+  const out = path.join(OUT, name);
+  execFileSync(CHROME, [
+    '--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
+    `--window-size=${opts.size || SIZE},${opts.size || SIZE}`, '--virtual-time-budget=10000',
+    ...(transparent ? ['--default-background-color=00000000'] : []),
+    `--screenshot=${out}`, 'file://' + html,
+  ], { stdio: 'ignore' });
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log('wrote', path.relative(process.cwd(), out));
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+// iOS masks the square to a rounded rect; 76% width keeps the X clear of it.
+render('icon.png', { background: INK, widthShare: 0.76 });
+// Android adaptive icons crop to a circle/squircle inside the middle ~66%.
+render('icon-foreground.png', { background: 'transparent', widthShare: 0.56 }, true);
+render('icon-background.png', { background: INK, widthShare: 0 });
+// Launch screen: the same wordmark, smaller, centered on navy.
+render('splash.png', { background: INK, widthShare: 0.3, size: 2732 });
+render('splash-dark.png', { background: INK, widthShare: 0.3, size: 2732 });
