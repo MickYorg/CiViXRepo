@@ -15,6 +15,11 @@ cd "$(dirname "$0")/.."
 # Always leave the working copy in bundled mode, even if a step fails.
 trap 'scripts/ios-live.sh off >/dev/null' EXIT
 source ~/.civix-asc/config
+# Signing new pieces (share extension, App Group) needs Xcode signed in to the
+# developer account; its login has been lost once before (25 Sep 2026).
+if ! defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists 2>/dev/null | grep -q identifier; then
+  echo "✗ Xcode isn't signed in to an Apple account: Xcode → Settings → Accounts → + → Apple ID"; exit 1
+fi
 KEY="$HOME/.civix-asc/AuthKey_${ASC_KEY_ID}.p8"
 [ -f "$KEY" ] || { echo "missing $KEY — see the setup notes at the top of this script"; exit 1; }
 
@@ -36,7 +41,7 @@ AUTH=(-allowProvisioningUpdates
 echo "▸ archiving build $BUILD_NUMBER"
 xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$OUT/App.xcarchive" \
-  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" "${AUTH[@]}" archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" -allowProvisioningUpdates archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
 
 cat > "$OUT/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
