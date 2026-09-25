@@ -23,6 +23,12 @@ function watchStateKey(bill) {
   return 'state:' + (bill.session || '') + ':' + (bill.identifier || '');
 }
 
+// 'federal:119:HR9694' -> { congress: '119', type: 'hr', number: '9694' }
+export function parseFederalWatchKey(key) {
+  const m = /^federal:(\d+):([A-Za-z]+)(\d+)$/.exec(key || '');
+  return m ? { congress: m[1], type: m[2].toLowerCase(), number: m[3] } : null;
+}
+
 async function fetchJson(url) {
   try {
     const res = await fetch(url);
@@ -48,9 +54,13 @@ async function listAllDevices(kv) {
   return devices;
 }
 
-async function run(env) {
+// deps are injectable for tests (tests/unit/push-scheduler.test.js):
+// { fetchJson, send } default to the real network calls.
+export async function run(env, opts = {}) {
   const kv = env.DIG_KV;
   if (!kv) return { error: 'missing DIG_KV binding' };
+  const getJson = opts.fetchJson || fetchJson;
+  const send = opts.send || sendPush;
 
   let serviceAccount = null;
   try {
@@ -59,25 +69,40 @@ async function run(env) {
   const projectId = env.FCM_PROJECT_ID;
   if (!serviceAccount || !projectId) return { error: 'FCM not configured yet — no-op' };
 
-  const devices = await listAllDevices(kv);
+  const devices = opts.devices || await listAllDevices(kv);
   if (!devices.length) return { devices: 0, notified: 0 };
 
-  const federalData = await fetchJson(SITE_ORIGIN + '/api/calendar');
+  const federalData = await getJson(SITE_ORIGIN + '/api/calendar');
   const federalByKey = {};
   ((federalData && federalData.bills) || []).forEach(b => { federalByKey[watchFederalKey(b)] = b; });
+
+  // 25 Sep 2026: a watched federal bill outside /api/calendar's ~100 most
+  // recently touched bills (e.g. one the citizen named themselves, like
+  // H.R.9694) could never alert. Look each missing one up directly, once per
+  // run no matter how many devices watch it.
+  const missing = new Set();
+  devices.forEach(d => (d.watching || []).forEach(w => {
+    if (w.kind === 'federal' && !federalByKey[w.key] && parseFederalWatchKey(w.key)) missing.add(w.key);
+  }));
+  for (const key of missing) {
+    const c = parseFederalWatchKey(key);
+    const data = await getJson(`${SITE_ORIGIN}/api/bill-lookup?type=${c.type}&number=${c.number}&congress=${c.congress}`);
+    if (data && data.bill) federalByKey[key] = data.bill;
+  }
 
   // Group by ZIP so state-bills is fetched once per distinct ZIP among all
   // devices, not once per device.
   const zips = [...new Set(devices.map(d => d.zip).filter(Boolean))];
   const stateByZip = {};
   for (const zip of zips) {
-    const data = await fetchJson(SITE_ORIGIN + '/api/state-bills?zip=' + encodeURIComponent(zip));
+    const data = await getJson(SITE_ORIGIN + '/api/state-bills?zip=' + encodeURIComponent(zip));
     const byKey = {};
     ((data && data.bills) || []).forEach(b => { byKey[watchStateKey(b)] = b; });
     stateByZip[zip] = byKey;
   }
 
   let notifiedCount = 0;
+  const results = [];
   for (const device of devices) {
     const notifiedKey = NOTIFIED_PREFIX + device.token;
     const notified = (await kv.get(notifiedKey, { type: 'json' })) || {};
@@ -88,7 +113,7 @@ async function run(env) {
       const pool = w.kind === 'federal' ? federalByKey : w.kind === 'state' ? stateByKey : null;
       if (!pool) continue; // 'general' watches have no bill data to diff — same limitation the client-side checkWatchlistUpdates() already has
       const bill = pool[w.key];
-      if (!bill) continue; // fell outside this fetch's recent-activity window this run
+      if (!bill) continue; // not found this run (state bills outside the recent window, or a lookup hiccup)
       const latest = (bill.latestAction && bill.latestAction.date) || bill.updateDate || null;
       if (!latest) continue;
       const lastNotified = notified[w.key] || w.lastSeenActionDate || null;
@@ -96,7 +121,7 @@ async function run(env) {
       changed.push(w.key);
       notified[w.key] = latest;
     }
-    if (!changed.length) continue;
+    if (!changed.length) { results.push({ changed: 0 }); continue; }
 
     // Deliberately generic — never names the bill/topic. See push.js and
     // push-register.js's own comments on why: this payload transits Apple's/
@@ -105,19 +130,44 @@ async function run(env) {
       ? "A bill you're watching changed status. Open CiViX to see what happened."
       : `${changed.length} bills you're watching changed status. Open CiViX to see what happened.`;
 
-    const result = await sendPush(serviceAccount, projectId, device.token, 'CiViX watchlist update', body);
+    const result = await send(serviceAccount, projectId, device.token, 'CiViX watchlist update', body);
     if (result.invalidToken) {
       await kv.delete('pushdevice:' + device.token);
       await kv.delete(notifiedKey);
+      results.push({ changed: changed.length, sent: false, invalidToken: true });
       continue;
     }
     if (result.ok) {
       notifiedCount++;
       await kv.put(notifiedKey, JSON.stringify(notified), { expirationTtl: NOTIFIED_TTL_SECONDS });
     }
+    results.push({ changed: changed.length, sent: !!result.ok });
   }
 
-  return { devices: devices.length, notified: notifiedCount };
+  return { devices: devices.length, notified: notifiedCount, results };
+}
+
+// "Simulate an update" (test builds only; see take-action.html's
+// pushRowHtml()): the app first rewinds one watched bill's
+// lastSeenActionDate and re-registers, then calls this. Clearing the
+// device's "already notified" record and running the real diff for just
+// this device sends a real push through the real pipeline. Needs no
+// secret: it only acts on the device whose token the caller already holds
+// (the token is its identity, same as push-register.js), and is capped
+// per device per day.
+const SIMULATE_DAILY_LIMIT = 20;
+export async function simulate(env, token, opts = {}) {
+  const kv = env.DIG_KV;
+  const device = token && await kv.get('pushdevice:' + token, { type: 'json' });
+  if (!device) return { status: 404, body: { error: { message: 'This device isn\u2019t registered for alerts yet — turn on alerts first.' } } };
+  const day = new Date().toISOString().slice(0, 10);
+  const rateKey = `pushsim:${token.slice(-24)}:${day}`;
+  const count = Number(await kv.get(rateKey)) || 0;
+  if (count >= SIMULATE_DAILY_LIMIT) return { status: 429, body: { error: { message: 'Daily limit of test alerts reached.' } } };
+  await kv.put(rateKey, String(count + 1), { expirationTtl: 60 * 60 * 48 });
+  await kv.delete(NOTIFIED_PREFIX + token);
+  const result = await run(env, { ...opts, devices: [device] });
+  return { status: 200, body: result };
 }
 
 export default {
@@ -130,6 +180,18 @@ export default {
   // anyone who finds the Worker's URL.
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/simulate') {
+      const origin = request.headers.get('Origin') || '';
+      const cors = ['https://mycivix.com', 'capacitor://mycivix.com'].includes(origin)
+        ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Vary': 'Origin' }
+        : {};
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      if (request.method !== 'POST') return new Response('not found', { status: 404 });
+      let token = '';
+      try { token = String((await request.json()).token || '').slice(0, 4096); } catch (e) {}
+      const { status, body } = await simulate(env, token);
+      return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
     if (url.pathname === '/run' && env.TRIGGER_SECRET && request.headers.get('X-Trigger-Secret') === env.TRIGGER_SECRET) {
       const result = await run(env);
       return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });

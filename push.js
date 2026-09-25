@@ -62,7 +62,11 @@
     if (!P || listenersWired) return;
     listenersWired = true;
     P.addListener('registration', function (data) {
-      if (data && data.value) register(data.value);
+      if (!data || !data.value) return;
+      register(data.value);
+      // The token arrives after requestPermission() resolves; let the page
+      // redraw so it shows "alerts are on" instead of "Get notified".
+      try { window.dispatchEvent(new Event('civix-push-registered')); } catch (e) {}
     });
     P.addListener('registrationError', function () { /* silent — same fail-open stance as other best-effort features here */ });
     P.addListener('pushNotificationActionPerformed', function () {
@@ -125,6 +129,7 @@
     isEnabled: isEnabled,
     requestPermission: requestPermission,
     resync: resync,
-    disable: disable
+    disable: disable,
+    token: storedToken
   };
 })();

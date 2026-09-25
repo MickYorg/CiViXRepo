@@ -679,6 +679,8 @@
   .watch-toggle:hover { border-color: var(--paper-dim); }
   .watch-toggle.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
   .watch-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
+  .watch-test { border: 1px dashed var(--amber); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .watch-test-msg { margin-top: 8px; color: var(--paper); }
   .noise-hint { font-size: 12px; color: var(--paper-dim); line-height: 1.55; margin: 0 0 10px; }
   .noise-links { display: flex; flex-wrap: wrap; gap: 8px; }
   .organize-tips { margin-top: 10px; }
@@ -1223,22 +1225,43 @@
     list.forEach(w => {
       if (w.kind !== kind) return;
       const b = byKey[w.key];
-      if (!b) return;
-      WATCH_LIVE[w.key] = b;
-      const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
-      if (latest && w.lastSeenActionDate && latest !== w.lastSeenActionDate) WATCH_UPDATES[w.key] = true;
-      // A watched bill actually becoming law is a real win, not just
-      // routine legislative churn — celebrated in watchCardHtml() (reads
-      // the persisted `won` flag on a fresh loadWatchlist(), which by the
-      // time renderWatchingZone() runs right after this always reflects
-      // what markWatchWon() just wrote) and counted once, ever. Federal-
-      // only: isEnacted() only ever matches a bill carrying calendar.js's
-      // own status field — see its comment.
-      if (kind === 'federal' && !w.won && isEnacted(b)) {
-        markWatchWon(w.key);
-        reportWin(Array.isArray(w.hits) ? w.hits : []);
-      }
+      if (b) applyWatchBill(w, b, kind);
     });
+  }
+  function applyWatchBill(w, b, kind) {
+    WATCH_LIVE[w.key] = b;
+    const latest = (b.latestAction && b.latestAction.date) || b.updateDate || null;
+    if (latest && w.lastSeenActionDate && latest !== w.lastSeenActionDate) WATCH_UPDATES[w.key] = true;
+    // A watched bill actually becoming law is a real win, not just
+    // routine legislative churn — celebrated in watchCardHtml() (reads
+    // the persisted `won` flag on a fresh loadWatchlist(), which by the
+    // time renderWatchingZone() runs right after this always reflects
+    // what markWatchWon() just wrote) and counted once, ever. Federal-
+    // only: isEnacted() only ever matches a bill carrying calendar.js's
+    // own status field — see its comment.
+    if (kind === 'federal' && !w.won && isEnacted(b)) {
+      markWatchWon(w.key);
+      reportWin(Array.isArray(w.hits) ? w.hits : []);
+    }
+  }
+
+  // 25 Sep 2026: a watched federal bill outside /api/calendar's ~100 most
+  // recently touched bills (typically one the citizen named, e.g.
+  // H.R.9694) never got live data, so it could never show "updated" —
+  // look each missing one up directly. workers/push-scheduler does the same
+  // for push alerts.
+  async function fillMissingFederalWatches() {
+    const missing = loadWatchlist().filter(w => w.kind === 'federal' && !WATCH_LIVE[w.key]);
+    await Promise.all(missing.map(async w => {
+      const m = /^federal:(\d+):([A-Za-z]+)(\d+)$/.exec(w.key);
+      if (!m) return;
+      try {
+        const r = await fetch(`/api/bill-lookup?type=${m[2].toLowerCase()}&number=${m[3]}&congress=${m[1]}`);
+        const d = r.ok ? await r.json() : null;
+        if (d && d.bill) applyWatchBill(w, d.bill, 'federal');
+      } catch (e) { /* stays unresolved, same as before */ }
+    }));
+    if (missing.length) renderWatchingZone();
   }
 
   // Progressive enhancement for watched cards, mirroring
@@ -1324,9 +1347,75 @@
       return `<p class="watch-note">CiViX also checks these every time you open this page.</p>`;
     }
     if (window.CivixPush.isEnabled()) {
-      return `<p class="watch-note">&#128276; Push alerts are on for this device. <button type="button" class="btn" data-push-disable>Turn off</button></p>`;
+      return `<p class="watch-note">&#128276; Push alerts are on for this device. <button type="button" class="btn" data-push-disable>Turn off</button></p>` +
+        simulateRowHtml();
     }
     return `<p class="watch-note">&#128276; Want a nudge the moment one of these moves, even when you're not here? <button type="button" class="btn" data-push-enable>Get notified</button></p>`;
+  }
+
+  // ---- Test builds only: simulate a watched bill changing -----------------
+  // A real alert only fires when a watched bill actually moves, which can
+  // take weeks. This rewinds one watched bill's "last seen" date (so both the
+  // alert server and this page see its real latest action as new), then asks
+  // workers/push-scheduler to run for this device only: a real push, through
+  // the real pipeline. Tapping it lands here with the "updated" badge. Undo
+  // puts the date back. Test builds are the native app loading the live site
+  // over https (scripts/ios-live.sh); App Store builds load capacitor:// and
+  // never show this.
+  const PUSH_SCHEDULER = 'https://civix-push-scheduler.mycivix.workers.dev';
+  let SIMULATE_MSG = '';
+  function isTestBuild() {
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && location.protocol === 'https:';
+  }
+  function simulateRowHtml() {
+    if (!isTestBuild()) return '';
+    const simulated = loadWatchlist().some(w => w.simulatedFrom !== undefined);
+    return `<div class="watch-note watch-test">
+      <strong>Test build:</strong> ${simulated
+        ? `A watched bill is marked as changed for testing. <button type="button" class="btn" data-push-undo>Undo test</button>`
+        : `<button type="button" class="btn" data-push-simulate>Simulate a bill update</button> sends a real alert for one of these in a few seconds.`}
+      ${SIMULATE_MSG ? `<div class="watch-test-msg">${esc(SIMULATE_MSG)}</div>` : ''}
+    </div>`;
+  }
+  async function simulateWatchUpdate() {
+    const profile = loadRawProfile();
+    const list = (profile && profile.watching) || [];
+    const w = list.find(x => (x.kind === 'federal' || x.kind === 'state') && WATCH_LIVE[x.key]) ||
+              list.find(x => x.kind === 'federal' || x.kind === 'state');
+    if (!w) { SIMULATE_MSG = 'Watch a federal or state bill first — topics have no bill to change.'; renderWatchingZone(); return; }
+    w.simulatedFrom = w.lastSeenActionDate || null;
+    w.lastSeenActionDate = '2000-01-01';
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+    SIMULATE_MSG = 'Sending…'; renderWatchingZone();
+    try {
+      await window.CivixPush.resync();
+      const r = await fetch(PUSH_SCHEDULER + '/simulate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: window.CivixPush.token() })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((d.error && d.error.message) || 'HTTP ' + r.status);
+      SIMULATE_MSG = d.notified
+        ? 'Alert sent. Lock the phone or go to the home screen; it should arrive within a few seconds. Tap it to come back here.'
+        : 'The alert server ran but found nothing to send (' + JSON.stringify(d.results || d) + ').';
+    } catch (e) {
+      SIMULATE_MSG = 'Couldn\u2019t send the test alert: ' + e.message;
+    }
+    WATCH_UPDATES[w.key] = !!(WATCH_LIVE[w.key]);
+    renderWatchingZone();
+  }
+  function undoSimulatedUpdate() {
+    const profile = loadRawProfile();
+    (profile && profile.watching || []).forEach(w => {
+      if (w.simulatedFrom === undefined) return;
+      w.lastSeenActionDate = w.simulatedFrom;
+      delete w.simulatedFrom;
+      delete WATCH_UPDATES[w.key];
+    });
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+    if (window.CivixPush) window.CivixPush.resync();
+    SIMULATE_MSG = '';
+    renderWatchingZone();
   }
 
   function renderWatchingZone() {
@@ -2282,6 +2371,8 @@ BODY: <the email body, a few short paragraphs>`;
     document.getElementById('action-close').addEventListener('click', closeStateActionModal);
   }
 
+  window.addEventListener('civix-push-registered', () => renderWatchingZone());
+
   document.addEventListener('click', (e) => {
     const t = e.target;
 
@@ -2443,6 +2534,8 @@ BODY: <the email body, a few short paragraphs>`;
       window.CivixPush.requestPermission().then(renderWatchingZone);
       return;
     }
+    if (t.closest('[data-push-simulate]') && window.CivixPush) { simulateWatchUpdate(); return; }
+    if (t.closest('[data-push-undo]')) { undoSimulatedUpdate(); return; }
     if (t.closest('[data-push-disable]') && window.CivixPush) {
       window.CivixPush.disable().then(renderWatchingZone);
       return;
@@ -3014,6 +3107,7 @@ BODY: <the email body, a few short paragraphs>`;
     // returned just now, on this same fetch the page always makes.
     checkWatchlistUpdates(bills);
     renderWatchingZone();
+    fillMissingFederalWatches();
     if (!bills.length) {
       FED_STATE = { kind: 'no-bills' };
       renderFedResults();
