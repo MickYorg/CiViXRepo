@@ -33,7 +33,9 @@ it whole.
   worse than `tests/phone-baseline.json` (a ratchet). Look at the
   screenshots in `phone-check-out/`; `-- --laptop` adds a MacBook
   reference; `--update-baseline` only after looking. Phone-width rules that
-  apply to every page go in the shared **`phone.css`**.
+  apply to every page go in the shared **`phone.css`**; the standard header
+  (CiViX left, mode switch centered, theme toggle right, one line, every
+  page) is **`topbar.css`**. Don't restyle the header per page.
 - `npm run test:live` — production smoke checks (no AI spend, no email).
 - `.githooks/pre-push` runs tests before every push (layout too when pages
   changed). New clone: `git config core.hooksPath .githooks`.
