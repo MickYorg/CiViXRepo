@@ -37,7 +37,7 @@ it whole.
 - `npm run test:live` — production smoke checks (no AI spend, no email).
 - `.githooks/pre-push` runs tests before every push (layout too when pages
   changed). New clone: `git config core.hooksPath .githooks`.
-  `.github/workflows/tests.yml` runs everything on push and nightly 7am ET
+  `.github/workflows/tests.yml` runs everything on push and nightly 7:17am ET
   against production; GitHub emails on failure.
 - Changing how a **cached** value is derived (an AI prompt, a status rule)?
   Bump its cache key's version in the same change.
@@ -146,7 +146,7 @@ are gitignored — public repo — re-download from the Firebase console
    6815834665, listing name "mccivix", internal group "Me" gets every
    build; test builds load the live site via `scripts/ios-live.sh`); the
    **nightly investigator** routine (claude.ai/code/routines/trig_01FkooSzXG33WVpyozqdqWon,
-   7:30am ET: all green → stops; failures → root cause + fix + test on a
+   7:45am ET, after the 7:17am CI run: all green → stops; failures → root cause + fix + test on a
    `nightly/<date>` branch and PR, never main). Still to build: the App
    Store half of hybrid live updates (bundled pages + a self-hosted
    update channel).
