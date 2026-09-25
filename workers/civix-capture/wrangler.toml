@@ -17,3 +17,8 @@ CAPTURE_DOMAIN = "mycivix.com"
 binding = "DB"
 database_name = "civix"
 database_id = "f511e702-e584-4f27-8ec7-2080eade8611"
+
+# Every minute: dig into newly captured items (see processDigQueue in
+# src/index.js). A dig can take longer than a request may keep working.
+[triggers]
+crons = ["* * * * *"]

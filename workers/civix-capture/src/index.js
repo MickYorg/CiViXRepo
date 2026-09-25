@@ -4033,8 +4033,55 @@ async function fileItem(env, token, { title, text, url, source }) {
   return { status: "filed", id, seq };
 }
 __name(fileItem, "fileItem");
+// "Your team gets on it" (25 Sep 2026): every new filing is handed to
+// mycivix.com's /api/capture-dig (Claude + web search), and the result is
+// stored with the filing for the "Sent to CiViX" feed on Take Action.
+// dig_state: '' (never tried) | 'queued' | 'digging' | 'ready' | 'error'.
+// A dig (Claude + web search) can outlast the ~30s a Worker may keep working
+// after a response, so new filings are only marked 'queued' and the
+// once-a-minute scheduled() handler below does the digging.
+var DIG_ENDPOINT = "https://mycivix.com/api/capture-dig";
+var DIG_BACKFILL_DAYS = 14;
+async function digInto(env, id) {
+  const row = await env.DB.prepare("SELECT id, title, url, note FROM filings WHERE id = ?").bind(id).first();
+  if (!row || !env.CAPTURE_DIG_SECRET) return;
+  await env.DB.prepare("UPDATE filings SET dig_state = 'digging', dig_at = ? WHERE id = ?").bind(Date.now(), id).run();
+  let state = "error", dig = "";
+  try {
+    const r = await fetch(DIG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Capture-Secret": env.CAPTURE_DIG_SECRET },
+      body: JSON.stringify({ title: row.title, text: row.note, url: row.url })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.dig) { state = "ready"; dig = JSON.stringify(d.dig); }
+    else dig = JSON.stringify({ error: (d.error && d.error.message) || "HTTP " + r.status });
+  } catch (e) {
+    dig = JSON.stringify({ error: "Couldn\u2019t reach CiViX" });
+  }
+  await env.DB.prepare("UPDATE filings SET dig = ?, dig_state = ?, dig_at = ? WHERE id = ?").bind(dig, state, Date.now(), id).run();
+}
+__name(digInto, "digInto");
+async function queueDig(env, id) {
+  await env.DB.prepare("UPDATE filings SET dig_state = 'queued', dig_at = ? WHERE id = ?").bind(Date.now(), id).run();
+}
+__name(queueDig, "queueDig");
+// Every minute: dig up to 3 queued filings (oldest first), plus any stuck
+// mid-dig for 10+ minutes (the invocation died).
+async function processDigQueue(env) {
+  const stale = Date.now() - 6e5;
+  const { results } = await env.DB.prepare(
+    "SELECT id FROM filings WHERE dig_state = 'queued' OR (dig_state = 'digging' AND dig_at < ?) ORDER BY at ASC LIMIT 3"
+  ).bind(stale).all();
+  for (const r of results || []) await digInto(env, r.id);
+}
+__name(processDigQueue, "processDigQueue");
+
 var index_default = {
-  async email(message, env) {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(processDigQueue(env));
+  },
+  async email(message, env, ctx) {
     const to = String(message.to || "").toLowerCase();
     const token = to.split("@")[0].replace(/\+.*$/, "");
     if (!TOKEN_RE.test(token)) {
@@ -4056,14 +4103,15 @@ var index_default = {
     const parsed = await PostalMime.parse(message.raw);
     const subject = (parsed.subject || "").trim();
     const body = cleanBody(parsed.text || stripHtml(parsed.html || ""));
-    await fileItem(env, token, {
+    const filed = await fileItem(env, token, {
       title: subject,
       text: body,
       url: "",
       source: "mail"
     });
+    if (filed && filed.status === "filed") await queueDig(env, filed.id);
   },
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     // ALLOWED_ORIGIN is a comma-separated list. The browser only accepts a
     // single origin back, so echo the caller's when it's on the list: the
@@ -4096,11 +4144,22 @@ var index_default = {
       if (!docket) return json({ error: "no such docket" }, 404);
       if (url.pathname === "/api/filings" && request.method === "GET") {
         const { results } = await env.DB.prepare(
-          "SELECT id, seq, title, url, host, note, at, repeats, state, source FROM filings WHERE token = ? ORDER BY at DESC"
+          "SELECT id, seq, title, url, host, note, at, repeats, state, source, dig, dig_state, dig_at FROM filings WHERE token = ? ORDER BY at DESC"
         ).bind(token).all();
+        const items = (results || []).map((it) => {
+          let dig = null;
+          try { dig = it.dig ? JSON.parse(it.dig) : null; } catch (e) {}
+          return { ...it, dig };
+        });
+        // Backfill: recent items never dug get queued for the minute job.
+        const now = Date.now();
+        for (const it of items.filter((it) => it.state !== "done" && it.dig_state === "" && now - it.at < DIG_BACKFILL_DAYS * 864e5)) {
+          await queueDig(env, it.id);
+          it.dig_state = "queued";
+        }
         return json({
           address: `${token}@${env.CAPTURE_DOMAIN}`,
-          items: results || []
+          items
         });
       }
       if (url.pathname === "/api/filings" && request.method === "POST") {
@@ -4109,11 +4168,12 @@ var index_default = {
         // Android shares say so; anything else counts as the web page.
         const source = ["ios-share", "siri", "android-share"].includes(body.source) ? body.source : "web";
         const r = await fileItem(env, token, { ...body, source });
+        if (r.status === "filed") await queueDig(env, r.id);
         return json(r);
       }
       if (url.pathname === "/api/filing" && request.method === "PATCH") {
         const { id, state, title } = await request.json();
-        if (state && !["docket", "adopted"].includes(state)) return json({ error: "bad state" }, 400);
+        if (state && !["docket", "adopted", "done"].includes(state)) return json({ error: "bad state" }, 400);
         if (state) {
           await env.DB.prepare("UPDATE filings SET state = ? WHERE id = ? AND token = ?").bind(state, id, token).run();
         }
@@ -4121,6 +4181,13 @@ var index_default = {
           await env.DB.prepare("UPDATE filings SET title = ? WHERE id = ? AND token = ?").bind(title.trim().slice(0, 300), id, token).run();
         }
         return json({ ok: true });
+      }
+      if (url.pathname === "/api/filing/dig" && request.method === "POST") {
+        const { id } = await request.json();
+        const own = await env.DB.prepare("SELECT id FROM filings WHERE id = ? AND token = ?").bind(id, token).first();
+        if (!own) return json({ error: "no such filing" }, 404);
+        await queueDig(env, id);
+        return json({ ok: true, dig_state: "queued" });
       }
       if (url.pathname === "/api/filing" && request.method === "DELETE") {
         const { id } = await request.json();
