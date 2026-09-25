@@ -146,28 +146,39 @@ export async function onRequestPost({ request, env }) {
   }
 
   const source = await readSource(item.url);
-  let res;
-  try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        // Search calls and reasoning count against this too; 2000 ran out
-        // mid-answer on a real capture (25 Sep 2026).
-        max_tokens: 8000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
-        messages: [{ role: 'user', content: buildPrompt({ ...item, source }) }],
-      }),
-    });
-  } catch (e) {
-    return json({ error: { message: 'Could not reach Anthropic API' } }, 500);
+  // Sonnet 5 thinks by default and that thinking counts against max_tokens
+  // (at 2000/8000 real captures ran out with almost no answer written), so:
+  // a roomy max_tokens, medium effort (this is triage, not deep research),
+  // and the current web search tool. A long search can end a turn with
+  // stop_reason "pause_turn"; continue it by sending the partial reply back.
+  const messages = [{ role: 'user', content: buildPrompt({ ...item, source }) }];
+  let parsed, res;
+  const content = [];
+  for (let turn = 0; turn < 3; turn++) {
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          max_tokens: 16000,
+          output_config: { effort: 'medium' },
+          tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
+          messages,
+        }),
+      });
+    } catch (e) {
+      return json({ error: { message: 'Could not reach Anthropic API' } }, 500);
+    }
+    const raw = await res.text();
+    try { parsed = JSON.parse(raw); } catch (e) { return json({ error: { message: 'Anthropic returned an unparseable response' } }, 500); }
+    if (kv) { try { await recordSpend(kv, 'capture_dig', parsed.usage, dateKey, record); } catch (e) {} }
+    if (!res.ok) return json({ error: { message: (parsed.error && parsed.error.message) || `Anthropic HTTP ${res.status}` } }, 500);
+    content.push(...(parsed.content || []));
+    if (parsed.stop_reason !== 'pause_turn') break;
+    messages.push({ role: 'assistant', content: parsed.content });
   }
-  const raw = await res.text();
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch (e) { return json({ error: { message: 'Anthropic returned an unparseable response' } }, 500); }
-  if (kv) { try { await recordSpend(kv, 'capture_dig', parsed.usage, dateKey, record); } catch (e) {} }
-  if (!res.ok) return json({ error: { message: (parsed.error && parsed.error.message) || `Anthropic HTTP ${res.status}` } }, 500);
+  parsed.content = content;
 
   // With web search, the reply arrives as several text blocks split around
   // citations, sometimes mid-string: join them with nothing, not newlines.
