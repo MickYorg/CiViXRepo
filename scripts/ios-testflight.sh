@@ -36,7 +36,7 @@ AUTH=(-allowProvisioningUpdates
 echo "▸ archiving build $BUILD_NUMBER"
 xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$OUT/App.xcarchive" \
-  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" -allowProvisioningUpdates archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" "${AUTH[@]}" archive | grep -E "ARCHIVE (SUCCEEDED|FAILED)|error:"
 
 cat > "$OUT/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

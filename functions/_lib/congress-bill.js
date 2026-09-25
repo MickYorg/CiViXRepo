@@ -41,9 +41,13 @@ const STATUS_PATTERNS = [
   { status: 'To President', re: /presented to president/i },
   // Senate simple resolutions are "Submitted in the Senate, considered, and
   // agreed to" / "Resolution agreed to in Senate" — that is passage.
-  { status: 'Passed Senate', re: /passed senate|passed\/agreed to in senate|agreed to in (the )?senate|considered,? and agreed to/i },
+  // "Senate agreed to the House amendment" = the Senate's final step on a
+  // bill both chambers have now passed.
+  { status: 'Passed Senate', re: /passed senate|passed\/agreed to in senate|agreed to in (the )?senate|senate agreed to|considered,? and agreed to/i },
   // A bill "Received in the Senate" / "Held at the desk" has passed the House.
-  { status: 'Passed House', re: /passed house|passed\/agreed to in house|agreed to in (the )?house|received in the senate|held at the desk/i },
+  // "Motion to reconsider laid on the table" is the House's routine
+  // follow-up right after a successful vote.
+  { status: 'Passed House', re: /passed house|passed\/agreed to in house|agreed to in (the )?house|house agreed to|received in the senate|held at the desk|motion to reconsider laid on the table/i },
   // "Placed on the Union/House Calendar" follows a committee report; the
   // Senate's "Placed on Senate Legislative Calendar" means it's awaiting
   // floor action (sometimes without going through committee at all).
