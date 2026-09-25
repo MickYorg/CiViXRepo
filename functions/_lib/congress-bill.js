@@ -47,7 +47,7 @@ const STATUS_PATTERNS = [
   // A bill "Received in the Senate" / "Held at the desk" has passed the House.
   // "Motion to reconsider laid on the table" is the House's routine
   // follow-up right after a successful vote.
-  { status: 'Passed House', re: /passed house|passed\/agreed to in house|agreed to in (the )?house|house agreed to|received in the senate|held at the desk|motion to reconsider laid on the table/i },
+  { status: 'Passed House', re: /passed house|passed\/agreed to in house|agreed to in (the )?house|house agreed to|received in the senate|held at the desk|motion to reconsider laid on the table|title of the measure was amended/i },
   // "Placed on the Union/House Calendar" follows a committee report; the
   // Senate's "Placed on Senate Legislative Calendar" means it's awaiting
   // floor action (sometimes without going through committee at all).

@@ -47,6 +47,7 @@ test('bill status is read from the latest action text', async () => {
   // Found by the live checks, 25 Sep 2026:
   assert.equal(deriveStatus('Senate agreed to the House amendment to S. 240 by Unanimous Consent.'), 'Passed Senate');
   assert.equal(deriveStatus('Motion to reconsider laid on the table Agreed to without objection.'), 'Passed House');
+  assert.equal(deriveStatus('The title of the measure was amended. Agreed to without objection.'), 'Passed House');
   assert.equal(deriveStatus('Held at the desk.'), 'Passed House');
   assert.equal(deriveStatus('Ordered to be Reported (Amended) by the Yeas and Nays: 28 - 21.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on the Union Calendar, Calendar No. 412.'), 'Reported by Committee');
