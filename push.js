@@ -50,10 +50,12 @@
     try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
     var zip = '';
     try { zip = (loadProfile() && loadProfile().place && loadProfile().place.zip) || ''; } catch (e) {}
+    var docket = '';
+    try { docket = (loadProfile() && loadProfile().token) || localStorage.getItem('civix.token') || ''; } catch (e) {}
     return fetch('/api/push-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: token, platform: platform(), zip: zip, watching: currentWatching() })
+      body: JSON.stringify({ token: token, platform: platform(), zip: zip, watching: currentWatching(), docket: docket })
     }).catch(function () { /* best-effort, same stance as every other background sync in this app */ });
   }
 
@@ -131,6 +133,19 @@
       body: JSON.stringify({ token: token })
     }).catch(function () {});
   }
+
+  // Keep the server's copy current (watchlist, ZIP, Send to CiViX address)
+  // without waiting for a watchlist change: re-register at most once a day.
+  (function refreshDaily() {
+    var t = storedToken();
+    if (!t || !isNative()) return;
+    var today = new Date().toISOString().slice(0, 10);
+    try {
+      if (localStorage.getItem('civix-push-synced') === today) return;
+      localStorage.setItem('civix-push-synced', today);
+    } catch (e) { return; }
+    register(t);
+  })();
 
   window.CivixPush = {
     available: !!plugin(),

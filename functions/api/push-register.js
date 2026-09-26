@@ -64,11 +64,25 @@ export async function onRequestPost({ request, env }) {
       lastSeenActionDate: typeof w.lastSeenActionDate === 'string' ? w.lastSeenActionDate.slice(0, 40) : null
     }));
 
-  const record = { token, platform, zip, watching, updatedAt: new Date().toISOString() };
+  // The citizen's Send to CiViX docket token (their capture address), so the
+  // capture Worker can tell this device when a dig on something they sent
+  // is ready (push-scheduler's /notify-dig). Only an opaque token, no content.
+  const docket = typeof body.docket === 'string' && /^[a-z0-9]{10}$/.test(body.docket) ? body.docket : '';
+  const record = { token, platform, zip, watching, docket, updatedAt: new Date().toISOString() };
   try {
     await kv.put(`pushdevice:${token}`, JSON.stringify(record), { expirationTtl: DEVICE_TTL_SECONDS });
   } catch (e) {
     return json({ error: { message: 'Could not save device registration.' } }, 500);
+  }
+
+  if (docket) {
+    try {
+      const key = `pushdocket:${docket}`;
+      const list = (await kv.get(key, { type: 'json' })) || [];
+      if (!list.includes(token)) {
+        await kv.put(key, JSON.stringify([...list, token].slice(-10)), { expirationTtl: DEVICE_TTL_SECONDS });
+      }
+    } catch (e) { /* dig-ready pushes are best-effort */ }
   }
 
   try {
@@ -96,6 +110,13 @@ export async function onRequestDelete({ request, env }) {
   if (!token) return json({ error: { message: 'Missing required "token"' } }, 400);
 
   try {
+    const rec = await kv.get(`pushdevice:${token}`, { type: 'json' });
+    if (rec && rec.docket) {
+      const key = `pushdocket:${rec.docket}`;
+      const list = ((await kv.get(key, { type: 'json' })) || []).filter(t => t !== token);
+      if (list.length) await kv.put(key, JSON.stringify(list), { expirationTtl: DEVICE_TTL_SECONDS });
+      else await kv.delete(key);
+    }
     await kv.delete(`pushdevice:${token}`);
   } catch (e) {
     return json({ error: { message: 'Could not delete device registration.' } }, 500);

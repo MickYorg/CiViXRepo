@@ -168,6 +168,35 @@ export async function welcome(env, token, opts = {}) {
   return { status: result.ok ? 200 : 500, body: { sent: !!result.ok } };
 }
 
+// Dig ready (Send to CiViX phase 2): the capture Worker calls this when
+// CiViX finishes digging into something a citizen sent. Every device linked
+// to that docket (push-register.js keeps pushdocket:<docket>) gets one
+// generic push; tapping it opens Take Action, where the result is waiting.
+// Never names the topic, same lock-screen rule as every alert.
+export async function notifyDig(env, docket, opts = {}) {
+  const kv = env.DIG_KV;
+  const send = opts.send || sendPush;
+  if (!/^[a-z0-9]{10}$/.test(docket || '')) return { status: 400, body: { error: { message: 'bad docket' } } };
+  const tokens = (await kv.get('pushdocket:' + docket, { type: 'json' })) || [];
+  if (!tokens.length) return { status: 200, body: { devices: 0, sent: 0 } };
+  let serviceAccount = null;
+  try { serviceAccount = env.FCM_SERVICE_ACCOUNT_JSON ? JSON.parse(env.FCM_SERVICE_ACCOUNT_JSON) : null; } catch (e) {}
+  if (!serviceAccount || !env.FCM_PROJECT_ID) return { status: 500, body: { error: { message: 'FCM not configured' } } };
+  let sent = 0;
+  const keep = [];
+  for (const t of tokens) {
+    const r = await send(serviceAccount, env.FCM_PROJECT_ID, t, 'CiViX dug in', 'CiViX looked into what you sent. Tap to see your move.');
+    if (r.invalidToken) { await kv.delete('pushdevice:' + t); continue; }
+    keep.push(t);
+    if (r.ok) sent++;
+  }
+  if (keep.length !== tokens.length) {
+    if (keep.length) await kv.put('pushdocket:' + docket, JSON.stringify(keep));
+    else await kv.delete('pushdocket:' + docket);
+  }
+  return { status: 200, body: { devices: tokens.length, sent } };
+}
+
 // "Simulate an update" (test builds only; see take-action.html's
 // pushRowHtml()): the app first rewinds one watched bill's
 // lastSeenActionDate and re-registers, then calls this. Clearing the
@@ -212,6 +241,14 @@ export default {
       try { token = String((await request.json()).token || '').slice(0, 4096); } catch (e) {}
       const { status, body } = url.pathname === '/welcome' ? await welcome(env, token) : await simulate(env, token);
       return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    if (url.pathname === '/notify-dig' && request.method === 'POST') {
+      // Server to server only (the capture Worker), shared secret.
+      if (!env.NOTIFY_SECRET || request.headers.get('X-Notify-Secret') !== env.NOTIFY_SECRET) return new Response('not found', { status: 404 });
+      let docket = '';
+      try { docket = String((await request.json()).docket || ''); } catch (e) {}
+      const { status, body } = await notifyDig(env, docket);
+      return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/run' && env.TRIGGER_SECRET && request.headers.get('X-Trigger-Secret') === env.TRIGGER_SECRET) {
       const result = await run(env);

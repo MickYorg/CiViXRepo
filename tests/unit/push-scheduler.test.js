@@ -110,3 +110,19 @@ test('turning alerts on sends one confirmation alert, once per device', async ()
   await welcome(env(kv), 'tok1', n);
   assert.equal(n.sent.length, 1, 'not repeated on re-registration');
 });
+
+test('dig ready: every device linked to the docket gets one generic push', async () => {
+  const { notifyDig } = await mod();
+  const kv = fakeKV({ 'pushdocket:abcdefghij': ['tokA', 'tokB'] });
+  const n = net();
+  const r = await notifyDig(env(kv), 'abcdefghij', n);
+  assert.equal(r.body.sent, 2);
+  assert.match(n.sent[0].body, /Tap to see your move/);
+  assert.doesNotMatch(n.sent[0].title + n.sent[0].body, /abcdefghij/);
+});
+
+test('dig ready: a docket with no phones is a quiet no-op; bad input is refused', async () => {
+  const { notifyDig } = await mod();
+  assert.equal((await notifyDig(env(fakeKV()), 'abcdefghij', net())).body.devices, 0);
+  assert.equal((await notifyDig(env(fakeKV()), '../../etc', net())).status, 400);
+});

@@ -4043,7 +4043,7 @@ __name(fileItem, "fileItem");
 var DIG_ENDPOINT = "https://mycivix.com/api/capture-dig";
 var DIG_BACKFILL_DAYS = 14;
 async function digInto(env, id) {
-  const row = await env.DB.prepare("SELECT id, title, url, note FROM filings WHERE id = ?").bind(id).first();
+  const row = await env.DB.prepare("SELECT id, token, title, url, note FROM filings WHERE id = ?").bind(id).first();
   if (!row || !env.CAPTURE_DIG_SECRET) return;
   await env.DB.prepare("UPDATE filings SET dig_state = 'digging', dig_at = ? WHERE id = ?").bind(Date.now(), id).run();
   let state = "error", dig = "";
@@ -4060,6 +4060,16 @@ async function digInto(env, id) {
     dig = JSON.stringify({ error: "Couldn\u2019t reach CiViX" });
   }
   await env.DB.prepare("UPDATE filings SET dig = ?, dig_state = ?, dig_at = ? WHERE id = ?").bind(dig, state, Date.now(), id).run();
+  // Tell the citizen's phone(s) it's ready (best effort; see push-scheduler).
+  if (state === "ready" && env.NOTIFY_SECRET) {
+    try {
+      await fetch("https://civix-push-scheduler.mycivix.workers.dev/notify-dig", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Notify-Secret": env.NOTIFY_SECRET },
+        body: JSON.stringify({ docket: row.token })
+      });
+    } catch (e) {}
+  }
 }
 __name(digInto, "digInto");
 async function queueDig(env, id) {
