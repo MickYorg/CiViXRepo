@@ -88,6 +88,12 @@ from that folder) and `workers/push-scheduler/` (hourly watchlist diff →
 FCM push; manual run: `POST /run` with `X-Trigger-Secret` from
 `~/.civix-push-trigger-secret`).
 
+**Worker-to-Worker calls must use a service binding** (`[[services]]` in
+wrangler.toml, `env.X.fetch`): fetching another Worker's workers.dev URL on
+the same account returns 404 (error 1042). That silently broke every
+"CiViX dug in" push until 26 Sep 2026. The capture Worker's `dig.pushed`
+field records each push attempt's outcome.
+
 **Hand-synced copies (tests enforce them):** `SYNONYMS` and loose-word
 stoplists in `digest.js` / `functions/_lib/bill-matching.js` /
 `builder.html`; issue taxonomy `builder.html` CATALOG ↔

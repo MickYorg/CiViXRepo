@@ -4078,7 +4078,7 @@ async function digInto(env, id) {
     if (!env.NOTIFY_SECRET) pushed = { error: "NOTIFY_SECRET not set" };
     else {
       try {
-        const r = await fetch("https://civix-push-scheduler.mycivix.workers.dev/notify-dig", {
+        const r = await env.PUSH.fetch("https://civix-push-scheduler/notify-dig", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Notify-Secret": env.NOTIFY_SECRET },
           body: JSON.stringify({ docket: row.token })

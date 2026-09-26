@@ -22,3 +22,10 @@ database_id = "f511e702-e584-4f27-8ec7-2080eade8611"
 # src/index.js). A dig can take longer than a request may keep working.
 [triggers]
 crons = ["* * * * *"]
+
+# Direct link to the push Worker. A Worker can't fetch another Worker's
+# workers.dev URL on the same account (Cloudflare answers 404, error 1042),
+# which silently broke "CiViX dug in" pushes until 26 Sep 2026.
+[[services]]
+binding = "PUSH"
+service = "civix-push-scheduler"
