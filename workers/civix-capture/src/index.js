@@ -4071,14 +4071,26 @@ async function digInto(env, id) {
   }
   await env.DB.prepare("UPDATE filings SET dig = ?, dig_state = ?, dig_at = ? WHERE id = ?").bind(dig, state, Date.now(), id).run();
   // Tell the citizen's phone(s) it's ready (best effort; see push-scheduler).
-  if (state === "ready" && env.NOTIFY_SECRET) {
-    try {
-      await fetch("https://civix-push-scheduler.mycivix.workers.dev/notify-dig", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Notify-Secret": env.NOTIFY_SECRET },
-        body: JSON.stringify({ docket: row.token })
-      });
-    } catch (e) {}
+  // What happened is recorded on the filing (dig.pushed), so a missing
+  // notification can be traced instead of guessed at.
+  if (state === "ready") {
+    let pushed;
+    if (!env.NOTIFY_SECRET) pushed = { error: "NOTIFY_SECRET not set" };
+    else {
+      try {
+        const r = await fetch("https://civix-push-scheduler.mycivix.workers.dev/notify-dig", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Notify-Secret": env.NOTIFY_SECRET },
+          body: JSON.stringify({ docket: row.token })
+        });
+        pushed = { http: r.status, ...(await r.json().catch(() => ({}))) };
+      } catch (e) {
+        pushed = { error: String(e && e.message || e) };
+      }
+    }
+    pushed.at = Date.now();
+    const withPush = JSON.stringify({ ...JSON.parse(dig), pushed });
+    await env.DB.prepare("UPDATE filings SET dig = ? WHERE id = ?").bind(withPush, id).run();
   }
 }
 __name(digInto, "digInto");

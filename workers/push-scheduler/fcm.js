@@ -76,9 +76,16 @@ export async function sendPush(serviceAccount, projectId, token, title, body) {
     headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { token, notification: { title, body } } })
   });
-  if (res.ok) return { ok: true };
+  if (res.ok) {
+    const d = await res.json().catch(() => ({}));
+    return { ok: true, id: d.name || '' };
+  }
   const errBody = await res.json().catch(() => ({}));
-  const status = errBody && errBody.error && errBody.error.status;
-  const invalidToken = status === 'UNREGISTERED' || status === 'NOT_FOUND' || status === 'INVALID_ARGUMENT';
-  return { ok: false, invalidToken };
+  const err = (errBody && errBody.error) || {};
+  const detail = (err.details || []).map(x => x.errorCode).filter(Boolean)[0] || '';
+  // Only a definite "this app is gone" deletes the device. INVALID_ARGUMENT
+  // used to count too, but it also covers message-format problems, which
+  // would have silently unregistered healthy phones.
+  const invalidToken = err.status === 'NOT_FOUND' || detail === 'UNREGISTERED';
+  return { ok: false, invalidToken, status: err.status || String(res.status), detail, message: String(err.message || '').slice(0, 200) };
 }

@@ -184,8 +184,10 @@ export async function notifyDig(env, docket, opts = {}) {
   if (!serviceAccount || !env.FCM_PROJECT_ID) return { status: 500, body: { error: { message: 'FCM not configured' } } };
   let sent = 0;
   const keep = [];
+  const results = [];
   for (const t of tokens) {
     const r = await send(serviceAccount, env.FCM_PROJECT_ID, t, 'CiViX dug in', 'CiViX looked into what you sent. Tap to see your move.');
+    results.push({ ok: !!r.ok, status: r.status || '', detail: r.detail || '', message: r.message || '' });
     if (r.invalidToken) { await kv.delete('pushdevice:' + t); continue; }
     keep.push(t);
     if (r.ok) sent++;
@@ -194,7 +196,7 @@ export async function notifyDig(env, docket, opts = {}) {
     if (keep.length) await kv.put('pushdocket:' + docket, JSON.stringify(keep));
     else await kv.delete('pushdocket:' + docket);
   }
-  return { status: 200, body: { devices: tokens.length, sent } };
+  return { status: 200, body: { devices: tokens.length, sent, results } };
 }
 
 // "Simulate an update" (test builds only; see take-action.html's
