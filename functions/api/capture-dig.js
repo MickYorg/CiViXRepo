@@ -125,10 +125,31 @@ export function parseDig(raw) {
   };
 }
 
-export async function onRequestPost({ request, env }) {
+// A dig (web search + reasoning) often runs past 100 seconds, and Cloudflare
+// ends any request with no response bytes by then (HTTP 524; a real capture
+// failed this way on 26 Sep 2026). So the reply starts at once and a space
+// is written every 15s while the dig runs; the JSON result follows (leading
+// whitespace is valid JSON). Status is always 200; errors are in the body.
+export async function onRequestPost({ request, env, waitUntil }) {
   if (!env.CAPTURE_DIG_SECRET || request.headers.get('X-Capture-Secret') !== env.CAPTURE_DIG_SECRET) {
     return json({ error: { message: 'not allowed' } }, 403);
   }
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+  const keepAlive = setInterval(() => { writer.write(enc.encode(' ')).catch(() => {}); }, 15000);
+  const work = runDig(request, env)
+    .then((res) => res.text())
+    .catch((e) => JSON.stringify({ error: { message: 'Dig failed: ' + (e && e.message || e) } }))
+    .then(async (text) => {
+      clearInterval(keepAlive);
+      try { await writer.write(enc.encode(text)); await writer.close(); } catch (e) {}
+    });
+  if (waitUntil) waitUntil(work);
+  return new Response(readable, { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+async function runDig(request, env) {
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) return json({ error: { message: 'Server is missing ANTHROPIC_API_KEY' } }, 500);
   const kv = env.DIG_KV;

@@ -4043,7 +4043,7 @@ __name(fileItem, "fileItem");
 var DIG_ENDPOINT = "https://mycivix.com/api/capture-dig";
 var DIG_BACKFILL_DAYS = 14;
 async function digInto(env, id) {
-  const row = await env.DB.prepare("SELECT id, token, title, url, note FROM filings WHERE id = ?").bind(id).first();
+  const row = await env.DB.prepare("SELECT id, token, title, url, note, dig FROM filings WHERE id = ?").bind(id).first();
   if (!row || !env.CAPTURE_DIG_SECRET) return;
   await env.DB.prepare("UPDATE filings SET dig_state = 'digging', dig_at = ? WHERE id = ?").bind(Date.now(), id).run();
   let state = "error", dig = "";
@@ -4058,6 +4058,16 @@ async function digInto(env, id) {
     else dig = JSON.stringify({ error: (d.error && d.error.message) || "HTTP " + r.status });
   } catch (e) {
     dig = JSON.stringify({ error: "Couldn\u2019t reach CiViX" });
+  }
+  // Up to 3 tries in all: a failed dig goes back in the queue (the minute
+  // job picks it up again) before it's shown to the citizen as an error.
+  if (state !== "ready") {
+    let prev = {};
+    try { prev = row.dig ? JSON.parse(row.dig) : {}; } catch (e) {}
+    const attempts = (prev.attempts || 0) + 1;
+    const err = JSON.parse(dig);
+    dig = JSON.stringify({ error: err.error, attempts });
+    if (attempts < 3) state = "queued";
   }
   await env.DB.prepare("UPDATE filings SET dig = ?, dig_state = ?, dig_at = ? WHERE id = ?").bind(dig, state, Date.now(), id).run();
   // Tell the citizen's phone(s) it's ready (best effort; see push-scheduler).
