@@ -131,12 +131,13 @@ are gitignored — public repo — re-download from the Firebase console
 
 ## Working with this user
 
-- **Every listening text goes three places:** `notes/` (below), a private
-  Artifact page made with `python3 scripts/listen-page.py <file> "<name>"`
-  (publish it, then send a push so the link is one tap away; Safari's
-  Listen to Page reads it aloud anywhere), and Apple Notes → CiViX via
-  `scripts/to-apple-notes.sh <file>` (needs the Mac's one-time
-  Automation permission for Notes; skip quietly if it times out).
+- **Every listening text goes three places.** The user listens with Apple
+  Notes' Speak (not Safari's Listen to Page), so Notes is primary:
+  `scripts/to-apple-notes.sh <file>` puts it in Notes → CiViX (needs the
+  Mac's one-time Automation permission; if it times out, the prompt is
+  waiting on the Mac). As the bridge when that can't run, publish a private
+  page with `python3 scripts/listen-page.py <file> "<name>"` (Copy all →
+  paste into a note → Speak) and send a push. And always `notes/` (below).
 - **`notes/` is the one place for every listening text** (gitignored, never
   shipped). Every summary/plan text file goes there, and the scheduled
   briefs (published in the cloud as private pages) get copied into

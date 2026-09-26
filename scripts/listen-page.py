@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Turns a listening text file (notes/*.txt) into a phone-friendly HTML page
-to publish as a private Artifact: open it anywhere, then Safari's page menu
--> Listen to Page reads it aloud (or Copy all -> paste into Notes -> Speak).
+to publish as a private Artifact: open it anywhere, Copy all, paste into a
+new Apple Note, Select All, Speak (the user prefers Notes' Speak; Apple
+Notes is the primary destination once scripts/to-apple-notes.sh can run).
 
   python3 scripts/listen-page.py notes/2026-09-25-walk-summary.txt "CiViX Walk Summary" > out.html
   (second argument: the short page name; defaults to the first line)
@@ -86,8 +87,8 @@ print(f"""<title>{html.escape(page_title)}</title>
   <h1>{html.escape(title)}</h1>
   <p class="meta">About {minutes} minute{'s' if minutes != 1 else ''} aloud</p>
   <div class="how">
-    <span>To listen: in Safari tap the page menu, then Listen to Page. Or copy it all into Notes and use Speak.</span>
     <button type="button" id="copy-all">Copy all</button>
+    <span>then paste into a new note in Notes, Select All, and Speak.</span>
   </div>
   <article id="text">
 {body}
