@@ -166,5 +166,17 @@
   "sources-map-fund@iphone-16-pro-max": {
     "smallText": 0,
     "smallTap": 1
+  },
+  "sources-map-empty@iphone-se": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "sources-map-empty@iphone-16": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "sources-map-empty@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 1
   }
 }

@@ -136,9 +136,9 @@
   .mid-x { left: 50%; top: 0; bottom: 0; width: 1px; }
   .mid-y { top: 50%; left: 0; right: 0; height: 1px; }
   .chip { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; width: 76px; padding: 4px 2px; border: 0; border-radius: 10px; background: none; color: var(--paper); font: inherit; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
-  .chip .ico { width: 40px; height: 40px; border-radius: 9px; overflow: hidden; background: #fff; border: 1.5px solid var(--amber); box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: grid; place-items: center; pointer-events: none; }
-  .chip .ico img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .chip .ico.initials { background: var(--ink); color: var(--paper); font: 600 14px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 0.02em; }
+  .chip .ico, .pick .ico { width: 40px; height: 40px; border-radius: 9px; overflow: hidden; background: #fff; border: 1.5px solid var(--amber); box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: grid; place-items: center; pointer-events: none; }
+  .chip .ico img, .pick .ico img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .chip .ico.initials, .pick .ico.initials { background: var(--ink); color: var(--paper); font: 600 14px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 0.02em; }
   .chip .nm { max-width: 100%; font-size: 11px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px var(--ink); }
   .chip.unplaced { opacity: 0.55; }
   .chip.unplaced .ico { border-style: dashed; border-color: var(--line); }
@@ -150,6 +150,21 @@
   .detail strong { color: var(--paper); }
   .foot { font-size: 14px; color: var(--paper-dim); margin: 22px 0 0; max-width: 62ch; line-height: 1.55; }
 
+  .trays { display: grid; gap: 10px; margin: 6px 0 0; }
+  .trays[hidden] { display: none; }
+  .empty-hint { position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%); width: max-content; max-width: 80%; text-align: center; padding: 12px 18px; border-radius: 22px; background: var(--ink); border: 1px solid var(--amber); color: var(--amber-ink); font-size: 15px; text-decoration: none; }
+  .empty-hint[hidden] { display: none; }
+  .tray { border: 1px solid var(--line); border-radius: 12px; background: var(--ink-raised); }
+  .tray summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper); }
+  .tray summary .n { color: var(--amber-ink); text-transform: none; letter-spacing: 0; }
+  .tray-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; padding: 4px 8px 14px; }
+  .pick { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; padding: 4px 2px; border: 0; border-radius: 10px; background: none; color: var(--paper-dim); font: inherit; cursor: pointer; }
+  .pick .nm { max-width: 100%; font-size: 11px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pick[aria-pressed="true"] { color: var(--paper); }
+  .pick[aria-pressed="true"] .ico { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .pick[aria-pressed="false"] .ico { opacity: 0.75; }
+  .pick:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .detail button { font: inherit; font-size: 14px; color: var(--amber-ink); background: none; border: 1px solid var(--line); border-radius: 20px; padding: 8px 14px; margin-top: 8px; min-height: 40px; cursor: pointer; }
   .views { display: inline-flex; border: 1px solid var(--line); border-radius: 20px; padding: 2px; gap: 2px; }
   .bar .views button { border: 0; padding: 6px 14px; min-height: 40px; color: var(--paper-dim); }
   .bar .views button[aria-pressed="true"] { background: var(--amber); color: var(--ink); }
@@ -157,7 +172,7 @@
   .board.fund .chip { cursor: pointer; }
   :root { --q-good: rgba(91, 182, 122, 0.07); --q-bad: rgba(200, 68, 58, 0.07); }
   @media (max-width: 560px) {
-    .board { height: 118vh; min-height: 640px; }
+    .board { height: 86vh; min-height: 540px; }
     /* Four columns on a phone: each icon fits its quarter; long names end
        in an ellipsis (tap shows the full name). */
     .chip { width: 23%; }
@@ -196,7 +211,7 @@
       <button type="button" data-view="mine">My map</button>
       <button type="button" data-view="fund">Who pays</button>
     </div>
-    <span id="count"></span><button type="button" id="reset">Reset</button>
+    <span id="count"></span><button type="button" id="reset">Clear the map</button>
   </div>
   <div class="board-wrap">
     <div class="axis-y" id="axis-y"></div>
@@ -206,10 +221,12 @@
       <div class="q bl" id="q-bl"></div>
       <div class="q br" id="q-br"></div>
       <div class="mid-x"></div><div class="mid-y"></div>
+      <a class="empty-hint" id="empty-hint" href="#trays" hidden>Pick a few sources from the groups below ↓</a>
     </div>
     <div class="axis-x" id="axis-x"></div>
   </div>
   <p class="detail" id="detail" aria-live="polite"></p>
+  <div class="trays" id="trays"></div>
   <p class="foot" id="foot-fund" hidden>Who pays is CiViX's reading of public reporting (ownership filings, the outlets' own disclosures, and news coverage) as of September 2026. Funding changes; where an outlet doesn't disclose its backers, the map says so rather than guess.</p>
   <p class="foot" id="foot-mine">This is an experiment. Your map is saved on this device only and doesn't change anything else in CiViX yet. The starting columns come from DIG's groupings, which lean on public bias and reliability trackers; where each source really belongs is your call.</p>
 </div>
@@ -324,7 +341,7 @@
     const stars = Object.keys(r).map(t => r[t].stars).filter(n => n > 0);
     if (!stars.length) return null;
     const avg = stars.reduce((a, b) => a + b, 0) / stars.length;
-    return 1 - (avg - 1) / 4 * 0.8 - 0.1; // 5 stars near the top, 1 near the bottom
+    return 0.1 + (avg - 1) / 4 * 0.8; // 5 stars near the top, 1 near the bottom
   }
 
   const profile = load('civix-profile', {});
@@ -338,32 +355,18 @@
   const SOURCES = [...byName.values()];
   let MAP = load(KEY, {});
 
-  // Default position: the group's column (yours: the middle), spread down
-  // most of the board so the icons don't pile up. Wide boards split each
-  // column into two staggered files; phones keep one.
-  function defaultPos(s, i, n) {
-    const two = board.clientWidth >= 600 && n > 4;
-    const rows = two ? Math.ceil(n / 2) : n;
-    const row = two ? Math.floor(i / 2) : i;
-    const x = (s.group ? COLUMN[s.group] : 0.5) + (two ? (i % 2 ? 0.055 : -0.055) : 0);
-    const seeded = trustY(s);
-    // A lone source of your own sits at the top middle, clear of the files.
-    const y = seeded != null ? seeded : rows > 1 ? 0.88 - (row / (rows - 1)) * 0.76 : 0.94;
-    return { x, y, placed: seeded != null };
-  }
-
   // Two views of the same sources. "mine": the citizen drags each one to
   // where it sits for them. "fund": CiViX snaps each one to who pays for it
   // (x) and who owns it (y), from public reporting.
   const VIEWS = {
     mine: {
-      dek: "Where do your news sources sit for you? Drag each one: left to right from mainstream to far out, bottom to top from untrusted to trusted. Dashed ones haven't been placed yet. Tap one to see what it is.",
+      dek: "Open a group below and pick a couple of sources you read, watch, or hear about. Then drag each one to where it sits for you: left to right from mainstream to far out, bottom to top from untrusted to trusted. When you're set, tap Who pays.",
       q: ['Trusted mainstream', 'Trusted alternative', 'Untrusted mainstream', 'Untrusted far out'],
       x: ['Mainstream', 'Independent', 'Alternative', 'Far out'],
       y: ['Untrusted', 'Trusted'],
     },
     fund: {
-      dek: "Who pays for the coverage? Left: mostly paid by institutions (corporations, governments, advertisers, big backers). Right: mostly paid by the audience (subscribers and small donors). Bottom: owned by a conglomerate, billionaire, or state. Top: independent. Tap one to see who pays.",
+      dek: "Who pays for the coverage? Left: mostly paid by institutions (corporations, governments, advertisers, big backers). Right: mostly paid by the audience (subscribers and small donors). Bottom: owned by a conglomerate, billionaire, or state. Top: independent. Showing the sources on your map; tap one to see who pays.",
       q: ['Institution-paid, independent', 'Audience-paid, independent', 'Institution-paid, big owner', 'Audience-paid, big owner'],
       x: ['Paid by institutions', 'Paid by the audience'],
       y: ['Big owner', 'Independent'],
@@ -418,17 +421,16 @@
 
   const board = document.getElementById('board');
   const detail = document.getElementById('detail');
+  // The map holds a handful, so it stays workable; the rest wait in trays.
+  const BOARD_MAX = 12;
+  const onBoard = () => SOURCES.filter(s => MAP[s.name]);
   function render() {
     board.querySelectorAll('.chip').forEach(c => c.remove());
     applyView();
+    renderTrays();
     if (VIEW === 'fund') return renderFund();
-    const perCol = {};
-    SOURCES.forEach(s => { const k = s.group || 'mine'; perCol[k] = (perCol[k] || 0) + 1; });
-    const seen = {};
-    SOURCES.forEach(s => {
-      const k = s.group || 'mine';
-      const i = seen[k] = (seen[k] || 0) + 1;
-      const pos = MAP[s.name] || defaultPos(s, i - 1, perCol[k]);
+    onBoard().forEach(s => {
+      const pos = MAP[s.name];
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'chip' + (pos.placed ? '' : ' unplaced') + (s.mine ? ' mine' : '');
@@ -443,8 +445,80 @@
       el._src = s;
       board.appendChild(el);
     });
-    const placed = SOURCES.filter(s => MAP[s.name] && MAP[s.name].placed).length;
-    document.getElementById('count').textContent = placed + ' of ' + SOURCES.length + ' placed';
+    countMine();
+  }
+  function countMine() {
+    const n = onBoard().length;
+    document.getElementById('empty-hint').hidden = n > 0;
+    document.getElementById('count').textContent = n ? n + ' on your map (up to ' + BOARD_MAX + ')' : 'Your map is empty';
+    document.getElementById('reset').hidden = !n || VIEW === 'fund';
+  }
+
+  // Trays: one per DIG group (and one for sources you added), closed until
+  // opened. Tapping a source puts it on the map or takes it off.
+  const openTrays = new Set();
+  function renderTrays() {
+    const trays = document.getElementById('trays');
+    trays.hidden = VIEW === 'fund';
+    trays.innerHTML = '';
+    const groups = CATEGORIES.map(c => ({ key: c.key, label: c.label, list: SOURCES.filter(s => s.group === c.key) }));
+    const yours = SOURCES.filter(s => !s.group);
+    if (yours.length) groups.push({ key: 'yours', label: 'Your sources', list: yours });
+    if (!onBoard().length && !openTrays.size) openTrays.add(groups[0].key);
+    groups.forEach(g => {
+      const d = document.createElement('details');
+      d.className = 'tray';
+      d.open = openTrays.has(g.key);
+      d.addEventListener('toggle', () => { d.open ? openTrays.add(g.key) : openTrays.delete(g.key); });
+      const on = g.list.filter(s => MAP[s.name]).length;
+      d.innerHTML = '<summary>' + esc(g.label) + (on ? ' <span class="n">' + on + ' on your map</span>' : '') + '</summary>';
+      const grid = document.createElement('div');
+      grid.className = 'tray-grid';
+      g.list.forEach(s => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pick';
+        b.setAttribute('aria-pressed', String(!!MAP[s.name]));
+        b.appendChild(icon(s));
+        const nm = document.createElement('span');
+        nm.className = 'nm';
+        nm.textContent = s.name;
+        b.appendChild(nm);
+        b.addEventListener('click', () => toggleOnBoard(s));
+        grid.appendChild(b);
+      });
+      d.appendChild(grid);
+      trays.appendChild(d);
+    });
+  }
+  function toggleOnBoard(s) {
+    if (MAP[s.name]) {
+      delete MAP[s.name];
+      saveMap();
+      render();
+      detail.textContent = s.name + ' is off your map.';
+      return;
+    }
+    if (onBoard().length >= BOARD_MAX) {
+      detail.textContent = 'Your map holds ' + BOARD_MAX + ' at a time, so it stays readable. Take one off (tap it in its group) to add ' + s.name + '.';
+      return;
+    }
+    MAP[s.name] = startPos(s);
+    saveMap();
+    render();
+    detail.textContent = s.name + ' is on your map. Drag it to where it sits for you.';
+  }
+  // A new source starts in its group's column (yours: the middle), at the
+  // height its DIG star rating suggests or halfway, stepping up or down
+  // until it's clear of the ones already there.
+  function startPos(s) {
+    const x = s.group ? COLUMN[s.group] : 0.5;
+    const seeded = trustY(s);
+    const base = seeded != null ? seeded : 0.5;
+    const taken = onBoard().map(o => MAP[o.name]).filter(p => Math.abs(p.x - x) < 0.12);
+    const steps = [0, 0.13, -0.13, 0.26, -0.26, 0.39, -0.39];
+    const y = steps.map(d => base + d).find(y => y > 0.06 && y < 0.94 && taken.every(p => Math.abs(p.y - y) > 0.1));
+    return { x, y: y != null ? y : base, placed: false };
   }
   // Each outlet's own icon, downloaded once by scripts/fetch-source-icons.js
   // and served from here (never loaded from the outlet, so browsing stays
@@ -476,8 +550,8 @@
     document.getElementById('axis-y').innerHTML = v.y.map(t => '<span>' + esc(t) + '</span>').join('');
     document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === VIEW)));
     board.classList.toggle('fund', VIEW === 'fund');
+    if (VIEW === 'fund') { document.getElementById('reset').hidden = true; document.getElementById('empty-hint').hidden = true; }
     board.style.height = '';
-    document.getElementById('reset').hidden = VIEW === 'fund';
     document.getElementById('foot-fund').hidden = VIEW !== 'fund';
     document.getElementById('foot-mine').hidden = VIEW === 'fund';
   }
@@ -491,7 +565,8 @@
     let H = board.clientHeight;
     const chipW = Math.min(80, W * 0.235), chipH = 60;
     const padY = W < 600 ? 42 : 30; // keep the quadrant labels (two lines on phones) readable
-    const known = SOURCES.filter(s => FUNDING[s.name]);
+    const picked = onBoard();
+    const known = picked.filter(s => FUNDING[s.name]);
     const pts = known.map(s => ({ s, x: FUNDING[s.name].x * W, y: (1 - FUNDING[s.name].y) * H }));
     for (let pass = 0; pass < 120; pass++) {
       let moved = false;
@@ -528,9 +603,10 @@
       el._src = s;
       board.appendChild(el);
     });
-    const missing = SOURCES.filter(s => !FUNDING[s.name]).map(s => s.name);
-    document.getElementById('count').textContent = known.length + ' of ' + SOURCES.length + ' mapped';
-    detail.textContent = missing.length ? 'No funding info yet for ' + missing.join(', ') + '.' : '';
+    const missing = picked.filter(s => !FUNDING[s.name]).map(s => s.name);
+    document.getElementById('count').textContent = picked.length ? known.length + ' from your map' : '';
+    detail.textContent = !picked.length ? 'Your map is empty. Go to My map, put a few sources on it, then come back to see who pays for them.'
+      : missing.length ? 'No funding info yet for ' + missing.join(', ') + '.' : '';
   }
 
   // Narrow boards: nudging can't clear a crowded corner, so each quadrant's
@@ -586,7 +662,8 @@
     const pos = MAP[s.name];
     detail.innerHTML = '<strong>' + esc(s.name) + '</strong> · ' + esc(s.hint || '') +
       (s.meta ? '<br>' + esc(s.meta) : '') +
-      '<br>' + (pos && pos.placed ? 'You placed it: ' + esc(describe(pos)) + '.' : 'Not placed yet' + (s.groupLabel ? ' (DIG groups it as ' + esc(s.groupLabel.toLowerCase()) + ')' : '') + '.');
+      '<br>' + (pos && pos.placed ? 'You placed it: ' + esc(describe(pos)) + '.' : 'Drag it to where it sits for you' + (s.groupLabel ? ' (DIG groups it as ' + esc(s.groupLabel.toLowerCase()) + ')' : '') + '.') +
+      '<br><button type="button" data-remove="' + esc(s.name) + '">Take it off the map</button>';
   }
 
   // Dragging (mouse and touch via pointer events). A press without movement
@@ -620,8 +697,6 @@
       MAP[chip._src.name] = pos;
       saveMap();
       chip.classList.remove('unplaced');
-      const placed = SOURCES.filter(s => MAP[s.name] && MAP[s.name].placed).length;
-      document.getElementById('count').textContent = placed + ' of ' + SOURCES.length + ' placed';
     }
     show(chip._src);
   }
@@ -638,11 +713,18 @@
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (VIEW === 'fund') render(); }, 150); });
 
+  detail.addEventListener('click', e => {
+    const b = e.target.closest('[data-remove]');
+    const s = b && SOURCES.find(x => x.name === b.dataset.remove);
+    if (s && MAP[s.name]) toggleOnBoard(s);
+  });
+
   document.getElementById('reset').addEventListener('click', () => {
     MAP = {};
     saveMap();
-    detail.textContent = 'Reset. Everything is back in its starting column.';
+    openTrays.clear();
     render();
+    detail.textContent = 'Your map is clear. Every source is back in its group below.';
   });
 
   render();

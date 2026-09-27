@@ -51,6 +51,16 @@ const LAPTOP = { name: 'laptop', width: 1440, height: 900, laptop: true };
 const MIN_FONT = 11;
 const MIN_TAP = 40;
 
+// A citizen's Source Map with a full board (12, the most it holds).
+const SOURCE_MAP_SAMPLE = {
+  'Associated Press': { x: 0.1, y: 0.85, placed: true }, 'Reuters': { x: 0.2, y: 0.78, placed: true },
+  'Fox News': { x: 0.12, y: 0.25, placed: true }, 'The New York Times': { x: 0.2, y: 0.55, placed: true },
+  'Breaking Points': { x: 0.4, y: 0.8, placed: true }, 'Matt Taibbi': { x: 0.45, y: 0.66, placed: true },
+  'The Young Turks': { x: 0.35, y: 0.4, placed: true }, 'Drop Site News': { x: 0.62, y: 0.72, placed: true },
+  'Reason': { x: 0.58, y: 0.5, placed: true }, 'ZeroHedge': { x: 0.7, y: 0.3, placed: true },
+  'RT (Russia Today)': { x: 0.9, y: 0.1, placed: true }, 'The Epoch Times': { x: 0.85, y: 0.3, placed: false },
+};
+
 // state: 'new' = brand-new citizen (empty storage); otherwise a /dev/ persona.
 // wait: ms to let animations/fetches settle before the shot.
 const PAGES = [
@@ -70,8 +80,9 @@ const PAGES = [
   { name: 'analytics', url: '/analytics.html', state: 'medium', wait: 3000 },
   { name: 'health', url: '/health.html', state: 'new', wait: 3000 },
   { name: 'civix101', url: '/civix101.html', state: 'new', wait: 1500 },
-  { name: 'sources-map', url: '/sources-map.html', state: 'medium', wait: 2500 },
-  { name: 'sources-map-fund', url: '/sources-map.html#fund', state: 'medium', wait: 2500 },
+  { name: 'sources-map', url: '/sources-map.html', state: 'medium', wait: 2500, storage: { 'civix-sources-map': SOURCE_MAP_SAMPLE } },
+  { name: 'sources-map-empty', url: '/sources-map.html', state: 'medium', wait: 2500 },
+  { name: 'sources-map-fund', url: '/sources-map.html#fund', state: 'medium', wait: 2500, storage: { 'civix-sources-map': SOURCE_MAP_SAMPLE } },
 ];
 
 // Pull the /dev/ persona fixtures straight out of dev/index.html so there's
@@ -255,7 +266,8 @@ async function shoot(cdp, page, phone, personas) {
     expression: `localStorage.clear();
       ${profile ? `localStorage.setItem('civix-profile', ${JSON.stringify(JSON.stringify(profile))});` : ''}
       ${mode ? `localStorage.setItem('civix-mode', '${mode}');` : ''}
-      ${page.state !== 'new' ? `localStorage.setItem('civix-splash-seen', String(Date.now())); localStorage.setItem('civix-splash-visits', '3');` : ''}`,
+      ${page.state !== 'new' ? `localStorage.setItem('civix-splash-seen', String(Date.now())); localStorage.setItem('civix-splash-visits', '3');` : ''}
+      ${Object.entries(page.storage || {}).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(JSON.stringify(v))});`).join('\n')}`,
   });
   await cdp.send('Page.navigate', { url: `http://localhost:${PORT}${page.url}` });
   await sleep(page.wait);
