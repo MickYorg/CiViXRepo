@@ -126,3 +126,15 @@ test('dig ready: a docket with no phones is a quiet no-op; bad input is refused'
   assert.equal((await notifyDig(env(fakeKV()), 'abcdefghij', net())).body.devices, 0);
   assert.equal((await notifyDig(env(fakeKV()), '../../etc', net())).status, 400);
 });
+
+test('dig ready: the push carries the capture id (never the topic) so a tap opens that item', async () => {
+  const { notifyDig } = await mod();
+  const kv = fakeKV({ 'pushdocket:abcdefghij': ['tokA'] });
+  let data;
+  const n = net();
+  n.send = async (sa, pid, token, title, body, d) => { data = d; return { ok: true }; };
+  await notifyDig(env(kv), 'abcdefghij', n, 'fmuibcthrwg42i');
+  assert.equal(data.sent, 'fmuibcthrwg42i');
+  await notifyDig(env(kv), 'abcdefghij', n, 'not a valid id!');
+  assert.equal(data, undefined);
+});

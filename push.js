@@ -79,11 +79,17 @@
       try { window.dispatchEvent(new Event('civix-push-registered')); } catch (e) {}
     });
     P.addListener('registrationError', function () { /* silent — same fail-open stance as other best-effort features here */ });
-    P.addListener('pushNotificationActionPerformed', function () {
-      // Payloads are deliberately generic (see workers/push-scheduler) — a
-      // tap always sends the citizen to their own watchlist to see what
-      // actually changed, never to a deep link naming the specific bill.
-      if (!/take-action\.html$/.test(location.pathname)) location.href = '/take-action.html';
+    P.addListener('pushNotificationActionPerformed', function (action) {
+      // Text is always generic (see workers/push-scheduler). A "CiViX dug
+      // in" push also carries the capture's opaque id, so the tap opens that
+      // exact item on Take Action; any other push opens Take Action itself.
+      var data = (action && action.notification && action.notification.data) || {};
+      var sent = /^[a-z0-9]{6,40}$/.test(data.sent || '') ? data.sent : '';
+      if (/\/take-action(\.html)?$/.test(location.pathname)) {
+        if (sent) { try { window.dispatchEvent(new CustomEvent('civix-open-sent', { detail: sent })); } catch (e) {} }
+        return;
+      }
+      location.href = '/take-action.html' + (sent ? '?sent=' + encodeURIComponent(sent) : '');
     });
   }
 
@@ -133,6 +139,11 @@
       body: JSON.stringify({ token: token })
     }).catch(function () {});
   }
+
+  // Listen for notification taps from the moment any page loads (26 Sep
+  // 2026: listeners were only wired after tapping "turn on alerts", so a tap
+  // on a notification with the app closed was simply lost).
+  if (isNative()) wireListeners();
 
   // Keep the server's copy current (watchlist, ZIP, Send to CiViX address)
   // without waiting for a watchlist change: re-register at most once a day.

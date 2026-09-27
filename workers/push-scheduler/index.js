@@ -173,7 +173,7 @@ export async function welcome(env, token, opts = {}) {
 // to that docket (push-register.js keeps pushdocket:<docket>) gets one
 // generic push; tapping it opens Take Action, where the result is waiting.
 // Never names the topic, same lock-screen rule as every alert.
-export async function notifyDig(env, docket, opts = {}) {
+export async function notifyDig(env, docket, opts = {}, sentId = '') {
   const kv = env.DIG_KV;
   const send = opts.send || sendPush;
   if (!/^[a-z0-9]{10}$/.test(docket || '')) return { status: 400, body: { error: { message: 'bad docket' } } };
@@ -186,7 +186,8 @@ export async function notifyDig(env, docket, opts = {}) {
   const keep = [];
   const results = [];
   for (const t of tokens) {
-    const r = await send(serviceAccount, env.FCM_PROJECT_ID, t, 'CiViX dug in', 'CiViX looked into what you sent. Tap to see your move.');
+    const data = /^[a-z0-9]{6,40}$/.test(sentId) ? { sent: sentId } : undefined;
+    const r = await send(serviceAccount, env.FCM_PROJECT_ID, t, 'CiViX dug in', 'CiViX looked into what you sent. Tap to see your move.', data);
     results.push({ ok: !!r.ok, status: r.status || '', detail: r.detail || '', message: r.message || '' });
     if (r.invalidToken) { await kv.delete('pushdevice:' + t); continue; }
     keep.push(t);
@@ -247,9 +248,9 @@ export default {
     if (url.pathname === '/notify-dig' && request.method === 'POST') {
       // Server to server only (the capture Worker), shared secret.
       if (!env.NOTIFY_SECRET || request.headers.get('X-Notify-Secret') !== env.NOTIFY_SECRET) return new Response('not found', { status: 404 });
-      let docket = '';
-      try { docket = String((await request.json()).docket || ''); } catch (e) {}
-      const { status, body } = await notifyDig(env, docket);
+      let docket = '', sent = '';
+      try { const b = await request.json(); docket = String(b.docket || ''); sent = String(b.sent || ''); } catch (e) {}
+      const { status, body } = await notifyDig(env, docket, {}, sent);
       return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/run' && env.TRIGGER_SECRET && request.headers.get('X-Trigger-Secret') === env.TRIGGER_SECRET) {

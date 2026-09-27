@@ -273,6 +273,8 @@
   .sent-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; }
   .sent-foot a, .sent-foot button { color: var(--amber-ink); background: none; border: 0; padding: 6px 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .sent-digging { font-size: 14px; color: var(--amber-ink); margin: 0 0 6px; }
+  .sent-card.is-focus { box-shadow: 0 0 0 3px var(--amber-wash), 0 0 0 1px var(--amber); }
+  .sent-new { display: inline-block; background: var(--amber); color: var(--btn-ink); border-radius: 20px; padding: 1px 8px; margin-right: 8px; font-weight: 600; letter-spacing: 0.06em; }
   .focus-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -2994,6 +2996,19 @@ BODY: <the email body, a few short paragraphs>`;
   const CAPTURE_API = 'https://civix-capture.mycivix.workers.dev';
   let SENT_ITEMS = [];
   let SENT_POLL = null;
+  // Opened from a "CiViX dug in" push: ?sent=<id> (or the in-page event
+  // below) scrolls to and highlights that capture.
+  let SENT_FOCUS = (new URLSearchParams(location.search).get('sent') || '').replace(/[^a-z0-9]/g, '');
+  let SENT_SCROLLED = false;
+  // Captures whose results have been shown here, so new ones get a "New"
+  // badge (and app-shell.js a dot on the Take Action tab) until seen.
+  function sentSeen() { try { return JSON.parse(localStorage.getItem('civix-sent-seen') || '[]'); } catch (e) { return []; } }
+  function markSentSeen(ids) {
+    const seen = sentSeen();
+    ids.forEach(id => { if (!seen.includes(id)) seen.push(id); });
+    try { localStorage.setItem('civix-sent-seen', JSON.stringify(seen.slice(-200))); } catch (e) {}
+  }
+  window.addEventListener('civix-open-sent', (e) => { SENT_FOCUS = String(e.detail || ''); SENT_SCROLLED = false; loadSentZone(); });
   function docketToken() {
     const p = loadRawProfile();
     try { return (p && p.token) || localStorage.getItem('civix.token') || ''; } catch (e) { return ''; }
@@ -3028,13 +3043,20 @@ BODY: <the email body, a few short paragraphs>`;
       body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX couldn’t dig into this yet: ${esc(why)}</p>
         <div class="sent-foot"><button type="button" data-sent-retry="${idx}">Try again</button><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
     }
-    return `<div class="sent-card"><p class="sent-eyebrow">${esc(sentSourceLabel(it))}</p>${body}</div>`;
+    const isNew = d && !sentSeen().includes(it.id);
+    return `<div class="sent-card${it.id === SENT_FOCUS ? ' is-focus' : ''}" id="sent-${esc(it.id)}"><p class="sent-eyebrow">${isNew ? '<span class="sent-new">New</span>' : ''}${esc(sentSourceLabel(it))}</p>${body}</div>`;
   }
   function renderSentZone() {
     const zone = document.getElementById('sent-zone');
     if (!zone) return;
     if (!SENT_ITEMS.length) { zone.innerHTML = ''; return; }
     zone.innerHTML = `<p class="focus-label">Sent to CiViX</p>` + SENT_ITEMS.map(sentCardHtml).join('');
+    if (SENT_FOCUS && !SENT_SCROLLED) {
+      const card = document.getElementById('sent-' + SENT_FOCUS);
+      if (card) { SENT_SCROLLED = true; card.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    }
+    // Shown now, so not "new" next time (the badge stays for this visit).
+    markSentSeen(SENT_ITEMS.filter(it => it.dig && !it.dig.error).map(it => it.id));
   }
   async function loadSentZone() {
     const token = docketToken();

@@ -4081,7 +4081,7 @@ async function digInto(env, id) {
         const r = await env.PUSH.fetch("https://civix-push-scheduler/notify-dig", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Notify-Secret": env.NOTIFY_SECRET },
-          body: JSON.stringify({ docket: row.token })
+          body: JSON.stringify({ docket: row.token, sent: id })
         });
         pushed = { http: r.status, ...(await r.json().catch(() => ({}))) };
       } catch (e) {

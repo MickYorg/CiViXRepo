@@ -45,7 +45,8 @@
       'align-items:center;justify-content:center;gap:2px;padding:8px 4px 6px;cursor:pointer;',
       'color:var(--cds);font-family:inherit;text-decoration:none;}',
       '.cxs-tab.is-on{color:var(--ca);}',
-      '.cxs-tab-emoji{font-size:18px;line-height:1;}',
+      '.cxs-tab-emoji{font-size:18px;line-height:1;position:relative;}',
+      '.cxs-tab.has-new .cxs-tab-emoji::after{content:"";position:absolute;top:-2px;right:-6px;width:9px;height:9px;border-radius:50%;background:#E5484D;}',
       '.cxs-tab-label{font-size:9px;letter-spacing:.04em;text-transform:uppercase;}',
       'body.cxs-has-nav{padding-bottom:calc(58px + env(safe-area-inset-bottom, 0px)) !important;}',
       // Pages' own bottom-pinned bars (splash sticky CTA + Skip/Replay,
@@ -146,8 +147,31 @@
     }).catch(function () {});
   }
 
+  // A dot on the Take Action tab while CiViX has dug into something the
+  // citizen hasn't looked at yet (take-action.html marks them seen). Covers
+  // the case where the push was dismissed or already gone.
+  function markUnseenCaptures() {
+    var token = webDocketToken();
+    if (!token || /\/take-action(\.html)?$/.test(location.pathname)) return;
+    fetch('https://civix-capture.mycivix.workers.dev/api/filings?token=' + encodeURIComponent(token))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        var seen = [];
+        try { seen = JSON.parse(localStorage.getItem('civix-sent-seen') || '[]'); } catch (e) {}
+        var cutoff = Date.now() - 30 * 864e5;
+        var unseen = (d.items || []).some(function (it) {
+          return it.state !== 'done' && it.at > cutoff && it.dig_state === 'ready' && seen.indexOf(it.id) === -1;
+        });
+        var tab = document.querySelector('.cxs-tab[href="/take-action.html"]');
+        if (unseen && tab) tab.classList.add('has-new');
+      })
+      .catch(function () {});
+  }
+
   function init() {
     render();
+    markUnseenCaptures();
     syncDocketToken();
     wireInternalLinks();
     wireBackButton();

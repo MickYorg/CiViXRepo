@@ -69,12 +69,15 @@ async function getAccessToken(serviceAccount) {
 // title/body here must never name the specific bill or topic). Returns
 // { ok: true } or { ok: false, invalidToken: true }; the caller deletes the
 // device record on invalidToken — the authoritative uninstall signal.
-export async function sendPush(serviceAccount, projectId, token, title, body) {
+// `data` (optional, string values) rides along invisibly for the app, e.g.
+// { sent: '<filing id>' } so a tap can open that exact item. Never put a
+// topic or bill in it; it transits Apple's/Google's servers like the text.
+export async function sendPush(serviceAccount, projectId, token, title, body, data) {
   const accessToken = await getAccessToken(serviceAccount);
   const res = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: { token, notification: { title, body } } })
+    body: JSON.stringify({ message: { token, notification: { title, body }, ...(data ? { data } : {}) } })
   });
   if (res.ok) {
     const d = await res.json().catch(() => ({}));
