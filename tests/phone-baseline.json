@@ -142,5 +142,17 @@
   "health@iphone-16-pro-max": {
     "smallText": 0,
     "smallTap": 1
+  },
+  "sources-map@iphone-se": {
+    "smallText": 0,
+    "smallTap": 4
+  },
+  "sources-map@iphone-16": {
+    "smallText": 0,
+    "smallTap": 4
+  },
+  "sources-map@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 4
   }
 }

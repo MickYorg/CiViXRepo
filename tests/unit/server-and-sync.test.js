@@ -99,3 +99,14 @@ test('synced copy: issue-taxonomy.js lists exactly builder.html CATALOG issues',
   const catalog = literalAfter('builder.html', 'const CATALOG =').flatMap(([, issues]) => issues);
   assert.deepEqual([...ALL_ISSUE_NAMES].sort(), catalog.sort());
 });
+
+test('synced copy: the Source Map experiment lists exactly DIG\'s sources', () => {
+  const names = (file, marker) => {
+    const src = read(file);
+    const start = src.indexOf(marker);
+    assert.ok(start !== -1, `${marker} in ${file}`);
+    const chunk = src.slice(start, src.indexOf('];', src.indexOf("key: 'fringe'", start)) + 2);
+    return [...chunk.matchAll(/name: "([^"]+)"/g)].map((m) => m[1]).sort();
+  };
+  assert.deepEqual(names('sources-map.html', 'const CATEGORIES ='), names('dig/index.html', 'const ONBOARD_CATEGORIES ='));
+});
