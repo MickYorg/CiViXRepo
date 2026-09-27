@@ -173,7 +173,10 @@ are gitignored — public repo — re-download from the Firebase console
    (daily 8:05am ET except Monday, weekly Monday, quarterly on the 1st of
    Jan/Apr/Jul/Oct: rotating creative formats, delivered as a private page
    plus a push to the phone; routines "CiViX daily/weekly/quarterly
-   brief"). Still to build: the App
+   brief"). All three update ONE permanent page, the **CiViX Brief**
+   (https://claude.ai/artifact/J5EHCohsibNjRMeadYrQgB), text-first with
+   Copy all for Apple Notes; dated text copies go in `notes/briefs/`
+   (`scripts/page-to-text.py` converts a saved page back to text). Still to build: the App
    Store half of hybrid live updates (bundled pages + a self-hosted
    update channel).
 2. **App Store MVP, remaining phases:** audit of the "advocating
