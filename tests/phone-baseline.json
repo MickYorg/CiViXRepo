@@ -96,16 +96,16 @@
     "smallTap": 0
   },
   "send-to-civix@iphone-se": {
-    "smallText": 7,
-    "smallTap": 5
+    "smallText": 0,
+    "smallTap": 4
   },
   "send-to-civix@iphone-16": {
-    "smallText": 7,
-    "smallTap": 5
+    "smallText": 0,
+    "smallTap": 4
   },
   "send-to-civix@iphone-16-pro-max": {
-    "smallText": 7,
-    "smallTap": 5
+    "smallText": 0,
+    "smallTap": 3
   },
   "analytics@iphone-se": {
     "smallText": 6,

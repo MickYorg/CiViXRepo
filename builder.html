@@ -1081,12 +1081,12 @@
     <section class="sec is-open" data-sec="inbox">
       <div class="sec-head">
         <span class="sec-num">§ 01</span>
-        <span class="sec-title">Inbox</span>
+        <span class="sec-title">Send to CiViX</span>
         <span class="sec-count" id="inbox-count"></span>
         <span class="sec-caret">›</span>
       </div>
       <div class="sec-body">
-        <p class="sec-note">Things you share to your CiViX address land here. Adopt what still matters and it becomes a priority below; strike the rest.</p>
+        <p class="sec-note">Share anything to CiViX (the Share button on iPhone, "Hey Siri, send to CiViX", or email it to your address below). CiViX digs into it, adds its topic to your manifesto, and puts your best moves on <a href="take-action.html">Take Action &#8594;</a></p>
 
         <div class="drop" id="drop-panel">
           <div class="drop-done-row" id="drop-done-row">
@@ -1107,7 +1107,6 @@
           </div>
         </div>
 
-        <div id="inbox-list"></div>
       </div>
     </section>
 
@@ -1888,8 +1887,12 @@ Describe this person's writing/speaking VOICE in one short sentence, for someone
     `).join('');
   }
 
+  // 27 Sep 2026: the adopt/strike inbox list was retired; captures are dug
+  // into and shown on Take Action ("Sent to CiViX") and feed the manifesto
+  // there. Without its container this does nothing.
   function renderInbox() {
     const el = document.getElementById('inbox-list');
+    if (!el) return;
 
     if (!P.token) {
       el.innerHTML = `<div class="empty">Setting up your address…</div>`;
@@ -2258,7 +2261,7 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
   function counts() {
     const set = (id, v) => { document.getElementById(id).textContent = v; };
     const n = INBOX.length;
-    set('inbox-count', inboxState === 'error' ? 'unreachable' : (n ? n + ' waiting' : 'clear'));
+    set('inbox-count', '');
     set('issues-count', P.issues.length ? P.issues.length + ' picked' : '');
     set('positions-count', P.issues.filter(i => i.stance).length + ' / ' + P.issues.length);
     set('sources-count', P.sources.length ? P.sources.length : '');
