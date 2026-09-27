@@ -150,6 +150,11 @@
   .detail strong { color: var(--paper); }
   .foot { font-size: 14px; color: var(--paper-dim); margin: 22px 0 0; max-width: 62ch; line-height: 1.55; }
 
+  .views { display: inline-flex; border: 1px solid var(--line); border-radius: 20px; padding: 2px; gap: 2px; }
+  .bar .views button { border: 0; padding: 6px 12px; color: var(--paper-dim); }
+  .bar .views button[aria-pressed="true"] { background: var(--amber); color: var(--ink); }
+  .board.fund .q.tl, .board.fund .q.br { background: none; }
+  .board.fund .chip { cursor: pointer; }
   :root { --q-good: rgba(91, 182, 122, 0.07); --q-bad: rgba(200, 68, 58, 0.07); }
   @media (max-width: 560px) {
     .board { height: 118vh; min-height: 640px; }
@@ -185,21 +190,28 @@
 <div class="wrap">
   <p class="crumb">Experiment · not linked from anywhere yet</p>
   <h1>Source Map</h1>
-  <p class="dek">Where do your news sources sit for you? Drag each one: left to right from mainstream to far out, bottom to top from untrusted to trusted. Dashed ones haven't been placed yet. Tap one to see what it is.</p>
-  <div class="bar"><span id="count"></span><button type="button" id="reset">Reset</button></div>
+  <p class="dek" id="dek"></p>
+  <div class="bar">
+    <div class="views" role="group" aria-label="Map view">
+      <button type="button" data-view="mine">My map</button>
+      <button type="button" data-view="fund">Who pays</button>
+    </div>
+    <span id="count"></span><button type="button" id="reset">Reset</button>
+  </div>
   <div class="board-wrap">
-    <div class="axis-y"><span>Untrusted</span><span>Trusted</span></div>
+    <div class="axis-y" id="axis-y"></div>
     <div class="board" id="board">
-      <div class="q tl">Trusted mainstream</div>
-      <div class="q tr">Trusted alternative</div>
-      <div class="q bl">Untrusted mainstream</div>
-      <div class="q br">Untrusted far out</div>
+      <div class="q tl" id="q-tl"></div>
+      <div class="q tr" id="q-tr"></div>
+      <div class="q bl" id="q-bl"></div>
+      <div class="q br" id="q-br"></div>
       <div class="mid-x"></div><div class="mid-y"></div>
     </div>
-    <div class="axis-x"><span>Mainstream</span><span>Independent</span><span>Alternative</span><span>Far out</span></div>
+    <div class="axis-x" id="axis-x"></div>
   </div>
   <p class="detail" id="detail" aria-live="polite"></p>
-  <p class="foot">This is an experiment. Your map is saved on this device only and doesn't change anything else in CiViX yet. The starting columns come from DIG's groupings, which lean on public bias and reliability trackers; where each source really belongs is your call.</p>
+  <p class="foot" id="foot-fund" hidden>Who pays is CiViX's reading of public reporting (ownership filings, the outlets' own disclosures, and news coverage) as of September 2026. Funding changes; where an outlet doesn't disclose its backers, the map says so rather than guess.</p>
+  <p class="foot" id="foot-mine">This is an experiment. Your map is saved on this device only and doesn't change anything else in CiViX yet. The starting columns come from DIG's groupings, which lean on public bias and reliability trackers; where each source really belongs is your call.</p>
 </div>
 
 <script>
@@ -340,10 +352,76 @@
     return { x, y, placed: seeded != null };
   }
 
+  // Two views of the same sources. "mine": the citizen drags each one to
+  // where it sits for them. "fund": CiViX snaps each one to who pays for it
+  // (x) and who owns it (y), from public reporting.
+  const VIEWS = {
+    mine: {
+      dek: "Where do your news sources sit for you? Drag each one: left to right from mainstream to far out, bottom to top from untrusted to trusted. Dashed ones haven't been placed yet. Tap one to see what it is.",
+      q: ['Trusted mainstream', 'Trusted alternative', 'Untrusted mainstream', 'Untrusted far out'],
+      x: ['Mainstream', 'Independent', 'Alternative', 'Far out'],
+      y: ['Untrusted', 'Trusted'],
+    },
+    fund: {
+      dek: "Who pays for the coverage? Left: mostly paid by institutions (corporations, governments, advertisers, big backers). Right: mostly paid by the audience (subscribers and small donors). Bottom: owned by a conglomerate, billionaire, or state. Top: independent. Tap one to see who pays.",
+      q: ['Institution-paid, independent', 'Audience-paid, independent', 'Institution-paid, big owner', 'Audience-paid, big owner'],
+      x: ['Paid by institutions', 'Paid by the audience'],
+      y: ['Big owner', 'Independent'],
+    },
+  };
+  // x: 0 = paid by institutions .. 1 = paid by the audience.
+  // y: 0 = owned by a conglomerate, billionaire, or state .. 1 = independent.
+  const FUNDING = {
+    'Associated Press': { x: 0.22, y: 0.72, who: 'A nonprofit cooperative, paid mostly by the news outlets that license its stories.' },
+    'Reuters': { x: 0.12, y: 0.22, who: 'Owned by Thomson Reuters, a public company controlled by the Thomson family; paid by media and financial clients.' },
+    'BBC News': { x: 0.3, y: 0.3, who: 'Mostly the UK licence fee, a household charge set by the government, plus commercial sales abroad.' },
+    'NPR': { x: 0.42, y: 0.66, who: 'Member-station fees, corporate sponsors, and foundations; stations lean on listener donations. Federal funding was cut in 2025.' },
+    'The New York Times': { x: 0.72, y: 0.24, who: 'Mostly digital subscriptions, plus ads; a public company controlled by the Sulzberger family.' },
+    'The Wall Street Journal': { x: 0.58, y: 0.08, who: 'Subscriptions and ads; owned by Rupert Murdoch\'s News Corp.' },
+    'Fox News': { x: 0.18, y: 0.1, who: 'Cable carriage fees and advertising; owned by the Murdochs\' Fox Corporation.' },
+    'CNN': { x: 0.12, y: 0.08, who: 'Cable carriage fees and advertising; owned by a publicly traded media conglomerate.' },
+    'The Washington Post': { x: 0.45, y: 0.06, who: 'Subscriptions and ads, with losses covered by its owner, Jeff Bezos.' },
+    'The Guardian': { x: 0.68, y: 0.8, who: 'Reader contributions and ads; owned by the Scott Trust, which has no shareholders.' },
+    'Breaking Points': { x: 0.78, y: 0.9, who: 'Premium subscribers plus YouTube ads and sponsors; owned by its hosts.' },
+    'The Free Press': { x: 0.78, y: 0.2, who: 'Subscriptions; bought in 2025 by Paramount Skydance, controlled by the Ellison family.' },
+    'The Daily Wire': { x: 0.6, y: 0.42, who: 'DailyWire+ subscriptions and ads; started with backing from the billionaire Wilks brothers.' },
+    'Glenn Greenwald': { x: 0.66, y: 0.78, who: 'A show deal with Rumble plus paying members.' },
+    'Matt Taibbi': { x: 0.95, y: 0.96, who: 'Paid Substack subscribers.' },
+    'Timcast IRL': { x: 0.62, y: 0.86, who: 'Ads, sponsors, and members. In 2024 prosecutors said a Russian-funded company had paid him for videos; he said he didn\'t know and was a victim.' },
+    'The Young Turks': { x: 0.68, y: 0.8, who: 'Members and ads, with past venture investment.' },
+    'Zeteo': { x: 0.92, y: 0.92, who: 'Paid Substack subscribers.' },
+    'Public': { x: 0.92, y: 0.94, who: 'Paid Substack subscribers.' },
+    'Pod Save America': { x: 0.42, y: 0.86, who: 'Ad sponsors and paying members; owned by its hosts\' Crooked Media.' },
+    'The Intercept': { x: 0.62, y: 0.7, who: 'A nonprofit: reader donations and foundations. Founded with money from billionaire Pierre Omidyar.' },
+    'Reason': { x: 0.24, y: 0.7, who: 'A nonprofit foundation funded largely by donors and foundations, including libertarian philanthropies.' },
+    'National Review': { x: 0.46, y: 0.7, who: 'Subscriptions plus donors to its nonprofit institute.' },
+    'Jacobin': { x: 0.9, y: 0.9, who: 'Mostly print and digital subscribers.' },
+    'The Federalist': { x: 0.3, y: 0.52, who: 'Doesn\'t disclose its funders.' },
+    'UnHerd': { x: 0.3, y: 0.2, who: 'Backed by hedge-fund billionaire Paul Marshall, plus subscriptions.' },
+    'Compact': { x: 0.62, y: 0.6, who: 'Subscriptions and private backers.' },
+    'The Dispatch': { x: 0.9, y: 0.86, who: 'Mostly paying members.' },
+    'ZeroHedge': { x: 0.48, y: 0.5, who: 'Ads and premium subscriptions; ownership has long been kept quiet.' },
+    'Drop Site News': { x: 0.95, y: 0.94, who: 'Reader-funded.' },
+    'InfoWars': { x: 0.76, y: 0.84, who: 'Mostly sales of supplements and gear to its audience.' },
+    'RT (Russia Today)': { x: 0.03, y: 0.03, who: 'Funded by the Russian government.' },
+    'The Grayzone': { x: 0.86, y: 0.86, who: 'Reader donations (Patreon and direct).' },
+    'Natural News': { x: 0.74, y: 0.86, who: 'Mostly its own online store (supplements and survival gear).' },
+    'The Duran': { x: 0.82, y: 0.86, who: 'YouTube and Rumble revenue plus paying members.' },
+    'Jimmy Dore': { x: 0.86, y: 0.9, who: 'Patrons, members, and platform ad revenue.' },
+    'Before It\'s News': { x: 0.14, y: 0.58, who: 'Advertising on posts its users submit.' },
+    'One America News (OAN)': { x: 0.2, y: 0.34, who: 'Cable carriage fees and ads; owned by the Herring family. Reporting showed AT&T carriage fees once made up most of its revenue.' },
+    'The Epoch Times': { x: 0.56, y: 0.4, who: 'Subscriptions and ads; tied to the Falun Gong movement.' },
+    'David Icke': { x: 0.9, y: 0.9, who: 'Books, events, and a paid streaming service.' },
+  };
+  let VIEW = location.hash === '#fund' ? 'fund' : load('civix-sources-map-view', 'mine');
+  if (!VIEWS[VIEW]) VIEW = 'mine';
+
   const board = document.getElementById('board');
   const detail = document.getElementById('detail');
   function render() {
     board.querySelectorAll('.chip').forEach(c => c.remove());
+    applyView();
+    if (VIEW === 'fund') return renderFund();
     const perCol = {};
     SOURCES.forEach(s => { const k = s.group || 'mine'; perCol[k] = (perCol[k] || 0) + 1; });
     const seen = {};
@@ -390,12 +468,121 @@
     box.appendChild(img);
     return box;
   }
+  function applyView() {
+    const v = VIEWS[VIEW];
+    document.getElementById('dek').textContent = v.dek;
+    ['tl', 'tr', 'bl', 'br'].forEach((k, i) => { document.getElementById('q-' + k).textContent = v.q[i]; });
+    document.getElementById('axis-x').innerHTML = v.x.map(t => '<span>' + esc(t) + '</span>').join('');
+    document.getElementById('axis-y').innerHTML = v.y.map(t => '<span>' + esc(t) + '</span>').join('');
+    document.querySelectorAll('.views button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === VIEW)));
+    board.classList.toggle('fund', VIEW === 'fund');
+    board.style.height = '';
+    document.getElementById('reset').hidden = VIEW === 'fund';
+    document.getElementById('foot-fund').hidden = VIEW !== 'fund';
+    document.getElementById('foot-mine').hidden = VIEW === 'fund';
+  }
+
+  // Funding view: each known source snaps to its spot, then icons that
+  // would overlap are nudged apart (a few passes of pairwise push) so every
+  // one stays visible. Sources without funding data are named, not dropped.
+  function renderFund() {
+    board.style.height = '';
+    const W = board.clientWidth;
+    let H = board.clientHeight;
+    const chipW = Math.min(80, W * 0.235), chipH = 60;
+    const padY = W < 600 ? 42 : 30; // keep the quadrant labels (two lines on phones) readable
+    const known = SOURCES.filter(s => FUNDING[s.name]);
+    const pts = known.map(s => ({ s, x: FUNDING[s.name].x * W, y: (1 - FUNDING[s.name].y) * H }));
+    for (let pass = 0; pass < 120; pass++) {
+      let moved = false;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+        const a = pts[i], b = pts[j];
+        const ox = chipW - Math.abs(a.x - b.x), oy = chipH - Math.abs(a.y - b.y);
+        if (ox <= 0 || oy <= 0) continue;
+        moved = true;
+        // Push apart up and down, so "who pays" (left-right) stays true;
+        // only a slight sideways overlap is settled sideways.
+        if (ox < 14) { const d = (ox / 2 + 0.5) * (a.x <= b.x ? -1 : 1); a.x += d; b.x -= d; }
+        else { const d = (oy / 2 + 0.5) * (a.y <= b.y ? -1 : 1); a.y += d; b.y -= d; }
+      }
+      pts.forEach(p => {
+        p.x = Math.min(W - chipW / 2, Math.max(chipW / 2, p.x));
+        p.y = Math.min(H - chipH / 2 - padY, Math.max(chipH / 2 + padY, p.y));
+      });
+      if (!moved) break;
+    }
+    const overlaps = pts.some((a, i) => pts.some((b, j) => j > i && Math.abs(a.x - b.x) < chipW - 1 && Math.abs(a.y - b.y) < chipH - 1));
+    if (overlaps) H = gridFund(pts, W, H, chipW, chipH, padY);
+    pts.forEach(({ s, x, y }) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'chip';
+      el.appendChild(icon(s));
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = s.name;
+      el.appendChild(nm);
+      el.style.left = (x / W * 100) + '%';
+      el.style.top = (y / H * 100) + '%';
+      el.setAttribute('aria-label', s.name + ': ' + FUNDING[s.name].who);
+      el._src = s;
+      board.appendChild(el);
+    });
+    const missing = SOURCES.filter(s => !FUNDING[s.name]).map(s => s.name);
+    document.getElementById('count').textContent = known.length + ' of ' + SOURCES.length + ' mapped';
+    detail.textContent = missing.length ? 'No funding info yet for ' + missing.join(', ') + '.' : '';
+  }
+
+  // Narrow boards: nudging can't clear a crowded corner, so each quadrant's
+  // sources go on a grid inside that same quadrant (nothing crosses a
+  // midline, which would change what it says). Each takes the free cell
+  // closest to its true spot; the board grows taller if a quadrant needs it.
+  function gridFund(pts, W, H, chipW, chipH, padY) {
+    const cols = Math.max(1, Math.floor(W / 2 / chipW));
+    const quad = p => (FUNDING[p.s.name].x >= 0.5 ? 1 : 0) + (FUNDING[p.s.name].y >= 0.5 ? 0 : 2);
+    const counts = [0, 0, 0, 0];
+    pts.forEach(p => counts[quad(p)]++);
+    const rows = Math.max(...counts.map(c => Math.ceil(c / cols)), Math.floor((H / 2 - padY) / chipH));
+    H = Math.max(H, 2 * (rows * chipH + padY));
+    board.style.height = H + 'px';
+    const cellW = W / 2 / cols;
+    [0, 1, 2, 3].forEach(q => {
+      const mine = pts.filter(p => quad(p) === q);
+      const cells = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        cells.push({
+          x: (q % 2) * W / 2 + (c + 0.5) * cellW,
+          // Top quadrants fill from their outer (top) edge, bottom ones from the bottom.
+          y: q < 2 ? padY + (r + 0.5) * chipH : H - padY - (r + 0.5) * chipH,
+        });
+      }
+      const pairs = [];
+      mine.forEach(p => {
+        const tx = FUNDING[p.s.name].x * W, ty = (1 - FUNDING[p.s.name].y) * H;
+        cells.forEach((cell, k) => pairs.push({ p, k, d: Math.hypot(cell.x - tx, cell.y - ty) }));
+      });
+      pairs.sort((a, b) => a.d - b.d);
+      const done = new Set(), used = new Set();
+      pairs.forEach(({ p, k }) => {
+        if (done.has(p) || used.has(k)) return;
+        done.add(p); used.add(k);
+        p.x = cells[k].x; p.y = cells[k].y;
+      });
+    });
+    return H;
+  }
+
   function describe(pos) {
     const trust = pos.y > 0.66 ? 'trusted' : pos.y < 0.34 ? 'untrusted' : 'in between';
     const lean = pos.x < 0.25 ? 'mainstream' : pos.x < 0.5 ? 'independent' : pos.x < 0.75 ? 'alternative' : 'far out';
     return trust + ', ' + lean;
   }
   function show(s) {
+    if (VIEW === 'fund') {
+      const f = FUNDING[s.name];
+      detail.innerHTML = '<strong>' + esc(s.name) + '</strong> · ' + esc(s.hint || '') + '<br>' + esc(f ? f.who : 'No funding info yet.');
+      return;
+    }
     const pos = MAP[s.name];
     detail.innerHTML = '<strong>' + esc(s.name) + '</strong> · ' + esc(s.hint || '') +
       (s.meta ? '<br>' + esc(s.meta) : '') +
@@ -413,7 +600,7 @@
     drag = { chip, id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
   });
   board.addEventListener('pointermove', e => {
-    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag || e.pointerId !== drag.id || VIEW === 'fund') return;
     if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
     drag.moved = true;
     drag.chip.classList.add('dragging');
@@ -440,6 +627,16 @@
   }
   board.addEventListener('pointerup', endDrag);
   board.addEventListener('pointercancel', endDrag);
+
+  document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => {
+    VIEW = b.dataset.view;
+    try { localStorage.setItem('civix-sources-map-view', JSON.stringify(VIEW)); } catch (e) {}
+    detail.textContent = '';
+    render();
+  }));
+  // Snapped positions depend on the board's size.
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (VIEW === 'fund') render(); }, 150); });
 
   document.getElementById('reset').addEventListener('click', () => {
     MAP = {};
