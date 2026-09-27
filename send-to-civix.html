@@ -139,6 +139,8 @@
   .next { font-size: 16px; line-height: 1.6; color: var(--paper-dim); padding-left: 20px; margin: 0 0 28px; }
   .next li { margin-bottom: 6px; }
   .msg { font-size: 14px; color: var(--paper-dim); min-height: 1.4em; }
+  /* The bookmark button is a laptop thing; phones use the share sheet. */
+  @media (max-width: 700px) { #laptop { display: none; } }
   .section-label { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--amber-ink); margin: 0 0 10px; }
   .home-link { display: inline-block; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber-ink); text-decoration: none; border: 1px solid var(--amber); border-radius: 20px; padding: 10px 16px; }
 </style>
@@ -173,6 +175,12 @@
     <div class="way">
       <h2>On iPhone</h2>
       <p>Tap <strong>Share</strong> in any app, then <strong>CiViX</strong>. Or say <strong>"Hey Siri, send to CiViX."</strong> Screenshots work too.</p>
+    </div>
+    <div class="way" id="laptop">
+      <h2>On a laptop</h2>
+      <p>Drag this button to your browser's bookmarks bar. Then, on any page, click it to send that page to CiViX.</p>
+      <p><a class="btn btn-primary" id="bookmarklet" href="javascript:(function(){window.open('https://mycivix.com/send-to-civix.html?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title)+'&amp;text='+encodeURIComponent(String(window.getSelection()).slice(0,1500)),'_blank');})();">Send to CiViX</a></p>
+      <p class="msg">Select some text first and it goes along too.</p>
     </div>
     <div class="way">
       <h2>Paste it here</h2>
@@ -279,6 +287,12 @@
     document.getElementById('addr').textContent = 'Couldn’t set up your address (' + e.message + ')';
   });
 
+  document.getElementById('bookmarklet').addEventListener('click', function (e) {
+    e.preventDefault();
+    document.getElementById('paste-msg').textContent = '';
+    e.target.textContent = 'Drag me to your bookmarks bar';
+  });
+  if (native) document.getElementById('laptop').hidden = true;
   document.getElementById('copy-addr').addEventListener('click', function (e) {
     var text = document.getElementById('addr').textContent;
     navigator.clipboard.writeText(text).then(function () { e.target.textContent = 'Copied'; }, function () {});

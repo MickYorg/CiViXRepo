@@ -63,7 +63,13 @@ framework — deliberately, until there's real cross-page shared state):
 - `calendar.html` — multi-year strategy (`/api/strategic-plan`) plus
   hand-written contingency playbooks.
 - `dig/index.html` — DIG: stance-by-source checker, DEBATE talking points.
-- `send-to-civix.html` — Send to CiViX (share target + per-docket email).
+- `send-to-civix.html` — Send to CiViX how-to: iPhone share/Siri, a laptop
+  bookmark button, paste box, email address; files incoming shares
+  (Android / installed web app); a `#token` link makes another device
+  share the same address. Captures are dug into on the server
+  (`functions/api/capture-dig.js`, queued by `workers/civix-capture`), shown
+  on Take Action ("Sent to CiViX", with Done / Not for me), and their topic
+  feeds the manifesto (with Undo). The old adopt/strike inbox is retired.
 - `analytics.html` — real anonymous platform stats (+ labeled sample data).
 - Placeholders: `connect.html`, `civil-dis.html`, `civix-track.html`.
 - `dev/index.html` — web-only persona switcher (not in the app).
