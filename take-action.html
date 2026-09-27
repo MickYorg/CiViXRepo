@@ -273,6 +273,9 @@
   .sent-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; }
   .sent-foot a, .sent-foot button { color: var(--amber-ink); background: none; border: 0; padding: 6px 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   .sent-digging { font-size: 14px; color: var(--amber-ink); margin: 0 0 6px; }
+  .sent-manifesto { font-size: 14px; color: var(--paper-dim); margin: 0 0 10px; }
+  .sent-manifesto strong { color: var(--paper); }
+  .sent-manifesto button { background: none; border: 0; padding: 4px 0 4px 6px; color: var(--amber-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .sent-card.is-focus { box-shadow: 0 0 0 3px var(--amber-wash), 0 0 0 1px var(--amber); }
   .sent-new { display: inline-block; background: var(--amber); color: var(--btn-ink); border-radius: 20px; padding: 1px 8px; margin-right: 8px; font-weight: 600; letter-spacing: 0.06em; }
   .focus-label {
@@ -2567,6 +2570,10 @@ BODY: <the email body, a few short paragraphs>`;
       if (it && it.dig && it.dig.moves[mi]) runSentMove(it, it.dig.moves[mi]);
       return;
     }
+    const sentUndo = t.closest('[data-sent-undo]');
+    if (sentUndo) { const it = SENT_ITEMS.find(x => x.id === sentUndo.dataset.sentUndo); if (it) { undoSentManifesto(it); renderSentZone(); loadFocusZone(); } return; }
+    const sentNot = t.closest('[data-sent-notforme]');
+    if (sentNot) { const it = SENT_ITEMS[Number(sentNot.dataset.sentNotforme)]; if (it) { undoSentManifesto(it); markSentDone(it); loadFocusZone(); } return; }
     const sentDone = t.closest('[data-sent-done]');
     if (sentDone) { const it = SENT_ITEMS[Number(sentDone.dataset.sentDone)]; if (it) markSentDone(it); return; }
     const sentRetry = t.closest('[data-sent-retry]');
@@ -3034,18 +3041,85 @@ BODY: <the email body, a few short paragraphs>`;
         <p class="sent-summary">${esc(d.summary)}</p>
         ${claims ? `<ul class="sent-claims">${claims}</ul>` : ''}
         <div class="sent-moves">${moves}</div>
-        <div class="sent-foot">${sources}<a href="${esc(digUrl(d.headline))}">Send to DIG &#8599;</a><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+        ${sentManifestoNote(it)}
+        <div class="sent-foot">${sources}<a href="${esc(digUrl(d.headline))}">Send to DIG &#8599;</a><button type="button" data-sent-done="${idx}">Done</button><button type="button" data-sent-notforme="${idx}">Not for me</button></div>`;
     } else if (pending) {
       body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX is digging into this&hellip; usually a minute or two.</p>
-        <div class="sent-foot"><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+        <div class="sent-foot"><button type="button" data-sent-done="${idx}">Done</button></div>`;
     } else {
       const why = (it.dig && it.dig.error) || 'Something went wrong.';
       body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX couldn’t dig into this yet: ${esc(why)}</p>
-        <div class="sent-foot"><button type="button" data-sent-retry="${idx}">Try again</button><button type="button" data-sent-done="${idx}">Mark done</button></div>`;
+        <div class="sent-foot"><button type="button" data-sent-retry="${idx}">Try again</button><button type="button" data-sent-done="${idx}">Done</button></div>`;
     }
     const isNew = d && !sentSeen().includes(it.id);
     return `<div class="sent-card${it.id === SENT_FOCUS ? ' is-focus' : ''}" id="sent-${esc(it.id)}"><p class="sent-eyebrow">${isNew ? '<span class="sent-new">New</span>' : ''}${esc(sentSourceLabel(it))}</p>${body}</div>`;
   }
+  // Send to CiViX feeds the manifesto (27 Sep 2026): what a citizen cares
+  // enough to share IS a signal about what they care about. Each dug capture
+  // adds its topic to the manifesto (or raises it a notch if already there),
+  // with their own "why it matters" as the stance, once per capture. The card
+  // says what happened and offers Undo; "Not for me" also undoes it.
+  // Recorded in profile.sentApplied[captureId] so it's applied exactly once.
+  function sentWhy(it) {
+    const m = /Why it matters to me: ([^\n]+)/.exec(it.note || '');
+    return m ? m[1].trim() : '';
+  }
+  function saveProfile(profile) {
+    try { localStorage.setItem('civix-profile', JSON.stringify(profile)); } catch (e) {}
+  }
+  function applySentToManifesto() {
+    const profile = loadRawProfile();
+    if (!profile) return false;
+    profile.issues = profile.issues || [];
+    profile.sentApplied = profile.sentApplied || {};
+    let changed = false;
+    SENT_ITEMS.forEach(it => {
+      const d = it.dig;
+      if (!d || d.error || profile.sentApplied[it.id]) return;
+      const topic = (d.topic || '').trim();
+      if (!topic) return;
+      const id = slug(topic);
+      const why = sentWhy(it);
+      const existing = profile.issues.find(i => i.id === id);
+      if (existing) {
+        const prevWeight = existing.weight || 1;
+        existing.weight = Math.min(3, prevWeight + 1);
+        if (why && !(existing.stance || '').includes(why)) existing.stance = existing.stance ? existing.stance + ' Also: ' + why : why;
+        profile.sentApplied[it.id] = { topic, id, added: false, prevWeight };
+      } else {
+        profile.issues.push({ id, name: topic, weight: 2, stance: why });
+        profile.sentApplied[it.id] = { topic, id, added: true };
+      }
+      profile.log = profile.log || [];
+      profile.log.unshift({ at: Date.now(), kind: 'add', text: topic + ' (from something you sent)' });
+      profile.log.length = Math.min(profile.log.length, 40);
+      profile.rev = (profile.rev || 0) + 1;
+      changed = true;
+    });
+    if (changed) saveProfile(profile);
+    return changed;
+  }
+  function undoSentManifesto(it) {
+    const profile = loadRawProfile();
+    const rec = profile && profile.sentApplied && profile.sentApplied[it.id];
+    if (!rec || rec.undone) return;
+    const iss = (profile.issues || []).find(i => i.id === rec.id);
+    if (iss) {
+      if (rec.added) profile.issues = profile.issues.filter(i => i.id !== rec.id);
+      else iss.weight = rec.prevWeight;
+    }
+    rec.undone = true;
+    profile.rev = (profile.rev || 0) + 1;
+    saveProfile(profile);
+  }
+  function sentManifestoNote(it) {
+    const profile = loadRawProfile();
+    const rec = profile && profile.sentApplied && profile.sentApplied[it.id];
+    if (!rec) return '';
+    if (rec.undone) return `<p class="sent-manifesto">Not added to your manifesto.</p>`;
+    return `<p class="sent-manifesto">${rec.added ? 'Added to your manifesto' : 'Raised in your manifesto'}: <strong>${esc(rec.topic)}</strong> <button type="button" data-sent-undo="${esc(it.id)}">Undo</button></p>`;
+  }
+
   function renderSentZone() {
     const zone = document.getElementById('sent-zone');
     if (!zone) return;
@@ -3068,6 +3142,7 @@ BODY: <the email body, a few short paragraphs>`;
       const cutoff = Date.now() - 30 * 864e5;
       SENT_ITEMS = (data.items || []).filter(it => it.state !== 'done' && it.at > cutoff).slice(0, 5);
     } catch (e) { return; }
+    if (applySentToManifesto()) loadFocusZone();
     renderSentZone();
     clearTimeout(SENT_POLL);
     // Dig queued items now, one at a time, while the page is open; the

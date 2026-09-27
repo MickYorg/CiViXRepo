@@ -438,11 +438,14 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
       else poolIssues.push(i);
     });
 
-    const [fed, state, municipal, docket] = await Promise.allSettled([
+    // Send to CiViX captures are no longer ranked here (27 Sep 2026): each
+    // one is dug into on the server and shown with its own moves in Take
+    // Action's "Sent to CiViX" feed, and its topic feeds the manifesto,
+    // which is how it influences these bill matches.
+    const [fed, state, municipal] = await Promise.allSettled([
       fetchFederalBills(),
       fetchStateBills(zip),
-      fetchMunicipalBills(zip),
-      fetchDocketItems(profile && profile.token)
+      fetchMunicipalBills(zip)
     ]);
 
     // A well-known recurring/annual bill referred to by its common
@@ -548,24 +551,6 @@ Reply with ONLY a short phrase of 3-7 words naming the broad, durable policy are
         r.score = r.score * (lean[r.kind] || 1);
       }
     });
-
-    if (docket.status === 'fulfilled' && docket.value.length && poolIssues.length) {
-      for (const item of docket.value) {
-        const topic = await classifyDocketItem(item);
-        const { score, hits } = scoreAgainstIssues(topic, poolIssues);
-        if (score > 0) {
-          results.push({
-            kind: 'docket', hits, score,
-            title: item.title,
-            label: topic,
-            rawSummary: item.note || '',
-            summaryId: null, // already plain — no AI summary needed
-            url: item.url || '',
-            actionHref: (profile.token ? 'send-to-civix.html#' + profile.token : 'send-to-civix.html')
-          });
-        }
-      }
-    }
 
     // A citizen who bothered to type something in their own words (the
     // Citizen-mode "anything else on your mind?" card, or a stance
