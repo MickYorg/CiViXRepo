@@ -135,10 +135,16 @@
   .mid-x, .mid-y { position: absolute; background: var(--line); pointer-events: none; }
   .mid-x { left: 50%; top: 0; bottom: 0; width: 1px; }
   .mid-y { top: 50%; left: 0; right: 0; height: 1px; }
-  .chip { position: absolute; transform: translate(-50%, -50%); font-size: 12.5px; line-height: 1.2; padding: 6px 10px; border-radius: 16px; border: 1px solid var(--amber); background: var(--ink); color: var(--paper); white-space: nowrap; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; box-shadow: 0 1px 2px rgba(0,0,0,0.25); max-width: 44%; overflow: hidden; text-overflow: ellipsis; }
-  .chip.unplaced { opacity: 0.55; border-style: dashed; border-color: var(--line); }
-  .chip.mine { border-color: var(--paper-dim); }
-  .chip.dragging { cursor: grabbing; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+  .chip { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; width: 76px; padding: 4px 2px; border: 0; border-radius: 10px; background: none; color: var(--paper); font: inherit; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .chip .ico { width: 40px; height: 40px; border-radius: 9px; overflow: hidden; background: #fff; border: 1.5px solid var(--amber); box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: grid; place-items: center; pointer-events: none; }
+  .chip .ico img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .chip .ico.initials { background: var(--ink); color: var(--paper); font: 600 14px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 0.02em; }
+  .chip .nm { max-width: 100%; font-size: 11px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; text-shadow: 0 1px 2px var(--ink); }
+  .chip.unplaced { opacity: 0.55; }
+  .chip.unplaced .ico { border-style: dashed; border-color: var(--line); }
+  .chip.mine .ico { border-color: var(--paper-dim); }
+  .chip.dragging { cursor: grabbing; z-index: 5; }
+  .chip.dragging .ico { box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
   .chip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   .detail { margin: 14px 0 0; min-height: 2.8em; font-size: 15px; line-height: 1.5; color: var(--paper-dim); }
   .detail strong { color: var(--paper); }
@@ -147,9 +153,11 @@
   :root { --q-good: rgba(91, 182, 122, 0.07); --q-bad: rgba(200, 68, 58, 0.07); }
   @media (max-width: 560px) {
     .board { height: 118vh; min-height: 640px; }
-    /* Four columns on a phone: each chip fits its quarter; long names end
+    /* Four columns on a phone: each icon fits its quarter; long names end
        in an ellipsis (tap shows the full name). */
-    .chip { font-size: 11.5px; padding: 5px 7px; max-width: 23%; }
+    .chip { width: 23%; }
+    .chip .ico { width: 34px; height: 34px; border-radius: 8px; }
+    .chip .nm { font-size: 11px; }
   }
   @media (prefers-reduced-motion: no-preference) { .chip { transition: box-shadow 0.15s ease, opacity 0.2s ease; } }
 </style>
@@ -318,12 +326,17 @@
   const SOURCES = [...byName.values()];
   let MAP = load(KEY, {});
 
-  // Default position: the group's column (yours: the middle), spread down a
-  // narrow band around the neutral line so chips don't pile up.
+  // Default position: the group's column (yours: the middle), spread down
+  // most of the board so the icons don't pile up. Wide boards split each
+  // column into two staggered files; phones keep one.
   function defaultPos(s, i, n) {
-    const x = s.group ? COLUMN[s.group] : 0.5;
+    const two = board.clientWidth >= 600 && n > 4;
+    const rows = two ? Math.ceil(n / 2) : n;
+    const row = two ? Math.floor(i / 2) : i;
+    const x = (s.group ? COLUMN[s.group] : 0.5) + (two ? (i % 2 ? 0.055 : -0.055) : 0);
     const seeded = trustY(s);
-    const y = seeded != null ? seeded : 0.36 + (n > 1 ? (i / (n - 1)) * 0.28 : 0.14);
+    // A lone source of your own sits at the top middle, clear of the files.
+    const y = seeded != null ? seeded : rows > 1 ? 0.88 - (row / (rows - 1)) * 0.76 : 0.94;
     return { x, y, placed: seeded != null };
   }
 
@@ -341,7 +354,11 @@
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'chip' + (pos.placed ? '' : ' unplaced') + (s.mine ? ' mine' : '');
-      el.textContent = s.name;
+      el.appendChild(icon(s));
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = s.name;
+      el.appendChild(nm);
       el.style.left = (pos.x * 100) + '%';
       el.style.top = ((1 - pos.y) * 100) + '%';
       el.setAttribute('aria-label', s.name + ', ' + describe(pos));
@@ -350,6 +367,28 @@
     });
     const placed = SOURCES.filter(s => MAP[s.name] && MAP[s.name].placed).length;
     document.getElementById('count').textContent = placed + ' of ' + SOURCES.length + ' placed';
+  }
+  // Each outlet's own icon, downloaded once by scripts/fetch-source-icons.js
+  // and served from here (never loaded from the outlet, so browsing stays
+  // private). No icon, or one the citizen added: an initials badge.
+  const NO_ICON = new Set(['Timcast IRL', 'InfoWars']);
+  const slug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  function initials(n) {
+    const words = n.replace(/\(.*?\)/g, '').replace(/^the\s+/i, '').split(/\s+/).filter(Boolean);
+    return (words.length > 1 ? words.slice(0, 3).map(w => w[0]).join('') : words[0].slice(0, 2)).toUpperCase();
+  }
+  function icon(s) {
+    const box = document.createElement('span');
+    box.className = 'ico';
+    const badge = () => { box.className = 'ico initials'; box.textContent = initials(s.name); };
+    if (NO_ICON.has(s.name)) { badge(); return box; }
+    const img = document.createElement('img');
+    img.src = 'assets/source-icons/' + slug(s.name) + '.png';
+    img.alt = '';
+    img.draggable = false;
+    img.onerror = () => { img.remove(); badge(); };
+    box.appendChild(img);
+    return box;
   }
   function describe(pos) {
     const trust = pos.y > 0.66 ? 'trusted' : pos.y < 0.34 ? 'untrusted' : 'in between';

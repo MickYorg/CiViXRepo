@@ -145,14 +145,14 @@
   },
   "sources-map@iphone-se": {
     "smallText": 0,
-    "smallTap": 4
+    "smallTap": 2
   },
   "sources-map@iphone-16": {
     "smallText": 0,
-    "smallTap": 4
+    "smallTap": 2
   },
   "sources-map@iphone-16-pro-max": {
     "smallText": 0,
-    "smallTap": 4
+    "smallTap": 2
   }
 }
