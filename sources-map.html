@@ -148,6 +148,7 @@
   .chip:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   .detail { margin: 14px 0 0; min-height: 2.8em; font-size: 15px; line-height: 1.5; color: var(--paper-dim); }
   .detail strong { color: var(--paper); }
+  .detail a { color: var(--amber-ink); }
   .foot { font-size: 14px; color: var(--paper-dim); margin: 22px 0 0; max-width: 62ch; line-height: 1.55; }
 
   .trays { display: grid; gap: 10px; margin: 6px 0 0; }
@@ -227,7 +228,7 @@
   </div>
   <p class="detail" id="detail" aria-live="polite"></p>
   <div class="trays" id="trays"></div>
-  <p class="foot" id="foot-fund" hidden>Who pays is CiViX's reading of public reporting (ownership filings, the outlets' own disclosures, and news coverage) as of September 2026. Funding changes; where an outlet doesn't disclose its backers, the map says so rather than guess.</p>
+  <p class="foot" id="foot-fund" hidden>Who pays is CiViX's reading of annual reports, tax filings, court records, and news coverage, checked September 2026; tap a source for its link. Funding changes; where an outlet doesn't disclose its backers, the map says so rather than guess.</p>
   <p class="foot" id="foot-mine">This is an experiment. Your map is saved on this device only and doesn't change anything else in CiViX yet. The starting columns come from DIG's groupings, which lean on public bias and reliability trackers; where each source really belongs is your call.</p>
 </div>
 
@@ -375,46 +376,46 @@
   // x: 0 = paid by institutions .. 1 = paid by the audience.
   // y: 0 = owned by a conglomerate, billionaire, or state .. 1 = independent.
   const FUNDING = {
-    'Associated Press': { x: 0.22, y: 0.72, who: 'A nonprofit cooperative, paid mostly by the news outlets that license its stories.' },
-    'Reuters': { x: 0.12, y: 0.22, who: 'Owned by Thomson Reuters, a public company controlled by the Thomson family; paid by media and financial clients.' },
-    'BBC News': { x: 0.3, y: 0.3, who: 'Mostly the UK licence fee, a household charge set by the government, plus commercial sales abroad.' },
-    'NPR': { x: 0.42, y: 0.66, who: 'Member-station fees, corporate sponsors, and foundations; stations lean on listener donations. Federal funding was cut in 2025.' },
-    'The New York Times': { x: 0.72, y: 0.24, who: 'Mostly digital subscriptions, plus ads; a public company controlled by the Sulzberger family.' },
-    'The Wall Street Journal': { x: 0.58, y: 0.08, who: 'Subscriptions and ads; owned by Rupert Murdoch\'s News Corp.' },
-    'Fox News': { x: 0.18, y: 0.1, who: 'Cable carriage fees and advertising; owned by the Murdochs\' Fox Corporation.' },
-    'CNN': { x: 0.12, y: 0.08, who: 'Cable carriage fees and advertising; owned by a publicly traded media conglomerate.' },
-    'The Washington Post': { x: 0.45, y: 0.06, who: 'Subscriptions and ads, with losses covered by its owner, Jeff Bezos.' },
-    'The Guardian': { x: 0.68, y: 0.8, who: 'Reader contributions and ads; owned by the Scott Trust, which has no shareholders.' },
-    'Breaking Points': { x: 0.78, y: 0.9, who: 'Premium subscribers plus YouTube ads and sponsors; owned by its hosts.' },
-    'The Free Press': { x: 0.78, y: 0.2, who: 'Subscriptions; bought in 2025 by Paramount Skydance, controlled by the Ellison family.' },
-    'The Daily Wire': { x: 0.6, y: 0.42, who: 'DailyWire+ subscriptions and ads; started with backing from the billionaire Wilks brothers.' },
-    'Glenn Greenwald': { x: 0.66, y: 0.78, who: 'A show deal with Rumble plus paying members.' },
-    'Matt Taibbi': { x: 0.95, y: 0.96, who: 'Paid Substack subscribers.' },
-    'Timcast IRL': { x: 0.62, y: 0.86, who: 'Ads, sponsors, and members. In 2024 prosecutors said a Russian-funded company had paid him for videos; he said he didn\'t know and was a victim.' },
-    'The Young Turks': { x: 0.68, y: 0.8, who: 'Members and ads, with past venture investment.' },
-    'Zeteo': { x: 0.92, y: 0.92, who: 'Paid Substack subscribers.' },
-    'Public': { x: 0.92, y: 0.94, who: 'Paid Substack subscribers.' },
-    'Pod Save America': { x: 0.42, y: 0.86, who: 'Ad sponsors and paying members; owned by its hosts\' Crooked Media.' },
-    'The Intercept': { x: 0.62, y: 0.7, who: 'A nonprofit: reader donations and foundations. Founded with money from billionaire Pierre Omidyar.' },
-    'Reason': { x: 0.24, y: 0.7, who: 'A nonprofit foundation funded largely by donors and foundations, including libertarian philanthropies.' },
-    'National Review': { x: 0.46, y: 0.7, who: 'Subscriptions plus donors to its nonprofit institute.' },
-    'Jacobin': { x: 0.9, y: 0.9, who: 'Mostly print and digital subscribers.' },
-    'The Federalist': { x: 0.3, y: 0.52, who: 'Doesn\'t disclose its funders.' },
-    'UnHerd': { x: 0.3, y: 0.2, who: 'Backed by hedge-fund billionaire Paul Marshall, plus subscriptions.' },
-    'Compact': { x: 0.62, y: 0.6, who: 'Subscriptions and private backers.' },
-    'The Dispatch': { x: 0.9, y: 0.86, who: 'Mostly paying members.' },
-    'ZeroHedge': { x: 0.48, y: 0.5, who: 'Ads and premium subscriptions; ownership has long been kept quiet.' },
-    'Drop Site News': { x: 0.95, y: 0.94, who: 'Reader-funded.' },
-    'InfoWars': { x: 0.76, y: 0.84, who: 'Mostly sales of supplements and gear to its audience.' },
-    'RT (Russia Today)': { x: 0.03, y: 0.03, who: 'Funded by the Russian government.' },
-    'The Grayzone': { x: 0.86, y: 0.86, who: 'Reader donations (Patreon and direct).' },
-    'Natural News': { x: 0.74, y: 0.86, who: 'Mostly its own online store (supplements and survival gear).' },
-    'The Duran': { x: 0.82, y: 0.86, who: 'YouTube and Rumble revenue plus paying members.' },
-    'Jimmy Dore': { x: 0.86, y: 0.9, who: 'Patrons, members, and platform ad revenue.' },
-    'Before It\'s News': { x: 0.14, y: 0.58, who: 'Advertising on posts its users submit.' },
-    'One America News (OAN)': { x: 0.2, y: 0.34, who: 'Cable carriage fees and ads; owned by the Herring family. Reporting showed AT&T carriage fees once made up most of its revenue.' },
-    'The Epoch Times': { x: 0.56, y: 0.4, who: 'Subscriptions and ads; tied to the Falun Gong movement.' },
-    'David Icke': { x: 0.9, y: 0.9, who: 'Books, events, and a paid streaming service.' },
+    'Associated Press': { x: 0.2, y: 0.72, who: 'A nonprofit cooperative, paid mainly by the news outlets and broadcasters that license its stories, plus advertising, AI licensing (OpenAI among others), and philanthropy.', src: 'https://pressgazette.co.uk/publishers/wires_and_agencies/advertising-philanthropy-and-ai-how-the-ap-is-diversifying-its-revenue-streams/' },
+    'Reuters': { x: 0.1, y: 0.15, who: 'Paid by news outlets and financial and professional clients. Owned by Thomson Reuters, about 70% held by the Thomson family\'s Woodbridge Company.', src: 'https://en.wikipedia.org/wiki/The_Woodbridge_Company' },
+    'BBC News': { x: 0.35, y: 0.28, who: 'About 65% from the UK licence fee, a compulsory household charge set by the government; 35% commercial. A public corporation under royal charter.', src: 'https://commonslibrary.parliament.uk/research-briefings/cbp-8101/' },
+    'NPR': { x: 0.42, y: 0.68, who: '$363M in 2025: fees from member stations (which lean on listener donations), about a quarter from corporate sponsors, and foundations. Federal funding through CPB ended in 2025.', src: 'https://www.insideradio.com/free/npr-funding-gap-highlights-pressure-on-public-radio-revenue/article_8ae77f98-9bb7-4b07-b242-d2750b1cce0b.html' },
+    'The New York Times': { x: 0.68, y: 0.28, who: 'About 69% subscriptions ($1.95B of $2.82B in 2025), 20% ads. A public company the Sulzberger family controls through special voting shares.', src: 'https://www.sec.gov/Archives/edgar/data/71691/000007169126000011/nyt-20251231.htm' },
+    'The Wall Street Journal': { x: 0.36, y: 0.08, who: 'Its parent, Dow Jones ($2.33B in 2025), earns much of its money selling data and news services to banks and corporations (Risk & Compliance, Energy, Factiva), plus 17% ads; reader subscriptions are the smaller part. Owned by the Murdochs\' News Corp.', src: 'https://www.sec.gov/Archives/edgar/data/1564708/000156470825000416/release-q4fy2025.htm' },
+    'Fox News': { x: 0.15, y: 0.1, who: 'Cable carriage fees and advertising. Owned by the Murdochs\' Fox Corporation.', src: 'https://en.wikipedia.org/wiki/Fox_News' },
+    'CNN': { x: 0.12, y: 0.08, who: 'Cable carriage fees and advertising. Owned by Warner Bros. Discovery, which Paramount Skydance (the Ellison family) agreed in 2026 to buy.', src: 'https://www.cnn.com/2026/09/22/media/paramount-warner-discovery-merger-hollywood-ellison' },
+    'The Washington Post': { x: 0.4, y: 0.05, who: 'Subscriptions and ads, losing about $100M a year that owner Jeff Bezos covers. Cut a third of its staff in February 2026.', src: 'https://www.cnn.com/2026/02/04/media/washington-post-layoffs' },
+    'The Guardian': { x: 0.68, y: 0.82, who: '£282M in 2025/26: digital reader support £126M (45%) plus print sales, and ads. Owned by the Scott Trust, which has no shareholders.', src: 'https://pressgazette.co.uk/media_business/guardian-reports-bumper-year-for-digital-reader-revenue/' },
+    'Breaking Points': { x: 0.82, y: 0.92, who: 'Mostly premium subscribers, plus YouTube and podcast ads. Owned and run by its hosts.', src: 'https://en.wikipedia.org/wiki/Breaking_Points' },
+    'The Free Press': { x: 0.8, y: 0.15, who: 'About 170,000 paying subscribers. Bought for $150M in October 2025 by Paramount Skydance (the Ellison family); Bari Weiss now runs CBS News.', src: 'https://www.axios.com/2025/10/06/paramount-skydance-acquires-the-free-press' },
+    'The Daily Wire': { x: 0.72, y: 0.5, who: 'About three-quarters subscriptions (roughly 850,000 in 2025, down a third) and 20% ads. Started with money from the billionaire Wilks brothers; now seeking investors.', src: 'https://www.semafor.com/article/06/23/2026/daily-wire-under-pressure-seeks-strategic-investors-targets-ipo' },
+    'Glenn Greenwald': { x: 0.6, y: 0.75, who: 'An exclusive show deal with Rumble, plus paying members on Locals.', src: 'https://www.prnewswire.com/news-releases/glenn-greenwald-launches-exclusive-daily-live-show-on-rumble-301620302.html' },
+    'Matt Taibbi': { x: 0.95, y: 0.96, who: 'Paid Substack subscribers.', src: 'https://www.racket.news/' },
+    'Timcast IRL': { x: 0.58, y: 0.85, who: 'Ads, sponsors, and members. A 2024 indictment says Tenet Media, secretly funded by Russia\'s RT, paid him $100,000 per episode; he wasn\'t charged and says he was deceived.', src: 'https://www.cnn.com/2024/09/04/politics/doj-alleges-russia-funded-company-linked-social-media-stars/index.html' },
+    'The Young Turks': { x: 0.62, y: 0.62, who: 'Members and ads, plus about $28M from venture investors (3L Capital, Greycroft, Jeffrey Katzenberg\'s WndrCo).', src: 'https://variety.com/2017/digital/news/young-turks-jeffrey-katzenberg-wndrco-funding-1202518938/' },
+    'Zeteo': { x: 0.92, y: 0.92, who: 'Paid Substack subscribers.', src: 'https://zeteo.com/' },
+    'Public': { x: 0.92, y: 0.94, who: 'Paid Substack subscribers.', src: 'https://www.public.news/' },
+    'Pod Save America': { x: 0.35, y: 0.85, who: 'Mostly advertising, plus about 50,000 paying Friends of the Pod. Owned by its hosts\' Crooked Media.', src: 'https://www.supercast.com/customers-cases/crookedmedia' },
+    'The Intercept': { x: 0.72, y: 0.8, who: 'A nonprofit. Since billionaire Pierre Omidyar stopped funding it in 2022, mostly reader donations plus some foundations.', src: 'https://www.cjr.org/business_of_news/layoffs-the-intercept.php' },
+    'Reason': { x: 0.15, y: 0.72, who: 'About 92% donor contributions to the Reason Foundation ($21M of $23M in 2024), including $5M through DonorsTrust; long-standing Koch family ties.', src: 'https://www.instrumentl.com/990-report/the-reason-foundation' },
+    'National Review': { x: 0.35, y: 0.72, who: 'Owned by the nonprofit National Review Institute, 95% funded by gifts and grants; plus magazine subscriptions.', src: 'https://philanthropy.org/990/report/133649537/national-review-institute' },
+    'Jacobin': { x: 0.92, y: 0.9, who: 'Mostly subscribers (about 75,000), plus book sales.', src: 'https://en.wikipedia.org/wiki/Jacobin_(magazine)' },
+    'The Federalist': { x: 0.18, y: 0.55, who: 'Doesn\'t disclose its funders. Tax records have shown foundation money, including $400K from the family foundation of Uline billionaire Richard Uihlein and $249K through DonorsTrust.', src: 'https://www.exposedbycmd.org/2020/12/09/who-funds-the-federalist-finally-we-know/' },
+    'UnHerd': { x: 0.22, y: 0.12, who: 'Funded by hedge-fund billionaire Paul Marshall (who also owns The Spectator and co-owns GB News), plus subscriptions.', src: 'https://en.wikipedia.org/wiki/UnHerd' },
+    'Compact': { x: 0.62, y: 0.65, who: 'Mainly subscriptions. Got a $200K grant from Soros\'s Open Society Foundations in 2023; Peter Thiel has been reported as a donor, which he denies.', src: 'https://en.wikipedia.org/wiki/Compact_(American_magazine)' },
+    'The Dispatch': { x: 0.9, y: 0.88, who: 'About 85% memberships (45,000 paying). 32 small investors, none with a controlling stake.', src: 'https://www.amediaoperator.com/profile/the-dispatchs-plan-to-double-revenue-in-2025/' },
+    'ZeroHedge': { x: 0.25, y: 0.7, who: 'Advertising. Owned through a Bulgarian company tied to founder Daniel Ivandjiiski\'s family.', src: 'https://en.wikipedia.org/wiki/Zero_Hedge' },
+    'Drop Site News': { x: 0.95, y: 0.94, who: 'Reader-funded.', src: 'https://www.dropsitenews.com/' },
+    'InfoWars': { x: 0.5, y: 0.35, who: 'Bought out of bankruptcy in April 2026 by the company that owns The Onion; Alex Jones is out. Under Jones it ran mostly on supplement sales.', src: 'https://www.houstonpublicmedia.org/articles/court/2026/04/20/549630/the-onion-says-its-finally-acquired-alex-jones-austin-based-infowars/' },
+    'RT (Russia Today)': { x: 0.03, y: 0.03, who: 'Funded by the Russian government.', src: 'https://en.wikipedia.org/wiki/RT_(TV_network)' },
+    'The Grayzone': { x: 0.85, y: 0.75, who: 'Says it\'s funded by reader donations and Patreon. The Washington Post reported hacked documents showing Iran\'s state-funded Press TV paid a writer who became its Washington editor.', src: 'https://en.wikipedia.org/wiki/The_Grayzone' },
+    'Natural News': { x: 0.74, y: 0.86, who: 'Mostly its own online store (supplements and survival gear).', src: 'https://en.wikipedia.org/wiki/Natural_News' },
+    'The Duran': { x: 0.82, y: 0.86, who: 'YouTube and Rumble revenue plus paying members.', src: 'https://theduran.com/' },
+    'Jimmy Dore': { x: 0.86, y: 0.9, who: 'Patrons, members, and platform ad revenue.', src: 'https://en.wikipedia.org/wiki/Jimmy_Dore' },
+    'Before It\'s News': { x: 0.14, y: 0.58, who: 'Advertising on posts its users submit.', src: 'https://en.wikipedia.org/wiki/Before_It%27s_News' },
+    'One America News (OAN)': { x: 0.15, y: 0.42, who: 'Cable carriage fees and ads; owned by the Herring family. The founder testified that AT&T\'s DirecTV once supplied up to 90% of its revenue; DirecTV dropped it in 2022 and Spectrum picked it up in 2025.', src: 'https://en.wikipedia.org/wiki/One_America_News_Network' },
+    'The Epoch Times': { x: 0.45, y: 0.45, who: 'Subscriptions and ads; founded by Falun Gong adherents. Its former CFO pleaded guilty in a $67M money-laundering scheme, during which its revenue grew from $15M to $62M.', src: 'https://www.courthousenews.com/former-epoch-times-executive-pleads-guilty-to-multimillion-dollar-fraud-scheme-that-funded-newspaper/' },
+    'David Icke': { x: 0.9, y: 0.9, who: 'Books, events, and a paid streaming service.', src: 'https://en.wikipedia.org/wiki/David_Icke' },
   };
   let VIEW = location.hash === '#fund' ? 'fund' : load('civix-sources-map-view', 'mine');
   if (!VIEWS[VIEW]) VIEW = 'mine';
@@ -656,7 +657,8 @@
   function show(s) {
     if (VIEW === 'fund') {
       const f = FUNDING[s.name];
-      detail.innerHTML = '<strong>' + esc(s.name) + '</strong> · ' + esc(s.hint || '') + '<br>' + esc(f ? f.who : 'No funding info yet.');
+      detail.innerHTML = '<strong>' + esc(s.name) + '</strong> · ' + esc(s.hint || '') + '<br>' + esc(f ? f.who : 'No funding info yet.') +
+        (f && f.src ? ' <a href="' + esc(f.src) + '" target="_blank" rel="noopener">Source</a>' : '');
       return;
     }
     const pos = MAP[s.name];
