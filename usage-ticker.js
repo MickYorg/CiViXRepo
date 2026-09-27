@@ -22,27 +22,35 @@
     return /\/dig\/?(index\.html)?$/.test(location.pathname) ? '../analytics.html' : 'analytics.html';
   }
 
+  // One short line (27 Sep 2026: the multi-line stats box took too much of
+  // every page). The full numbers live on the Analytics dashboard it links to.
+  function injectStyle() {
+    if (document.getElementById('usage-ticker-style')) return;
+    const st = document.createElement('style');
+    st.id = 'usage-ticker-style';
+    st.textContent = '.usage-ticker.usage-ticker-ready{padding:7px 12px;font-size:14.5px;line-height:1.4;font-family:"Newsreader",Georgia,serif;' +
+      'align-items:center;white-space:nowrap;overflow:hidden;}' +
+      '.usage-ticker.usage-ticker-ready .usage-ticker-text{overflow:hidden;text-overflow:ellipsis;min-width:0;}' +
+      '.usage-ticker.usage-ticker-ready .usage-ticker-link{margin-left:6px;}' +
+      '@media (max-width:560px){.usage-ticker-nums{display:none;}}';
+    document.head.appendChild(st);
+  }
+
   function render(el, stats) {
-    const checks = (stats.functions && stats.functions.dig_check) || 0;
-    const talkingPoints = (stats.functions && stats.functions.dig_debate) || 0;
+    injectStyle();
     const actions = stats.actionsTotal || 0;
     const manifestos = stats.manifestos || 0;
-    const costUsd = (stats.tokensSummary && stats.tokensSummary.costUsd) || 0;
-    const total = checks + talkingPoints + actions + manifestos;
+    const link = `<a class="usage-ticker-link" href="${analyticsHref()}">See how &#8594;</a>`;
 
-    if (total === 0) {
-      el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">Be part of the first wave of citizens using CiViX — your activity here becomes the platform's very first stats.</span>`;
+    if (actions + manifestos === 0) {
+      el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">Be one of the first citizens putting CiViX to work.</span>${link}`;
       return;
     }
-
-    const parts = [];
-    if (checks) parts.push(`<strong>${fmt(checks)}</strong> checks run`);
-    if (talkingPoints) parts.push(`<strong>${fmt(talkingPoints)}</strong> talking points pulled`);
-    if (actions) parts.push(`<strong>${fmt(actions)}</strong> actions taken`);
-    if (manifestos) parts.push(`<strong>${fmt(manifestos)}</strong> manifestos built`);
-    if (costUsd > 0) parts.push(`<strong>$${costUsd.toFixed(2)}</strong> of real AI work done, in the open`);
-
-    el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">${parts.join(' · ')}<span class="usage-ticker-tagline"> — citizens are putting CiViX to work</span> <a class="usage-ticker-link" href="${analyticsHref()}">See the full dashboard &#8594;</a></span>`;
+    const bits = [];
+    if (manifestos) bits.push(`<strong>${fmt(manifestos)}</strong> manifestos`);
+    if (actions) bits.push(`<strong>${fmt(actions)}</strong> actions`);
+    // Numbers only where there's room; on a phone the one line is the claim + link.
+    el.innerHTML = `<span class="usage-ticker-emoji">📈</span><span class="usage-ticker-text">CiViX is making a difference<span class="usage-ticker-nums">: ${bits.join(', ')}</span>.</span>${link}`;
   }
 
   async function init() {
