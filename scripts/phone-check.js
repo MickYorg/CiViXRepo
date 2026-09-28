@@ -51,6 +51,18 @@ const LAPTOP = { name: 'laptop', width: 1440, height: 900, laptop: true };
 const MIN_FONT = 11;
 const MIN_TAP = 40;
 
+// Opens a Take Action modal by tapping the page's own button. AI drafts are answered
+// with a canned reply in the page (no AI spend on every layout run); the
+// representative lookups are real.
+const cannedDrafts = (open) => `(() => {
+  const real = window.fetch;
+  const reply = 'SUBJECT: Please support affordable housing near transit\\nBODY: Dear Representative, as a constituent I urge you to support more homes near transit. Thank you.\\nSCRIPT: Hi, I am a constituent calling to ask the office to support more homes near transit. Thank you.';
+  window.fetch = (u, o) => String(u).includes('/api/dig-check')
+    ? Promise.resolve(new Response(JSON.stringify({ content: [{ type: 'text', text: reply }] }), { headers: { 'content-type': 'application/json' } }))
+    : real(u, o);
+  ${open};
+})()`;
+
 // A citizen's Source Map with a full board (12, the most it holds).
 const SOURCE_MAP_SAMPLE = {
   'Associated Press': { x: 0.1, y: 0.85, placed: true }, 'Reuters': { x: 0.2, y: 0.78, placed: true },
@@ -74,6 +86,10 @@ const PAGES = [
   { name: 'take-action', url: '/take-action.html', state: 'medium', wait: 9000 },
   // Calendar's plan is cached for 24h per manifesto after its first (~40s)
   // generation, so repeat runs render the full plan within a few seconds.
+  { name: 'take-action-federal', url: '/take-action.html', state: 'medium', wait: 5000,
+    after: cannedDrafts("document.querySelector('[data-take-action]').click()") },
+  { name: 'take-action-state', url: '/take-action.html', state: 'medium', wait: 5000,
+    after: cannedDrafts("document.querySelector('[data-take-state-action]').click()") },
   { name: 'calendar', url: '/calendar.html', state: 'medium', wait: 7000 },
   { name: 'dig', url: '/dig/index.html', state: 'medium', wait: 3000 },
   { name: 'send-to-civix', url: '/send-to-civix.html', state: 'medium', wait: 3000 },
@@ -276,6 +292,10 @@ async function shoot(cdp, page, phone, personas) {
       expression: "(JSON.parse(localStorage.getItem('civix-profile') || '{}').issues || []).length", returnByValue: true,
     });
     if (!seeded.value) console.warn(`  ! ${page.name}: test manifesto didn't stick`);
+  }
+  if (page.after) {
+    await cdp.send('Runtime.evaluate', { expression: page.after });
+    await sleep(page.afterWait || 3000);
   }
 
   const { result } = await cdp.send('Runtime.evaluate', {

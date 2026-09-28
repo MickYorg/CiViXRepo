@@ -178,5 +178,29 @@
   "sources-map-empty@iphone-16-pro-max": {
     "smallText": 0,
     "smallTap": 1
+  },
+  "take-action-federal@iphone-se": {
+    "smallText": 10,
+    "smallTap": 8
+  },
+  "take-action-federal@iphone-16": {
+    "smallText": 10,
+    "smallTap": 8
+  },
+  "take-action-federal@iphone-16-pro-max": {
+    "smallText": 10,
+    "smallTap": 8
+  },
+  "take-action-state@iphone-se": {
+    "smallText": 10,
+    "smallTap": 5
+  },
+  "take-action-state@iphone-16": {
+    "smallText": 10,
+    "smallTap": 5
+  },
+  "take-action-state@iphone-16-pro-max": {
+    "smallText": 10,
+    "smallTap": 5
   }
 }
