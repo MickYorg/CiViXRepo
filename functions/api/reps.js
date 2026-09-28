@@ -42,7 +42,9 @@ export async function onRequestGet({ request, env }) {
   }
 
   if (!res.ok) {
-    return json({ error: { message: `5calls returned HTTP ${res.status}` } }, 500);
+    // 5calls can't place US territories (Puerto Rico, Guam, the Virgin
+    // Islands...) or ZIPs it doesn't know; say that, not a raw HTTP code.
+    return json({ error: { message: failureMessage(res.status, zip) } }, 500);
   }
 
   let data;
@@ -63,7 +65,7 @@ export async function onRequestGet({ request, env }) {
       phone: r.phone || '',
       area: r.area,
       state: r.state || data.state || '',
-      district: r.district || data.district || '',
+      district: r.area === 'US Senate' ? '' : (r.district || data.district || ''),
       photoURL: r.photoURL || '',
       url: r.url || ''
     }));
@@ -79,6 +81,15 @@ export async function onRequestGet({ request, env }) {
   }
 
   return json(payload);
+}
+
+// Puerto Rico and the Virgin Islands (006-009), Guam and the Northern
+// Mariana Islands (969), American Samoa (96799). 967/968 are Hawaii.
+export function failureMessage(status, zip) {
+  if (status !== 400) return `5calls returned HTTP ${status}`;
+  return /^(00[6-9]|969|96799)/.test(zip)
+    ? "CiViX can't look up representatives for US territories yet."
+    : "CiViX couldn't place that ZIP. Check it in your manifesto.";
 }
 
 function json(body, status) {

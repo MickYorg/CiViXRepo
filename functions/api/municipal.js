@@ -25,6 +25,29 @@ const CITY_CLIENTS = {
   'pittsburgh|pa': 'pittsburgh'
 };
 
+// The postal lookup names some ZIPs by neighborhood, not city: eight Boston
+// neighborhoods (about a quarter of a million people) came back "not
+// covered" until 28 Sep 2026. Each is part of the covered city it maps to.
+const NEIGHBORHOODS = {
+  'allston|ma': 'boston|ma',
+  'brighton|ma': 'boston|ma',
+  'charlestown|ma': 'boston|ma',
+  'hyde park|ma': 'boston|ma',
+  'jamaica plain|ma': 'boston|ma',
+  'mattapan|ma': 'boston|ma',
+  'roslindale|ma': 'boston|ma',
+  'west roxbury|ma': 'boston|ma'
+};
+
+// The covered city a ZIP's place belongs to, or null.
+export function coveredCity(city, stateAbbr) {
+  const key = cityKey(city, stateAbbr);
+  const cityOf = NEIGHBORHOODS[key] || key;
+  const client = CITY_CLIENTS[cityOf];
+  if (!client) return null;
+  const name = cityOf.split('|')[0].replace(/\b\w/g, c => c.toUpperCase());
+  return { client, city: NEIGHBORHOODS[key] ? name : city };
+}
 const ZIP_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30; // ZIP->city is effectively static
 const MATTERS_CACHE_TTL_SECONDS = 60 * 60; // 1 hour, matching calendar.js/state-bills.js
 const MATTER_LIMIT = 20;
@@ -139,10 +162,12 @@ export async function onRequestGet({ request, env }) {
     }
   }
 
-  const client = CITY_CLIENTS[cityKey(place.city, place.stateAbbr)];
-  if (!client) {
+  const covered = coveredCity(place.city, place.stateAbbr);
+  if (!covered) {
     return json({ covered: false, city: place.city, state: place.state, bills: [], events: [] });
   }
+  const client = covered.client;
+  place = Object.assign({}, place, { city: covered.city });
 
   const cacheKey = 'municipal:v2:' + client; // v2: adds events, bumped so pre-existing cached entries don't return the old shape
   if (kv) {

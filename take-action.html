@@ -610,6 +610,8 @@
     font-size: 10.5px; letter-spacing: 0.05em; color: var(--paper-dim); margin: 6px 0 18px;
   }
   .action-empty { font-size: 13px; color: var(--paper-dim); line-height: 1.6; }
+  .zip-note { font-size: 12.5px; color: var(--paper-dim); line-height: 1.5; margin: 6px 0 0; }
+  .zip-note a { color: var(--amber-ink); }
   .action-empty a { color: var(--amber-ink); }
   .action-section {
     border-top: 1px solid var(--line-soft, var(--line));
@@ -1125,6 +1127,17 @@
       })
       .filter(Boolean)
       .join('\n\n');
+  }
+
+  // Representatives come from the citizen's ZIP, and a ZIP can cross
+  // district lines (5calls flags every ZIP-only answer as low accuracy;
+  // state legislators come from the ZIP's center point). Say so plainly
+  // and point to the official lookup, rather than imply certainty.
+  function zipNote(kind) {
+    const link = kind === 'state'
+      ? '<a href="https://openstates.org/find_your_legislator/" target="_blank" rel="noopener">confirm yours</a>'
+      : '<a href="https://www.house.gov/representatives/find-your-representative" target="_blank" rel="noopener">confirm yours</a>';
+    return `<p class="zip-note">Matched from your ZIP. If it crosses district lines, this may not be your ${kind === 'state' ? 'legislator' : 'House member'}: ${link}.</p>`;
   }
 
   async function fetchReps(zip) {
@@ -1708,7 +1721,7 @@ BODY: <the email body \u2014 a few short paragraphs, addressed to "Dear ${chambe
     } else {
       const picker = `<div class="rep-picker">${ACTIVE.reps.map(r =>
         `<button type="button" class="rep-chip ${r.id === ACTIVE.selectedRepId ? 'is-on' : ''}" data-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} \u2014 ${r.area === 'US Senate' ? 'Senate' : 'House'}</button>`
-      ).join('')}</div>`;
+      ).join('')}</div>` + zipNote('federal');
 
       const rep = ACTIVE.reps.find(r => r.id === ACTIVE.selectedRepId);
       const draft = ACTIVE.drafts[ACTIVE.lean];
@@ -2052,7 +2065,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     } else {
       const picker = `<div class="rep-picker">${active.reps.map(r =>
         `<button type="button" class="rep-chip ${r.id === active.selectedRepId ? 'is-on' : ''}" data-general-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} — ${r.area === 'US Senate' ? 'Senate' : 'House'}</button>`
-      ).join('')}</div>`;
+      ).join('')}</div>` + zipNote('federal');
 
       const rep = active.reps.find(r => r.id === active.selectedRepId);
       const callBody = active.call.status === 'loading'
@@ -2344,7 +2357,7 @@ BODY: <the email body, a few short paragraphs>`;
     } else {
       const picker = `<div class="rep-picker">${active.reps.map(r =>
         `<button type="button" class="rep-chip ${r.id === active.selectedRepId ? 'is-on' : ''}" data-state-rep="${esc(r.id)}">${esc(r.name)}${r.party ? ' (' + esc(r.party) + ')' : ''} — ${esc(r.chamberLabel)}</button>`
-      ).join('')}</div>`;
+      ).join('')}</div>` + zipNote('state');
 
       const rep = active.reps.find(r => r.id === active.selectedRepId);
       const draft = active.draft;

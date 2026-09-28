@@ -110,3 +110,22 @@ test('synced copy: the Source Map experiment lists exactly DIG\'s sources', () =
   };
   assert.deepEqual(names('sources-map.html', 'const CATEGORIES ='), names('dig/index.html', 'const ONBOARD_CATEGORIES ='));
 });
+
+test('municipal: Boston neighborhood ZIPs (named by neighborhood) count as Boston', async () => {
+  const { coveredCity } = await import(path.join(ROOT, 'functions/api/municipal.js'));
+  for (const hood of ['Allston', 'Brighton', 'Charlestown', 'Hyde Park', 'Jamaica Plain', 'Mattapan', 'Roslindale', 'West Roxbury']) {
+    assert.deepEqual(coveredCity(hood, 'MA'), { client: 'boston', city: 'Boston' }, hood);
+  }
+  assert.deepEqual(coveredCity('Seattle', 'WA'), { client: 'seattle', city: 'Seattle' });
+  assert.equal(coveredCity('Brighton', 'NY'), null); // a different Brighton
+  assert.equal(coveredCity('Cambridge', 'MA'), null);
+});
+
+test('reps: a ZIP 5calls rejects gets a plain reason (territories named), not a raw HTTP code', async () => {
+  const { failureMessage } = await import(path.join(ROOT, 'functions/api/reps.js'));
+  assert.match(failureMessage(400, '00901'), /territories/); // Puerto Rico
+  assert.match(failureMessage(400, '96910'), /territories/); // Guam
+  assert.match(failureMessage(400, '96799'), /territories/); // American Samoa
+  assert.doesNotMatch(failureMessage(400, '96813'), /territories/); // Honolulu is a state
+  assert.match(failureMessage(400, '12345'), /couldn't place that ZIP/);
+});
