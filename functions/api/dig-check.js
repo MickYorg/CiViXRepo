@@ -12,6 +12,7 @@
 // doesn't pass one.
 
 import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
+import { aiFailure } from '../_lib/ai-errors.js';
 
 // Daily counters are only ever read/written within their own UTC day, so a
 // short TTL lets KV clean them up on its own instead of accumulating forever.
@@ -152,5 +153,11 @@ export async function onRequestPost({ request, env }) {
   const retryAfter = anthropicRes.headers.get('retry-after');
   if (retryAfter) headers['retry-after'] = retryAfter;
 
+  if (!anthropicRes.ok) {
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch (e) {}
+    const f = aiFailure(anthropicRes.status, parsed);
+    return new Response(JSON.stringify({ error: { message: f.message } }), { status: f.status, headers });
+  }
   return new Response(text, { status: anthropicRes.status, headers });
 }

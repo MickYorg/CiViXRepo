@@ -13,6 +13,7 @@
 // happens in the app, where the manifesto lives.
 import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
 import { ALL_ISSUE_NAMES } from '../_lib/issue-taxonomy.js';
+import { aiFailure } from '../_lib/ai-errors.js';
 
 const MAX_SOURCE_CHARS = 4000;
 
@@ -194,7 +195,7 @@ async function runDig(request, env) {
     const raw = await res.text();
     try { parsed = JSON.parse(raw); } catch (e) { return json({ error: { message: 'Anthropic returned an unparseable response' } }, 500); }
     if (kv) { try { await recordSpend(kv, 'capture_dig', parsed.usage, dateKey, record); } catch (e) {} }
-    if (!res.ok) return json({ error: { message: (parsed.error && parsed.error.message) || `Anthropic HTTP ${res.status}` } }, 500);
+    if (!res.ok) { const f = aiFailure(res.status, parsed); return json({ error: { message: f.message } }, 500); }
     content.push(...(parsed.content || []));
     if (parsed.stop_reason !== 'pause_turn') break;
     messages.push({ role: 'assistant', content: parsed.content });

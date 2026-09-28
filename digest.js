@@ -16,7 +16,9 @@
 
   const CAPTURE_API = 'https://civix-capture.mycivix.workers.dev';
   const INBOX_TOPICS_KEY = 'civix-inbox-topics'; // shared with builder.html's Inbox
-  const SUMMARY_KEY = 'civix-plain-summaries';
+  // v3 (28 Sep 2026): drops cached replies where the AI asked for the bill
+  // text instead of summarizing it; matches /api/plain-summary's v3 key.
+  const SUMMARY_KEY = 'civix-plain-summaries-v3';
 
   // ---- Matching (moved from take-action.html) ---------------------------
   const SYNONYMS = {

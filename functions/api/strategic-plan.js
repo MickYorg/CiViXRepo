@@ -16,6 +16,7 @@
 import { electionFacts } from '../_lib/election-dates.js';
 import { matchBills, slug } from '../_lib/bill-matching.js';
 import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
+import { aiFailure } from '../_lib/ai-errors.js';
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h — same manifesto, same plan, no new spend on a reload
 const COUNTER_TTL_SECONDS = 60 * 60 * 24 * 2; // per-IP rate-limit counter TTL (unrelated to token-stats.js's own budget-counter TTL)
@@ -389,8 +390,8 @@ export async function onRequestPost({ request, env }) {
   }
 
   if (!anthropicRes.ok) {
-    const message = (parsed.error && parsed.error.message) || `Anthropic returned HTTP ${anthropicRes.status}`;
-    return json({ error: { message } }, 500);
+    const f = aiFailure(anthropicRes.status, parsed);
+    return json({ error: { message: f.message } }, f.status);
   }
 
   const text = (parsed.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();

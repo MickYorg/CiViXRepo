@@ -26,6 +26,7 @@
 // then, still accepted now, not something this pass changes.
 
 import { todayKey, readDailyUsage, recordSpend } from '../_lib/token-stats.js';
+import { aiFailure } from '../_lib/ai-errors.js';
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24 * 60; // 60 days — cheap to keep, real spend to regenerate
 
@@ -56,7 +57,11 @@ export async function onRequestPost({ request, env }) {
   // don't sit stale under the 60-day TTL; they just regenerate once on
   // next request under the new key, same convention as digest.js's own
   // versioned localStorage cache keys.
-  const cacheKey = `plainsummary:v2:${id}`;
+  // v3, 28 Sep 2026: short titles ("Housing COST Act") got the model
+  // asking the citizen for the bill text, and that reply was cached and
+  // shown as the bill's summary. The prompt now forbids it and
+  // usableSummary() refuses to keep such a reply.
+  const cacheKey = `plainsummary:v3:${id}`;
 
   if (kv) {
     try {
@@ -117,11 +122,11 @@ export async function onRequestPost({ request, env }) {
   const TITLE_CLEAR_MAX = 90;
   const isDense = title.length > TITLE_CLEAR_MAX;
   const prompt = isDense
-    ? `Rewrite this bill in plain language a busy person with no policy background could understand in a few seconds. Its official title is dense, legalistic, cross-referencing prior statutes/sections rather than describing itself in plain terms — common for state and local legislation. Don't just paraphrase that legal structure. Read past it to the real subject matter and state plainly: what would actually change, who it affects, and why someone might reasonably care. If the title genuinely doesn't reveal more than the general subject area, say only that much — never invent specifics it doesn't support. Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that. Two to three sentences, no markdown, no quotes, under 55 words total.
+    ? `Rewrite this bill in plain language a busy person with no policy background could understand in a few seconds. Its official title is dense, legalistic, cross-referencing prior statutes/sections rather than describing itself in plain terms — common for state and local legislation. Don't just paraphrase that legal structure. Read past it to the real subject matter and state plainly: what would actually change, who it affects, and why someone might reasonably care. If the title genuinely doesn't reveal more than the general subject area, say only that much — never invent specifics it doesn't support. Never ask a question or ask for more information, and never mention what you don't have or can't see: if the title reveals only its general subject, write one plain sentence saying what that subject is (for example, a bill named for housing costs is "a bill about the cost of housing"). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that. Two to three sentences, no markdown, no quotes, under 55 words total.
 
 Bill: ${title}
 (background only, not to be described procedurally) Latest action: ${actionText || 'No recorded action yet.'}`
-    : `Rewrite this bill in plain language a busy person with no policy background could understand in five seconds — what it would actually DO or change, based on its title (which describes the real subject matter, just in legalese). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that, so this text would just be redundant with it. One to two sentences, no markdown, no quotes, under 40 words total.
+    : `Rewrite this bill in plain language a busy person with no policy background could understand in five seconds — what it would actually DO or change, based on its title (which describes the real subject matter, just in legalese). Do NOT describe legislative procedure or what stage it's at ("referred to committee," "passed the House," etc.) — a separate status indicator already covers that, so this text would just be redundant with it. If the title reveals only its general subject, say only that much — never invent specifics. Never ask a question or ask for more information, and never mention what you don't have or can't see: if the title reveals only its general subject, write one plain sentence saying what that subject is (for example, a bill named for housing costs is "a bill about the cost of housing"). One to two sentences, no markdown, no quotes, under 40 words total.
 
 Bill: ${title}
 (background only, not to be described procedurally) Latest action: ${actionText || 'No recorded action yet.'}`;
@@ -164,8 +169,8 @@ Bill: ${title}
   }
 
   if (!anthropicRes.ok) {
-    const message = (parsed.error && parsed.error.message) || `Anthropic returned HTTP ${anthropicRes.status}`;
-    return json({ error: { message } }, anthropicRes.status);
+    const f = aiFailure(anthropicRes.status, parsed);
+    return json({ error: { message: f.message } }, f.status);
   }
 
   const text = (parsed.content || [])
@@ -175,8 +180,9 @@ Bill: ${title}
     .trim()
     .replace(/^["']|["']$/g, '');
 
-  if (!text) {
-    return json({ error: { message: 'Empty response from Anthropic' } }, 500);
+  if (!usableSummary(text)) {
+    // Not cached: the card falls back to the bill's own title and status.
+    return json({ error: { message: 'No usable summary for this bill' } }, 500);
   }
 
   if (kv) {
@@ -186,6 +192,14 @@ Bill: ${title}
   }
 
   return json({ text, cached: false });
+}
+
+// A reply that talks to the citizen instead of describing the bill (asks
+// a question, says it lacks the text) must never be shown or cached.
+export function usableSummary(text) {
+  if (!text || !text.trim()) return false;
+  if (/\?/.test(text)) return false;
+  return !/\b(I (don't|do not|can't|cannot|am unable|'m unable|would need)|without (the|its|more|additional) (actual |full )?(text|details|information)|could you (provide|share)|please (provide|share)|not enough information|as an AI)\b/i.test(text);
 }
 
 function json(body, status) {

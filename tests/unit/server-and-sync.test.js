@@ -129,3 +129,25 @@ test('reps: a ZIP 5calls rejects gets a plain reason (territories named), not a 
   assert.doesNotMatch(failureMessage(400, '96813'), /territories/); // Honolulu is a state
   assert.match(failureMessage(400, '12345'), /couldn't place that ZIP/);
 });
+
+test('plain summary: a reply that asks for the bill text is never kept', async () => {
+  const { usableSummary } = await import(path.join(ROOT, 'functions/api/plain-summary.js'));
+  // Real replies from production, 27-28 Sep 2026.
+  assert.equal(usableSummary('I don\'t have the actual text or subject matter details of this bill beyond its short title "Housing COST Act." Could you provide the bill\'s summary or key provisions so I can accurately explain what it does?'), false);
+  assert.equal(usableSummary("This bill likely aims to stop entities from profiting off certain activities—but without the actual text, I can't specify what it targets. Could you share the bill's summary or details?"), false);
+  assert.equal(usableSummary(''), false);
+  assert.equal(usableSummary('A bill about the cost of housing.'), true);
+  assert.equal(usableSummary('Would require insurers to cover hearing aids for children, lowering costs for families.'), true);
+});
+
+test('AI failures reach citizens as a plain message, never Anthropic billing text', async () => {
+  const { aiFailure } = await import(path.join(ROOT, 'functions/_lib/ai-errors.js'));
+  const log = console.log; console.log = () => {};
+  try {
+    const credit = aiFailure(400, { error: { message: 'Your credit balance is too low to access the Anthropic API.' } });
+    assert.doesNotMatch(credit.message, /credit|balance|Anthropic/);
+    assert.equal(credit.status, 500);
+    assert.equal(aiFailure(529, { error: { message: 'Overloaded' } }).status, 429);
+    assert.equal(aiFailure(502, null).status, 500); // never a Cloudflare-reserved 5xx
+  } finally { console.log = log; }
+});
