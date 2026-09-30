@@ -32,4 +32,21 @@ class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(CivixSharedPlugin())
     }
+
+    #if DEBUG
+    // Daily demo clip (scripts/demo-loop.sh): the UI test launches the app
+    // with CIVIX_START_URL pointing at the live site's demo setup page.
+    // Debug builds only; release and App Store builds never compile this.
+    private var demoStartDone = false
+    override open func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !demoStartDone,
+              let raw = ProcessInfo.processInfo.environment["CIVIX_START_URL"],
+              let url = URL(string: raw), url.host == "mycivix.com" else { return }
+        demoStartDone = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.bridge?.webView?.load(URLRequest(url: url))
+        }
+    }
+    #endif
 }

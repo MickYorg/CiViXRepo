@@ -301,7 +301,33 @@
       }
     });
   });
+
+  // Demo mode, for the daily demo clip (scripts/demo-loop.sh): the iOS UI
+  // test opens /dev/?demo=medium&token=<demo docket>&go=../take-action.html
+  // in a fresh simulator. Loads the persona with the demo Send to CiViX
+  // address (never a citizen's), asks for alert permission (the test taps
+  // Allow), then heads to the page.
+  var q = new URLSearchParams(location.search);
+  var demo = q.get('demo');
+  if (demo && PERSONAS[demo]) {
+    var token = (q.get('token') || '').toLowerCase();
+    var profile = Object.assign({}, PERSONAS[demo], /^[a-z0-9]{6,40}$/.test(token) ? { token: token } : {});
+    localStorage.setItem('civix-profile', JSON.stringify(profile));
+    localStorage.setItem('civix-mode', 'activist');
+    localStorage.setItem('civix-splash-seen', String(Date.now()));
+    localStorage.setItem('civix-splash-visits', '3');
+    if (profile.token) localStorage.setItem('civix.token', profile.token);
+    var next = q.get('go') || '../take-action.html';
+    setStatus('Demo: loaded ' + demo + '. Heading to ' + next + '…');
+    window.addEventListener('load', function () { // push.js loads after this script
+      var asked = (window.CivixPush && window.CivixPush.requestPermission)
+        ? window.CivixPush.requestPermission() : Promise.resolve(false);
+      Promise.race([asked, new Promise(function (r) { setTimeout(r, 15000); })])
+        .then(function () { window.location.href = next; });
+    });
+  }
 })();
 </script>
+<script src="../push.js"></script>
 </body>
 </html>
