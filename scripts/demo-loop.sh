@@ -50,7 +50,7 @@ xcrun simctl bootstatus "$SIM" -b >/dev/null
 open -a Simulator --args -CurrentDeviceUDID "$SIM" || true
 xcrun simctl status_bar "$SIM" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
 
-BEFORE=$(curl -s -H 'Origin: https://mycivix.com' "$API/api/filings?token=$TOKEN" | python3 -c 'import sys,json; print(" ".join(i["id"] for i in json.load(sys.stdin).get("items", [])))')
+BEFORE=$(curl -s -H 'Origin: https://mycivix.com' "$API/api/filings?token=$TOKEN" | python3 -c 'import sys,json; print(" ".join(i["id"] + ":" + str(i.get("repeats") or 0) for i in json.load(sys.stdin).get("items", [])))')
 
 log "recording"
 xcrun simctl io "$SIM" recordVideo --codec=h264 --force "$WORK/raw.mov" &
@@ -72,7 +72,8 @@ for _ in $(seq 1 180); do
   STATE=$(curl -s -H 'Origin: https://mycivix.com' "$API/api/filings?token=$TOKEN" | BEFORE="$BEFORE" python3 -c '
 import sys, json, os
 before = set(os.environ["BEFORE"].split())
-items = [i for i in json.load(sys.stdin).get("items", []) if i["id"] not in before]
+# New, or a repeat share of an existing story (CiViX counts repeats on the same item).
+items = [i for i in json.load(sys.stdin).get("items", []) if i["id"] + ":" + str(i.get("repeats") or 0) not in before]
 print(items[0]["id"] + " " + (items[0].get("dig_state") or "new") if items else "")' || true)
   if [ -n "$STATE" ]; then
     set -- $STATE
@@ -84,6 +85,9 @@ print(items[0]["id"] + " " + (items[0].get("dig_state") or "new") if items else 
 done
 
 if [ -n "$T_DUG" ]; then
+  # Give the test time to get back to the home screen (a repeat share is
+  # already dug, so "dug in" can come right after the share).
+  WAIT=$(python3 -c "print(max(0, 15 - ($(now) - $T_SENT)))"); sleep "$WAIT"
   cat > "$WORK/push.json" <<JSON
 {"aps":{"alert":{"title":"CiViX dug in","body":"CiViX looked into what you sent. Tap to see your move."},"sound":"default"},"sent":"$ID"}
 JSON

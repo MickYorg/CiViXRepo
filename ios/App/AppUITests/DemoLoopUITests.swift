@@ -57,7 +57,13 @@ final class DemoLoopUITests: XCTestCase {
         XCUIDevice.shared.press(.home)
         let banner = springboard.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] 'CiViX dug in'")).firstMatch
-        XCTAssertTrue(banner.waitForExistence(timeout: 300), "no 'CiViX dug in' notification")
+        if !banner.waitForExistence(timeout: 300) {
+            // Missed the banner: it's waiting in Notification Center.
+            let top = springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.01))
+            top.press(forDuration: 0.1, thenDragTo: springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6)))
+            sleep(2)
+        }
+        XCTAssertTrue(banner.waitForExistence(timeout: 10), "no 'CiViX dug in' notification")
         press(banner)
 
         // 4. The response on Take Action, then its first move.
@@ -72,6 +78,10 @@ final class DemoLoopUITests: XCTestCase {
                 app.swipeUp()
                 sleep(3)
             }
+        } else {
+            sleep(3) // no drafted action to show: end on the response itself
+            app.swipeUp()
+            sleep(4)
         }
     }
 
@@ -153,7 +163,8 @@ final class DemoLoopUITests: XCTestCase {
         if element.waitForExistence(timeout: seconds) && !element.frame.isEmpty { press(element) }
     }
 
-    // The newest capture on the demo address, and its first suggested move.
+    // The newest capture on the demo address, and its first move that opens
+    // a drafted action (nil if none: the clip then ends on the response).
     func latestFirstMove(token: String) -> String? {
         guard let url = URL(string: "https://civix-capture.mycivix.workers.dev/api/filings?token=\(token)") else { return nil }
         var request = URLRequest(url: url)
@@ -166,9 +177,16 @@ final class DemoLoopUITests: XCTestCase {
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let items = json["items"] as? [[String: Any]],
                   let dig = items.first?["dig"] as? [String: Any],
-                  let moves = dig["moves"] as? [[String: Any]],
-                  let title = moves.first?["title"] as? String else { return }
-            result = title
+                  let moves = dig["moves"] as? [[String: Any]] else { return }
+            // The first move that opens CiViX's own drafted call or email
+            // (a call or email to an elected official, the page's own rule).
+            let official = try? NSRegularExpression(pattern: "senator|representative|congress|legislat|lawmaker|council|governor|mayor|elected|official|member of", options: .caseInsensitive)
+            result = moves.first(where: { m in
+                let action = m["action"] as? String ?? ""
+                let text = "\(m["target"] as? String ?? "") \(m["title"] as? String ?? "")"
+                return (action == "call" || action == "email")
+                    && official?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+            })?["title"] as? String
         }.resume()
         wait(for: [done], timeout: 20)
         return result

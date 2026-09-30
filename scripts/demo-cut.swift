@@ -1,6 +1,7 @@
 // Cuts the raw demo recording to about `target` seconds (used by
 // scripts/demo-loop.sh). Three parts, paced for a viewer:
-//   0 .. sent        setup, Safari, the share: sped up to fit
+//   0 .. sent-6      setup, Safari: sped up to fit
+//   sent-6 .. sent   CiViX's share screen and the Send tap: ~1.8s
 //   sent .. dug      the real dig wait: squeezed to under a second
 //   dug .. end       the push, the response, the action: the payoff, kept
 //                    near real speed (at most ~55% of the clip)
@@ -32,11 +33,13 @@ Task {
         let waitOut = d > s ? 0.8 : 0
         let payoff = end - d
         let payoffOut = min(payoff / 1.5, target * 0.55)          // ~1.5x, capped
-        let setupOut = max(1, target - waitOut - payoffOut)
+        let shareStart = max(0, s - 6), shareOut = s > shareStart ? 1.8 : 0
+        let setupOut = max(1, target - waitOut - payoffOut - shareOut)
         func t(_ x: Double) -> CMTime { CMTime(seconds: x, preferredTimescale: 600) }
 
         // (source start, source end, output length)
-        let pieces = [(0.0, s, min(s, setupOut)), (s, d, waitOut), (d, end, payoffOut)].filter { $0.1 > $0.0 && $0.2 > 0 }
+        let pieces = [(0.0, shareStart, min(shareStart, setupOut)), (shareStart, s, shareOut), (s, d, waitOut), (d, end, payoffOut)]
+            .filter { $0.1 > $0.0 && $0.2 > 0 }
         var cursor = CMTime.zero
         for (a, b, length) in pieces {
             let range = CMTimeRange(start: t(a), end: t(b))
@@ -49,7 +52,7 @@ Task {
         guard let export = AVAssetExportSession(asset: comp, presetName: AVAssetExportPresetHighestQuality) else { throw NSError(domain: "demo-cut", code: 3) }
         try await export.export(to: output, as: .mp4)
         print(String(format: "cut %.0fs -> %.1fs (setup %.0fs -> %.1fs, dig %.0fs -> %.1fs, payoff %.0fs -> %.1fs)",
-                     total, cursor.seconds, s, min(s, setupOut), d - s, waitOut, payoff, payoffOut))
+                     total, cursor.seconds, shareStart, min(shareStart, setupOut), d - s, waitOut, payoff, payoffOut))
     } catch {
         FileHandle.standardError.write("demo-cut failed: \(error)\n".data(using: .utf8)!)
         exit(1)
