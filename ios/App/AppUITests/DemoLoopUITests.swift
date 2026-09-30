@@ -37,12 +37,19 @@ final class DemoLoopUITests: XCTestCase {
         for label in ["Continue", "Not Now", "Close"] { tapIfAppears(safari.buttons[label], within: 2) }
         sleep(6) // let the story render
         openShareSheet()
-        let civix = firstExisting([safari.cells["CiViX"], safari.buttons["CiViX"], springboard.cells["CiViX"]], within: 10)
-            ?? openMoreAndFindCivix()
-        civix.tap()
-        let send = firstExisting([safari.buttons["Send to CiViX"], springboard.buttons["Send to CiViX"]], within: 20)
-        XCTAssertNotNil(send, "Send to CiViX button not found")
-        send!.tap()
+        // The share sheet is a remote view: its elements report positions
+        // relative to the sheet, not the screen, so tap them as elements.
+        let civixCell = safari.cells["CiViX"]
+        if !civixCell.waitForExistence(timeout: 10), let more = spot(label: "More", in: safari) {
+            tap(more, in: safari); sleep(2)
+        }
+        XCTAssertTrue(civixCell.waitForExistence(timeout: 10), "CiViX isn't in the share sheet")
+        sheetTap(civixCell)
+        sleep(3)
+        let send = safari.buttons["Send to CiViX"]
+        XCTAssertTrue(send.waitForExistence(timeout: 20), "Send to CiViX button not found")
+        sleep(2) // let the viewer see what's being sent
+        sheetTap(send)
         tapIfAppears(firstExisting([safari.buttons["Close"], springboard.buttons["Close"]], within: 20), within: 1)
 
         // 3. Home screen; wait for "CiViX dug in" (demo-loop.sh pushes it
@@ -51,7 +58,7 @@ final class DemoLoopUITests: XCTestCase {
         let banner = springboard.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] 'CiViX dug in'")).firstMatch
         XCTAssertTrue(banner.waitForExistence(timeout: 300), "no 'CiViX dug in' notification")
-        banner.tap()
+        press(banner)
 
         // 4. The response on Take Action, then its first move.
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20))
@@ -60,7 +67,7 @@ final class DemoLoopUITests: XCTestCase {
             let button = app.webViews.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", move)).firstMatch
             if button.waitForExistence(timeout: 15) {
                 sleep(2)
-                button.tap()
+                press(button)
                 sleep(10) // the drafted action fills in
                 app.swipeUp()
                 sleep(3)
@@ -68,36 +75,82 @@ final class DemoLoopUITests: XCTestCase {
         }
     }
 
-    // Safari's share button is in the toolbar, or (newer layouts) under More.
+    // iOS 26 Safari: the Share action lives in the toolbar's "…" menu.
+    // Several elements are labelled "Share" (some hidden), so pick the one
+    // actually on screen, lowest down (the open menu).
     func openShareSheet() {
-        if let share = firstExisting([safari.buttons["ShareButton"], safari.buttons["Share"]], within: 5) {
-            share.tap(); return
+        if let more = firstExisting([safari.buttons["MoreMenuButton"], safari.buttons["MoreButton"], safari.buttons["More"]], within: 8) {
+            press(more)
+            sleep(2)
         }
-        if let more = firstExisting([safari.buttons["MoreButton"], safari.buttons["More"]], within: 5) {
-            more.tap()
-            if let share = firstExisting([safari.buttons["Share"], safari.cells["Share"]], within: 5) { share.tap() }
-        }
+        if let share = spot(label: "Share", in: safari) { tap(share, in: safari) }
+        sleep(3)
     }
 
-    func openMoreAndFindCivix() -> XCUIElement {
-        if let more = firstExisting([safari.cells["More"], safari.buttons["More"]], within: 5) { more.tap() }
-        let row = firstExisting([safari.cells["CiViX"], safari.buttons["CiViX"], safari.staticTexts["CiViX"]], within: 10)
-        XCTAssertNotNil(row, "CiViX isn't in the share sheet")
-        return row!
+    // Finds an on-screen element by label from one snapshot of the screen
+    // (live queries go stale while menus animate); the lowest match wins.
+    func spot(label: String, in app: XCUIApplication) -> CGRect? {
+        guard let root = try? app.snapshot() else { return nil }
+        let screen = root.frame
+        var hits: [CGRect] = []
+        var all: [String] = []
+        func walk(_ n: XCUIElementSnapshot) {
+            if !n.label.isEmpty && !n.frame.isEmpty && screen.intersects(n.frame) {
+                all.append("\(n.label)[\(n.elementType.rawValue)]@\(Int(n.frame.minX)),\(Int(n.frame.minY)) \(Int(n.frame.width))x\(Int(n.frame.height))")
+                if n.label == label { hits.append(n.frame) }
+            }
+            n.children.forEach(walk)
+        }
+        walk(root)
+        NSLog("DEMO: %@ -> %@ (screen %@)", label, hits.map { NSCoder.string(for: $0) }.joined(separator: ", "), NSCoder.string(for: screen))
+        if hits.isEmpty || label == "CiViX" { NSLog("DEMO: visible: %@", all.suffix(60).joined(separator: " | ")) }
+        return hits.max(by: { $0.minY < $1.minY })
     }
 
+    // Taps an element inside a remote sheet (share sheet, share extension).
+    // A normal tap maps its position correctly when XCUITest allows it;
+    // otherwise shift its sheet-relative frame down to where the sheet
+    // sits on screen (anchored to the bottom).
+    func sheetTap(_ element: XCUIElement) {
+        if element.isHittable { element.tap(); return }
+        guard let root = try? safari.snapshot() else { return }
+        var maxY: CGFloat = 0
+        func walk(_ n: XCUIElementSnapshot) {
+            if n.frame.height < root.frame.height - 1 { maxY = max(maxY, n.frame.maxY) }
+            n.children.forEach(walk)
+        }
+        walk(root)
+        let offset = max(0, root.frame.height - 22 - maxY)
+        let f = element.frame
+        NSLog("DEMO: sheet tap %@ offset %.0f", NSCoder.string(for: f), offset)
+        tap(CGRect(x: f.minX, y: f.minY + offset, width: f.width, height: f.height), in: safari)
+    }
+
+    func tap(_ rect: CGRect, in app: XCUIApplication) {
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rect.midX, dy: rect.midY)).tap()
+    }
+
+    // iOS 26's floating menus and share sheet report some real, visible
+    // items as not hittable, so an item that exists counts, and press()
+    // taps its position when a normal tap isn't allowed.
     func firstExisting(_ elements: [XCUIElement], within seconds: TimeInterval) -> XCUIElement? {
         let deadline = Date().addingTimeInterval(seconds)
         repeat {
             if let hit = elements.first(where: { $0.exists && $0.isHittable }) { return hit }
+            if let seen = elements.first(where: { $0.exists && !$0.frame.isEmpty }) { return seen }
             usleep(300_000)
         } while Date() < deadline
         return nil
     }
 
+    func press(_ element: XCUIElement) {
+        if element.isHittable { element.tap() }
+        else { element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+    }
+
     func tapIfAppears(_ element: XCUIElement?, within seconds: TimeInterval) {
         guard let element = element else { return }
-        if element.waitForExistence(timeout: seconds) && element.isHittable { element.tap() }
+        if element.waitForExistence(timeout: seconds) && !element.frame.isEmpty { press(element) }
     }
 
     // The newest capture on the demo address, and its first suggested move.

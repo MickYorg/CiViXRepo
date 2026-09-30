@@ -1,14 +1,17 @@
 // Cuts the raw demo recording to about `target` seconds (used by
-// scripts/demo-loop.sh). The real dig wait (waitStart..waitEnd, seconds
-// into the recording) is squeezed to under a second; everything else is
-// sped up evenly to fit. AVFoundation only, nothing to install.
-//   swift scripts/demo-cut.swift raw.mov out.mp4 <waitStart> <waitEnd> <target>
+// scripts/demo-loop.sh). Three parts, paced for a viewer:
+//   0 .. sent        setup, Safari, the share: sped up to fit
+//   sent .. dug      the real dig wait: squeezed to under a second
+//   dug .. end       the push, the response, the action: the payoff, kept
+//                    near real speed (at most ~55% of the clip)
+// AVFoundation only, nothing to install.
+//   swift scripts/demo-cut.swift raw.mov out.mp4 <sent> <dug> <end> <target>
 import AVFoundation
 import Foundation
 
 let args = CommandLine.arguments
-guard args.count == 6, let waitStart = Double(args[3]), let waitEnd = Double(args[4]), let target = Double(args[5]) else {
-    FileHandle.standardError.write("usage: demo-cut.swift raw.mov out.mp4 waitStart waitEnd target\n".data(using: .utf8)!)
+guard args.count == 7, let sent = Double(args[3]), let dug = Double(args[4]), let endAt = Double(args[5]), let target = Double(args[6]) else {
+    FileHandle.standardError.write("usage: demo-cut.swift raw.mov out.mp4 sent dug end target\n".data(using: .utf8)!)
     exit(2)
 }
 let input = URL(fileURLWithPath: args[1]), output = URL(fileURLWithPath: args[2])
@@ -24,14 +27,16 @@ Task {
         guard let out = comp.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw NSError(domain: "demo-cut", code: 2) }
         out.preferredTransform = transform
 
-        let ws = max(0, min(waitStart, total)), we = max(ws, min(waitEnd, total))
-        let waitOut = we > ws ? 0.8 : 0
-        let rest = ws + (total - we)
-        let speed = rest > 0 ? max(1, rest / max(1, target - waitOut)) : 1 // never slow down
-        func t(_ s: Double) -> CMTime { CMTime(seconds: s, preferredTimescale: 600) }
+        let end = max(0, min(endAt, total))
+        let s = max(0, min(sent, end)), d = max(s, min(dug, end))
+        let waitOut = d > s ? 0.8 : 0
+        let payoff = end - d
+        let payoffOut = min(payoff / 1.5, target * 0.55)          // ~1.5x, capped
+        let setupOut = max(1, target - waitOut - payoffOut)
+        func t(_ x: Double) -> CMTime { CMTime(seconds: x, preferredTimescale: 600) }
 
         // (source start, source end, output length)
-        let pieces = [(0.0, ws, ws / speed), (ws, we, waitOut), (we, total, (total - we) / speed)].filter { $0.1 > $0.0 }
+        let pieces = [(0.0, s, min(s, setupOut)), (s, d, waitOut), (d, end, payoffOut)].filter { $0.1 > $0.0 && $0.2 > 0 }
         var cursor = CMTime.zero
         for (a, b, length) in pieces {
             let range = CMTimeRange(start: t(a), end: t(b))
@@ -43,7 +48,8 @@ Task {
         try? FileManager.default.removeItem(at: output)
         guard let export = AVAssetExportSession(asset: comp, presetName: AVAssetExportPresetHighestQuality) else { throw NSError(domain: "demo-cut", code: 3) }
         try await export.export(to: output, as: .mp4)
-        print(String(format: "cut %.0fs -> %.1fs (%.1fx, dig wait %.0fs -> %.1fs)", total, cursor.seconds, speed, we - ws, waitOut))
+        print(String(format: "cut %.0fs -> %.1fs (setup %.0fs -> %.1fs, dig %.0fs -> %.1fs, payoff %.0fs -> %.1fs)",
+                     total, cursor.seconds, s, min(s, setupOut), d - s, waitOut, payoff, payoffOut))
     } catch {
         FileHandle.standardError.write("demo-cut failed: \(error)\n".data(using: .utf8)!)
         exit(1)

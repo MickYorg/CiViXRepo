@@ -30,7 +30,10 @@ now() { python3 -c 'import time; print(time.time())'; }
 ARTICLE=$(curl -s https://mycivix.com/api/headlines-batch | python3 -c '
 import sys, json
 cards = json.load(sys.stdin).get("cards") or []
-pick = next((c for c in cards if c.get("topic") and c.get("article", {}).get("url")), None)
+news = ("apnews", "reuters", "npr.org", "politico", "thehill", "axios", "nbcnews", "cbsnews", "abcnews",
+        "usatoday", "nytimes", "washingtonpost", "cnn.com", "foxnews", "pbs.org", "bloomberg", "wsj.com", "theguardian")
+civic = [c for c in cards if c.get("topic") and c.get("article", {}).get("url")]
+pick = next((c for c in civic if any(n in c["article"]["url"] for n in news)), civic[0] if civic else None)
 print(pick["article"]["url"] if pick else "https://apnews.com/politics")')
 log "story: $ARTICLE"
 
@@ -95,11 +98,14 @@ kill -INT "$REC"; wait "$REC" 2>/dev/null || true
 log "loop $RESULT"
 [ "$RESULT" = passed ] || { tail -40 "$WORK/test.log"; echo "raw recording kept at $WORK/raw.mov"; exit 1; }
 
-# Cut: squeeze the dig wait (between shared and dug-in) to a second, then
-# speed the rest up to land near 15 seconds.
+# Cut to ~15 seconds: setup sped up, the dig wait squeezed, the payoff
+# (push -> response -> action) near real speed. The last seconds are the
+# test tearing down (back to the home screen), so they're trimmed.
 OUT="$OUT_DIR/$DAY-loop.mp4"
+cp "$WORK/test.log" /tmp/civix-demo-last-test.log
 swift scripts/demo-cut.swift "$WORK/raw.mov" "$OUT" \
-  "$(python3 -c "print($T_SENT - $T0 + 2)")" "$(python3 -c "print($T_DUG - $T0)")" 15
+  "$(python3 -c "print($T_SENT - $T0 + 2)")" "$(python3 -c "print($T_DUG - $T0)")" \
+  "$(python3 -c "print($T_END - $T0 - 5)")" 15
 log "clip: $OUT"
 
 ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs/CiViX Demos"
