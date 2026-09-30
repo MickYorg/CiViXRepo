@@ -28,6 +28,10 @@
 //     no backend change needed — rather than a fixed enum, since more
 //     functions (plain-summary, strategic-plan, ...) will likely join.
 
+// Topic names here can be a citizen's own words (a custom manifesto issue),
+// so the public lists pass public-stats.js: common and fit to display.
+import { publicEntries } from '../_lib/public-stats.js';
+
 const MAX_TOPIC_ENTRIES = 500;
 const MAX_NAME_LEN = 200;
 const MAX_TOPICS_PER_REQUEST = 10;
@@ -86,11 +90,11 @@ async function handleGet(kv) {
   ]);
 
   const actionsTotal = Object.values(levels).reduce((a, b) => a + b, 0);
-  const topTopics = Object.entries(topics)
+  const topTopics = publicEntries(topics, v => v)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
-  const topWinTopics = Object.entries(winTopics)
+  const topWinTopics = publicEntries(winTopics, v => v)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);

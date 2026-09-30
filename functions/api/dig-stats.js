@@ -7,12 +7,20 @@
 //
 //   - sources: how many times each source name has been added to someone's
 //     local profile (onboarding picks, custom adds, settings-panel adds)
-//   - topics:  how many times each topic string has been checked
+//   - topics:  how many DIG checks fell under each broad issue (30 Sep
+//     2026: counted by subject via topicCategory(), never the words typed;
+//     the old raw-text list `stats:topics` is deleted on first read)
 //   - ratings: aggregate like/dislike + star-rating totals per source,
 //     submitted from the results "focus" view
 //
 // Every entry is a plain count/sum keyed by a name string — nothing here
-// links back to a particular visitor, session, or request.
+// links back to a particular visitor, session, or request. What GET shows
+// publicly passes functions/_lib/public-stats.js: common enough (at least
+// PUBLIC_MIN_COUNT) and fit to display.
+import { topicCategory, publicEntries } from '../_lib/public-stats.js';
+
+const TOPICS_KEY = 'stats:topics:v2';
+const LEGACY_RAW_TOPICS_KEY = 'stats:topics';
 
 const MAX_ENTRIES = 500; // per counter map, trimmed to the top entries so this can't grow unbounded
 const MAX_NAME_LEN = 200;
@@ -47,21 +55,24 @@ function jsonResponse(body, status) {
 async function handleGet(kv) {
   const [sources, topics, ratings] = await Promise.all([
     readJson(kv, 'stats:sources', {}),
-    readJson(kv, 'stats:topics', {}),
+    readJson(kv, TOPICS_KEY, {}),
     readJson(kv, 'stats:ratings', {})
   ]);
+  // One-time cleanup: the raw-text search list from before 30 Sep 2026.
+  try { if (await kv.get(LEGACY_RAW_TOPICS_KEY) !== null) await kv.delete(LEGACY_RAW_TOPICS_KEY); } catch (e) {}
 
-  const topSources = Object.entries(sources)
+  const topSources = publicEntries(sources, v => v)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 25);
 
-  const topTopics = Object.entries(topics)
+  const topTopics = publicEntries(topics, v => v)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 25);
 
-  const ratingList = Object.entries(ratings)
+  const votes = r => (r.likes || 0) + (r.dislikes || 0) + (r.starCount || 0);
+  const ratingList = publicEntries(ratings, votes)
     .map(([name, r]) => ({
       name,
       likes: r.likes || 0,
@@ -75,7 +86,8 @@ async function handleGet(kv) {
   return jsonResponse({ sources: topSources, topics: topTopics, ratings: ratingList }, 200);
 }
 
-async function handlePost(request, kv) {
+async function handlePost(request, env) {
+  const kv = env.DIG_KV;
   let body;
   try {
     body = await request.json();
@@ -93,11 +105,19 @@ async function handlePost(request, kv) {
   // fails open (200 { ok: false }) rather than surfacing an error to the
   // person checking a topic.
   try {
-    if (type === 'source' || type === 'topic') {
-      const key = type === 'source' ? 'stats:sources' : 'stats:topics';
-      const map = await readJson(kv, key, {});
+    if (type === 'source') {
+      const map = await readJson(kv, 'stats:sources', {});
       map[name] = (map[name] || 0) + 1;
-      await kv.put(key, JSON.stringify(trimMap(map, v => v)));
+      await kv.put('stats:sources', JSON.stringify(trimMap(map, v => v)));
+    } else if (type === 'topic') {
+      // The search is counted under its broad subject; the words typed are
+      // never stored. Searches that fit no issue aren't counted.
+      const category = await topicCategory(name, env);
+      if (category) {
+        const map = await readJson(kv, TOPICS_KEY, {});
+        map[category] = (map[category] || 0) + 1;
+        await kv.put(TOPICS_KEY, JSON.stringify(map));
+      }
     } else if (type === 'rating') {
       const action = body.action; // 'like' | 'dislike' | 'star'
       const ratings = await readJson(kv, 'stats:ratings', {});
@@ -139,7 +159,7 @@ export async function onRequestGet({ env }) {
 
 export async function onRequestPost({ request, env }) {
   try {
-    return await handlePost(request, env.DIG_KV);
+    return await handlePost(request, env);
   } catch (e) {
     return jsonResponse({ ok: false }, 200);
   }

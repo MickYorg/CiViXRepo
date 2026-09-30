@@ -1387,10 +1387,10 @@
 
     <div class="wd-info-chip">
       <span class="wd-info-icon">📊</span>
-      <span class="wd-info-text">Anonymous, aggregate stats only — never tied to you.</span>
+      <span class="wd-info-text">Your searches stay private. Public stats count only broad topics.</span>
       <button class="wd-info-toggle" data-target="wd-stats-detail">more</button>
     </div>
-    <div class="wd-info-detail" id="wd-stats-detail" style="display:none;">We keep fully anonymous public counters — which sources get added to profiles and which topics get checked, across everyone, plus aggregate like/dislike/star feedback per source. No device, account, or IP is ever attached to these — see STATS in the app once you're in.</div>
+    <div class="wd-info-detail" id="wd-stats-detail" style="display:none;">The words you search are never stored or shown. We keep anonymous public counters: which broad issue each check falls under (like Immigration or Public health, never your wording), which sources get added, and like/dislike/star totals per source. Nothing appears publicly until at least 5 checks share it, and no device, account or IP is ever attached. See STATS in the app once you're in.</div>
 
     <div class="wd-onboard-tabs" id="wd-onboard-tabs"></div>
     <div class="wd-onboard-panel">
@@ -2318,16 +2318,16 @@
   function renderStatsBody(data) {
     const sourcesRows = (data.sources || []).slice(0, 10).map((s, i) =>
       `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(s.name)}</span><span class="wd-stats-count">added ${s.count}×</span></div>`
-    ).join('') || '<div class="wd-stats-row">No data yet.</div>';
+    ).join('') || '<div class="wd-stats-row">Nothing common enough to show yet (at least 5 needed).</div>';
 
     const topicsRows = (data.topics || []).slice(0, 10).map((t, i) =>
       `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(t.name)}</span><span class="wd-stats-count">checked ${t.count}×</span></div>`
-    ).join('') || '<div class="wd-stats-row">No data yet.</div>';
+    ).join('') || '<div class="wd-stats-row">Nothing common enough to show yet (at least 5 needed).</div>';
 
     const ratingsRows = (data.ratings || []).slice(0, 10).map((r, i) => {
       const stars = r.avgStars ? `${r.avgStars}★ (${r.starCount})` : 'no ratings';
       return `<div class="wd-stats-row"><span>${i + 1}. ${escapeHtml(r.name)}</span><span class="wd-stats-count">👍${r.likes} 👎${r.dislikes} · ${stars}</span></div>`;
-    }).join('') || '<div class="wd-stats-row">No ratings yet.</div>';
+    }).join('') || '<div class="wd-stats-row">Not enough ratings to show yet (at least 5 needed).</div>';
 
     return `
       <div class="wd-stats-section">
@@ -2335,7 +2335,7 @@
         ${sourcesRows}
       </div>
       <div class="wd-stats-section">
-        <div class="wd-stats-heading">Most-checked topics</div>
+        <div class="wd-stats-heading">Most-checked issues</div>
         ${topicsRows}
       </div>
       <div class="wd-stats-section">
