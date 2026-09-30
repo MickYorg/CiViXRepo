@@ -317,6 +317,8 @@
     localStorage.setItem('civix-splash-seen', String(Date.now()));
     localStorage.setItem('civix-splash-visits', '3');
     if (profile.token) localStorage.setItem('civix.token', profile.token);
+    // No teachable-moment pop-up mid-clip: mark one as just shown (civics.js cooldown).
+    try { var cs = JSON.parse(localStorage.getItem('civix-civics') || '{}'); cs.lastShownAt = Date.now() + 864e5; localStorage.setItem('civix-civics', JSON.stringify(cs)); } catch (e) {}
     var next = q.get('go') || '../take-action.html';
     setStatus('Demo: loaded ' + demo + '. Heading to ' + next + '…');
     window.addEventListener('load', function () { // push.js loads after this script
