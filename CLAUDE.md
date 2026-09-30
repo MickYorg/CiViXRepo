@@ -157,8 +157,9 @@ are gitignored — public repo — re-download from the Firebase console
   user's artifacts titled "CiViX … brief", and save any not yet in
   `notes/briefs/` as `YYYY-MM-DD-<daily|weekly|quarterly>-<frame>.txt`.
 
-- Often off-grid on a boat (solar, slow internet): flag big downloads and
-  long builds first. Starts sessions with `civix` (shell function:
+- Often on a boat, but with Starlink: connection speed is not a constraint
+  (corrected 30 Sep 2026). This Intel Mac compiles slowly, so prefer
+  prebuilt binaries over Homebrew source builds. Starts sessions with `civix` (shell function:
   `claude --continue --remote-control`; `civix new` for a fresh one).
 - Never embed other sites in the app; share out via the OS share sheet.
 - Never silently drop what a citizen typed; show added / skipped / why.
