@@ -36,7 +36,24 @@ Task {
             cursor = cursor + t(len)
         }
         try? FileManager.default.removeItem(at: output)
+        // CLIP_SCALE=0.75 shrinks the frame (smaller file, still sharp on a
+        // phone); H.264 so every player and social site takes it.
+        let scale = Double(ProcessInfo.processInfo.environment["CLIP_SCALE"] ?? "") ?? 1
         guard let export = AVAssetExportSession(asset: comp, presetName: AVAssetExportPresetHighestQuality) else { throw NSError(domain: "clip-cut", code: 3) }
+        if scale < 1 {
+            let natural = try await track.load(.naturalSize)
+            let size = natural.applying(out.preferredTransform)
+            let video = AVMutableVideoComposition()
+            video.renderSize = CGSize(width: (abs(size.width) * scale).rounded(), height: (abs(size.height) * scale).rounded())
+            video.frameDuration = CMTime(value: 1, timescale: 60)
+            let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: out)
+            layer.setTransform(out.preferredTransform.concatenating(CGAffineTransform(scaleX: scale, y: scale)), at: .zero)
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: .zero, duration: cursor)
+            instruction.layerInstructions = [layer]
+            video.instructions = [instruction]
+            export.videoComposition = video
+        }
         try await export.export(to: output, as: .mp4)
         print(String(format: "clip: %d pieces, %.1fs", pieces.count, cursor.seconds))
     } catch {
