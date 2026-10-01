@@ -2587,7 +2587,7 @@ BODY: <the email body, a few short paragraphs>`;
     const sentUndo = t.closest('[data-sent-undo]');
     if (sentUndo) { const it = SENT_ITEMS.find(x => x.id === sentUndo.dataset.sentUndo); if (it) { undoSentManifesto(it); renderSentZone(); loadFocusZone(); } return; }
     const sentNot = t.closest('[data-sent-notforme]');
-    if (sentNot) { const it = SENT_ITEMS[Number(sentNot.dataset.sentNotforme)]; if (it) { undoSentManifesto(it); markSentDone(it); loadFocusZone(); } return; }
+    if (sentNot) { const it = SENT_ITEMS[Number(sentNot.dataset.sentNotforme)]; if (it) { undoSentManifesto(it); deleteSent(it); loadFocusZone(); } return; }
     const sentDone = t.closest('[data-sent-done]');
     if (sentDone) { const it = SENT_ITEMS[Number(sentDone.dataset.sentDone)]; if (it) markSentDone(it); return; }
     const sentRetry = t.closest('[data-sent-retry]');
@@ -3215,6 +3215,17 @@ BODY: <the email body, a few short paragraphs>`;
     try {
       await fetch(`${CAPTURE_API}/api/filing?token=${encodeURIComponent(docketToken())}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: it.id, state: 'done' })
+      });
+    } catch (e) {}
+  }
+  // "Not for me" deletes the item from CiViX's server for real: the share
+  // sheet promises "Delete it anytime" (until 1 Oct 2026 this only hid it).
+  async function deleteSent(it) {
+    SENT_ITEMS = SENT_ITEMS.filter(x => x !== it);
+    renderSentZone();
+    try {
+      await fetch(`${CAPTURE_API}/api/filing?token=${encodeURIComponent(docketToken())}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: it.id })
       });
     } catch (e) {}
   }

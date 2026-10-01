@@ -60,3 +60,11 @@ test('failed digs and captures with no topic never touch the manifesto', () => {
   assert.equal(apply(), false);
   assert.equal(store.profile.issues.length, 0);
 });
+
+test('Send to CiViX: "Not for me" really deletes the item from the server ("Delete it anytime")', () => {
+  const src = require('../helpers/load').read('take-action.html');
+  const handler = /const sentNot = [^\n]*\n\s*if \(sentNot\)[^\n]*/.exec(src);
+  assert.ok(handler && /deleteSent\(it\)/.test(handler[0]), 'Not for me calls deleteSent');
+  const fn = /async function deleteSent\(it\) \{[\s\S]*?\n  \}/.exec(src);
+  assert.ok(fn && /method: 'DELETE'/.test(fn[0]) && /\/api\/filing\?token=/.test(fn[0]), 'deleteSent sends DELETE /api/filing');
+});
