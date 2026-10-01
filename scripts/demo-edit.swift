@@ -87,26 +87,41 @@ Task {
             parent.addSublayer(block)
         }
 
-        let r = W * 0.055
+        // Tap marker: a solid CiViX-amber dot with a white ring and a dark
+        // edge (readable on light and dark screens), plus a ripple that
+        // expands and fades, so each touch is unmistakable at phone size.
+        let r = W * 0.06
+        func circle(_ radius: CGFloat, at p: CGPoint) -> CAShapeLayer {
+            let c = CAShapeLayer()
+            c.frame = CGRect(x: p.x - radius, y: p.y - radius, width: 2 * radius, height: 2 * radius)
+            c.path = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: 2 * radius, height: 2 * radius), transform: nil)
+            c.opacity = 0
+            return c
+        }
+        func play(_ layer: CALayer, at time: Double, duration: Double, opacity: [Double], scale: [Double], keys: [NSNumber]) {
+            let fade = CAKeyframeAnimation(keyPath: "opacity"); fade.values = opacity; fade.keyTimes = keys
+            let grow = CAKeyframeAnimation(keyPath: "transform.scale"); grow.values = scale; grow.keyTimes = keys
+            let group = CAAnimationGroup(); group.animations = [fade, grow]
+            group.beginTime = AVCoreAnimationBeginTimeAtZero + max(0, time); group.duration = duration
+            group.isRemovedOnCompletion = false
+            layer.add(group, forKey: "tap")
+        }
         for tap in spec.taps ?? [] {
             guard let at = clipTime(tap[0]) else { continue }
-            let dot = CAShapeLayer()
-            dot.frame = CGRect(x: W * tap[1] - r, y: H * (1 - tap[2]) - r, width: 2 * r, height: 2 * r)
-            dot.path = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: 2 * r, height: 2 * r), transform: nil)
-            dot.fillColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.35)
-            dot.strokeColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.95)
-            dot.lineWidth = r * 0.09
-            dot.opacity = 0
-            let fade = CAKeyframeAnimation(keyPath: "opacity")
-            fade.values = [0, 1, 1, 0]; fade.keyTimes = [0, 0.15, 0.55, 1]
-            let grow = CAKeyframeAnimation(keyPath: "transform.scale")
-            grow.values = [0.55, 1.0, 1.05, 1.25]; grow.keyTimes = [0, 0.15, 0.55, 1]
-            let group = CAAnimationGroup()
-            group.animations = [fade, grow]
-            group.beginTime = AVCoreAnimationBeginTimeAtZero + max(0, at - 0.12)
-            group.duration = 0.7
-            group.isRemovedOnCompletion = false
-            dot.add(group, forKey: "tap")
+            let p = CGPoint(x: W * tap[1], y: H * (1 - tap[2]))
+            let dot = circle(r, at: p)
+            dot.fillColor = CGColor(red: 0.88, green: 0.66, blue: 0.25, alpha: 0.75)
+            dot.strokeColor = CGColor(red: 1, green: 1, blue: 1, alpha: 1)
+            dot.lineWidth = r * 0.14
+            dot.shadowColor = CGColor(red: 0, green: 0, blue: 0, alpha: 1)
+            dot.shadowOpacity = 0.6; dot.shadowRadius = r * 0.25; dot.shadowOffset = .zero
+            play(dot, at: at - 0.15, duration: 0.9, opacity: [0, 1, 1, 0], scale: [0.5, 1.0, 0.92, 0.9], keys: [0, 0.15, 0.7, 1])
+            let ripple = circle(r, at: p)
+            ripple.fillColor = CGColor(red: 0, green: 0, blue: 0, alpha: 0)
+            ripple.strokeColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.95)
+            ripple.lineWidth = r * 0.1
+            play(ripple, at: at - 0.05, duration: 0.7, opacity: [0.9, 0.6, 0], scale: [1.0, 1.9, 2.6], keys: [0, 0.5, 1])
+            parent.addSublayer(ripple)
             parent.addSublayer(dot)
         }
         video.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
