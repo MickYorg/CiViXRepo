@@ -13,7 +13,9 @@ text = open(sys.argv[1], encoding="utf-8").read().strip()
 m = re.search(r"(\d{4})-(\d{2})-(\d{2})", os.path.basename(sys.argv[1]))
 stamp = "".join(m.groups()) if m else datetime.date.today().strftime("%Y%m%d")
 title = (stamp + " " + (text.splitlines()[0].strip() or sys.argv[1]))[:120]
-body = "".join(f"<div>{html.escape(line) or '<br>'}</div>" for line in text.splitlines())
+# Notes shows the name as the note's first line, so the body starts after
+# the file's own title line (otherwise the title appears twice).
+body = "".join(f"<div>{html.escape(line) or '<br>'}</div>" for line in text.splitlines()[1:]).removeprefix("<div><br></div>")
 esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')
 print(f'''
 tell application "Notes"
