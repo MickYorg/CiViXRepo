@@ -252,32 +252,69 @@
      .wrap from the same pass still does real work here on its own,
      since these are full-width blocks, not a fixed column measure. */
   .focus-zone { margin-bottom: 8px; display: flex; flex-direction: column; gap: 12px; }
-  /* "Sent to CiViX" feed (25 Sep 2026): what the citizen captured from the
-     share sheet / Siri / email, and what CiViX found out about it. */
-  .sent-zone { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+  /* "Sent to CiViX" inbox (4 Oct 2026): what the citizen captured from the
+     share sheet / Siri / email, and what CiViX found out about it. One
+     frame; each item is a one-line summary that opens into collapsible
+     sections. Opened from a "CiViX dug in" push, that item (and all its
+     sections) starts open. */
+  .sent-zone { margin-bottom: 22px; }
   .sent-zone:empty { display: none; }
-  .sent-card { border: 1px solid var(--amber); border-radius: 12px; padding: 16px 18px; background: var(--ink-raised); }
-  .sent-eyebrow { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--paper-dim); margin: 0 0 6px; }
-  .sent-headline { font-weight: 700; font-size: 19px; line-height: 1.3; margin: 0 0 6px; }
-  .sent-summary { font-size: 15.5px; line-height: 1.55; color: var(--paper); margin: 0 0 10px; }
-  .sent-sent { font-size: 14px; line-height: 1.5; color: var(--paper-dim); margin: 0 0 8px; }
-  .sent-claims { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .sent-claims li { font-size: 14px; line-height: 1.45; color: var(--paper-dim); }
+  .inbox { border: 1px solid var(--amber); border-radius: 12px; background: var(--ink-raised); overflow: hidden; }
+  .inbox-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 18px 10px; }
+  .inbox-head .focus-label { margin: 0; font-size: 11.5px; }
+  .inbox-count { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--paper-dim); }
+  .inbox-list { list-style: none; margin: 0; padding: 0; }
+  .inbox-list > li { border-top: 1px solid var(--line); }
+  .sent-item > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 18px; min-height: 48px; }
+  .sent-item > summary::-webkit-details-marker { display: none; }
+  .sent-line { flex: 1; min-width: 0; }
+  .sent-line-title { display: block; font-weight: 600; font-size: 16px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sent-line-meta { display: block; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: var(--paper-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sent-chev { flex: none; color: var(--amber-ink); font-size: 18px; transition: transform 0.15s; }
+  details[open] > summary > .sent-chev { transform: rotate(90deg); }
+  .sent-item[open] > summary { background: var(--amber-wash); }
+  .sent-item.is-focus > summary { box-shadow: inset 3px 0 0 var(--amber); }
+  .sent-body { padding: 4px 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+  /* Opened, the one-liner shows the whole headline instead of truncating. */
+  .sent-item[open] > summary .sent-line-title { white-space: normal; font-size: 18px; text-wrap: balance; }
+  .sent-summary { font-size: 16px; line-height: 1.55; color: var(--paper); margin: 0; }
+  .sent-sent { font-size: 15px; line-height: 1.5; color: var(--paper-dim); margin: 0; }
+  .sent-sec { border: 1px solid var(--line); border-radius: 10px; }
+  .sent-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; min-height: 44px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--amber-ink); }
+  .sent-sec > summary::-webkit-details-marker { display: none; }
+  .sent-sec-body { padding: 0 14px 14px; }
+  .sent-claims { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .sent-claims li { font-size: 15px; line-height: 1.5; color: var(--paper); }
   .claim-tag { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; border-radius: 20px; padding: 2px 8px; margin-right: 6px; border: 1px solid var(--line); color: var(--paper); }
   .claim-tag.accurate { border-color: #5BB67A; color: #5BB67A; }
   .claim-tag.misleading { border-color: var(--amber); color: var(--amber-ink); }
   .claim-tag.false { border-color: var(--strike); color: var(--strike); }
-  .sent-moves { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
-  .sent-move { text-align: left; }
-  .sent-move .why { display: block; font-size: 13px; opacity: 0.85; margin-top: 2px; font-weight: 400; }
-  .sent-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; }
-  .sent-foot a, .sent-foot button { color: var(--amber-ink); background: none; border: 0; padding: 6px 0; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-  .sent-digging { font-size: 14px; color: var(--amber-ink); margin: 0 0 6px; }
-  .sent-manifesto { font-size: 14px; color: var(--paper-dim); margin: 0 0 10px; }
+  /* Action steps read as buttons: a bordered row, the step in the page's
+     body face (no mono letter-spacing, which left rivers), its explanation
+     on its own line below, and an arrow saying "this does something". */
+  .sent-moves { display: flex; flex-direction: column; gap: 10px; }
+  .sent-move { appearance: none; width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; text-align: left;
+    padding: 12px 14px; min-height: 52px; border: 1px solid var(--line); border-radius: 10px; background: var(--ink); color: var(--paper);
+    font: inherit; cursor: pointer; }
+  .sent-move:hover, .sent-move:focus-visible { border-color: var(--amber); }
+  .sent-move:active { background: var(--amber-wash); }
+  .sent-move .step { font-weight: 600; font-size: 16px; line-height: 1.35; }
+  .sent-move .why { grid-column: 1; font-size: 14.5px; line-height: 1.5; color: var(--paper-dim); }
+  .sent-move .go { grid-column: 2; grid-row: 1 / span 2; color: var(--amber-ink); font-size: 20px; }
+  .sent-move.is-primary { border-color: var(--amber); background: var(--amber-wash); }
+  .sent-links { display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+  .sent-links a { color: var(--amber-ink); text-underline-offset: 3px; }
+  .sent-foot { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12.5px; }
+  .sent-foot a, .sent-foot button { color: var(--amber-ink); background: none; border: 0; padding: 10px 0; min-height: 40px; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .sent-digging { font-size: 15px; color: var(--amber-ink); margin: 0; }
+  .sent-manifesto { font-size: 14.5px; color: var(--paper-dim); margin: 0; }
   .sent-manifesto strong { color: var(--paper); }
-  .sent-manifesto button { background: none; border: 0; padding: 4px 0 4px 6px; color: var(--amber-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-  .sent-card.is-focus { box-shadow: 0 0 0 3px var(--amber-wash), 0 0 0 1px var(--amber); }
-  .sent-new { display: inline-block; background: var(--amber); color: var(--btn-ink); border-radius: 20px; padding: 1px 8px; margin-right: 8px; font-weight: 600; letter-spacing: 0.06em; }
+  .sent-manifesto button { background: none; border: 0; padding: 10px 4px 10px 8px; min-height: 40px; color: var(--amber-ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .sent-new { display: inline-block; vertical-align: 2px; background: var(--amber); color: var(--btn-ink); border-radius: 20px; padding: 1px 7px; margin-right: 8px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .inbox-more { display: block; width: 100%; border: 0; border-top: 1px solid var(--line); background: none; color: var(--amber-ink); padding: 12px 18px; min-height: 44px; text-align: left;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
   .focus-label {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 10.5px;
@@ -2577,6 +2614,7 @@ BODY: <the email body, a few short paragraphs>`;
       window.CivixPush.requestPermission().then(renderWatchingZone);
       return;
     }
+    if (t.closest('[data-sent-more]')) { SENT_SHOW_ALL = true; renderSentZone(); return; }
     const sentMove = t.closest('[data-sent-move]');
     if (sentMove) {
       const [i, mi] = sentMove.dataset.sentMove.split(':').map(Number);
@@ -3041,22 +3079,54 @@ BODY: <the email body, a few short paragraphs>`;
     const ago = mins < 60 ? `${Math.max(mins, 1)} min ago` : mins < 2880 ? `${Math.round(mins / 60)} hr ago` : `${Math.round(mins / 1440)} days ago`;
     return [via + (where ? ' from ' + where : ''), ago].join(' · ');
   }
-  function sentCardHtml(it, idx) {
+  // Which inbox rows and sections start open. Opened from a "CiViX dug in"
+  // push (focusId), that item and every section in it are open; otherwise
+  // everything starts collapsed to one-line summaries. Whatever the citizen
+  // opens or closes afterwards is kept across re-renders (the inbox re-polls
+  // while a dig is running) via `remembered`: key -> open.
+  function sentOpenState(items, focusId, remembered) {
+    const open = {};
+    items.forEach(it => {
+      const focused = !!focusId && it.id === focusId;
+      ['', ':moves', ':claims', ':sources'].forEach(part => {
+        const key = it.id + part;
+        open[key] = remembered && key in remembered ? remembered[key] : focused;
+      });
+    });
+    return open;
+  }
+  // The one-line summary of a sent item: what CiViX found (its headline),
+  // or what was sent while it's still digging or couldn't be dug.
+  function sentLineText(it) {
+    const d = it.dig && !it.dig.error ? it.dig : null;
+    if (d && d.headline) return d.headline;
+    return it.title || it.url || 'Something you sent';
+  }
+  function sentStatus(it) {
+    const d = it.dig && !it.dig.error ? it.dig : null;
+    if (d) return '';
+    if (it.dig_state === 'queued' || it.dig_state === 'digging' || it.dig_state === '') return 'Digging in…';
+    return 'Couldn’t dig in';
+  }
+  function sentCardHtml(it, idx, open) {
     const d = it.dig && !it.dig.error ? it.dig : null;
     const pending = it.dig_state === 'queued' || it.dig_state === 'digging' || (!d && it.dig_state === '');
+    const sec = (part, label, inner) =>
+      `<details class="sent-sec" data-open-key="${esc(it.id + part)}"${open[it.id + part] ? ' open' : ''}><summary>${label}<span class="sent-chev" aria-hidden="true">&#8250;</span></summary><div class="sent-sec-body">${inner}</div></details>`;
     let body;
     if (d) {
       const claims = (d.claims || []).map(c =>
         `<li><span class="claim-tag ${esc(c.assessment)}">${esc(c.assessment)}</span>${esc(c.claim)}${c.note ? ` <em>${esc(c.note)}</em>` : ''}</li>`).join('');
       const moves = (d.moves || []).map((m, mi) =>
-        `<button type="button" class="btn ${mi === 0 ? 'btn-primary' : ''} sent-move" data-sent-move="${idx}:${mi}">${esc(m.title)}${m.why ? `<span class="why">${esc(m.why)}</span>` : ''}</button>`).join('');
+        `<button type="button" class="sent-move${mi === 0 ? ' is-primary' : ''}" data-sent-move="${idx}:${mi}"><span class="step">${esc(m.title)}</span>${m.why ? `<span class="why">${esc(m.why)}</span>` : ''}<span class="go" aria-hidden="true">&#8594;</span></button>`).join('');
       const sources = (d.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title || 'Source')} &#8599;</a>`).join('');
-      body = `<h3 class="sent-headline">${esc(d.headline)}</h3>
-        <p class="sent-summary">${esc(d.summary)}</p>
-        ${claims ? `<ul class="sent-claims">${claims}</ul>` : ''}
-        <div class="sent-moves">${moves}</div>
+      const nMoves = (d.moves || []).length, nClaims = (d.claims || []).length, nSources = (d.sources || []).length;
+      body = `<p class="sent-summary">${esc(d.summary)}</p>
         ${sentManifestoNote(it)}
-        <div class="sent-foot">${sources}<a href="${esc(digUrl(d.headline))}">Send to DIG &#8599;</a><button type="button" data-sent-done="${idx}">Done</button><button type="button" data-sent-notforme="${idx}">Not for me</button></div>`;
+        ${nMoves ? sec(':moves', `What you can do (${nMoves})`, `<div class="sent-moves">${moves}</div>`) : ''}
+        ${nClaims ? sec(':claims', `What it claims (${nClaims})`, `<ul class="sent-claims">${claims}</ul>`) : ''}
+        ${sec(':sources', `Sources${nSources ? ` (${nSources})` : ''}`, `<div class="sent-links">${sources}<a href="${esc(digUrl(d.headline))}">Send to DIG &#8599;</a></div>`)}
+        <div class="sent-foot"><button type="button" data-sent-done="${idx}">Done</button><button type="button" data-sent-notforme="${idx}">Not for me</button></div>`;
     } else if (pending) {
       body = `<p class="sent-sent">${esc(it.title)}</p><p class="sent-digging">CiViX is digging into this&hellip; usually a minute or two.</p>
         <div class="sent-foot"><button type="button" data-sent-done="${idx}">Done</button></div>`;
@@ -3066,7 +3136,11 @@ BODY: <the email body, a few short paragraphs>`;
         <div class="sent-foot"><button type="button" data-sent-retry="${idx}">Try again</button><button type="button" data-sent-done="${idx}">Done</button></div>`;
     }
     const isNew = d && !sentSeen().includes(it.id);
-    return `<div class="sent-card${it.id === SENT_FOCUS ? ' is-focus' : ''}" id="sent-${esc(it.id)}"><p class="sent-eyebrow">${isNew ? '<span class="sent-new">New</span>' : ''}${esc(sentSourceLabel(it))}</p>${body}</div>`;
+    const status = sentStatus(it);
+    const meta = [sentSourceLabel(it), status].filter(Boolean).join(' · ');
+    return `<li><details class="sent-item${it.id === SENT_FOCUS ? ' is-focus' : ''}" id="sent-${esc(it.id)}" data-open-key="${esc(it.id)}"${open[it.id] ? ' open' : ''}>
+      <summary><span class="sent-line"><span class="sent-line-title">${isNew ? '<span class="sent-new">New</span>' : ''}${esc(sentLineText(it))}</span><span class="sent-line-meta">${esc(meta)}</span></span><span class="sent-chev" aria-hidden="true">&#8250;</span></summary>
+      <div class="sent-body">${body}</div></details></li>`;
   }
   // Send to CiViX feeds the manifesto (27 Sep 2026): what a citizen cares
   // enough to share IS a signal about what they care about. Each dug capture
@@ -3134,14 +3208,37 @@ BODY: <the email body, a few short paragraphs>`;
     return `<p class="sent-manifesto">${rec.added ? 'Added to your manifesto' : 'Raised in your manifesto'}: <strong>${esc(rec.topic)}</strong> <button type="button" data-sent-undo="${esc(it.id)}">Undo</button></p>`;
   }
 
+  // The inbox shows the latest three; the rest (up to five) behind "Show".
+  const SENT_SHOWN = 3;
+  let SENT_SHOW_ALL = false;
+  const SENT_OPEN = {};
   function renderSentZone() {
     const zone = document.getElementById('sent-zone');
     if (!zone) return;
     if (!SENT_ITEMS.length) { zone.innerHTML = ''; return; }
-    zone.innerHTML = `<p class="focus-label">Sent to CiViX</p>` + SENT_ITEMS.map(sentCardHtml).join('');
+    const open = sentOpenState(SENT_ITEMS, SENT_FOCUS, SENT_OPEN);
+    const focusIdx = SENT_ITEMS.findIndex(it => it.id === SENT_FOCUS);
+    const shown = SENT_SHOW_ALL || focusIdx >= SENT_SHOWN ? SENT_ITEMS : SENT_ITEMS.slice(0, SENT_SHOWN);
+    const fresh = SENT_ITEMS.filter(it => it.dig && !it.dig.error && !sentSeen().includes(it.id)).length;
+    const count = `${SENT_ITEMS.length} sent${fresh ? ` · ${fresh} new` : ''}`;
+    const more = SENT_ITEMS.length - shown.length;
+    zone.innerHTML = `<section class="inbox" aria-label="Sent to CiViX inbox">
+      <div class="inbox-head"><p class="focus-label">Inbox &middot; Sent to CiViX</p><span class="inbox-count">${count}</span></div>
+      <ul class="inbox-list">${shown.map((it, i) => sentCardHtml(it, i, open)).join('')}</ul>
+      ${more > 0 ? `<button type="button" class="inbox-more" data-sent-more>Show ${more} more</button>` : ''}
+    </section>`;
+    if (!zone.dataset.toggleWired) {
+      zone.dataset.toggleWired = '1';
+      // <details> "toggle" doesn't bubble; capture it to remember what the
+      // citizen opened or closed.
+      zone.addEventListener('toggle', (e) => {
+        const key = e.target && e.target.dataset && e.target.dataset.openKey;
+        if (key) SENT_OPEN[key] = e.target.open;
+      }, true);
+    }
     if (SENT_FOCUS && !SENT_SCROLLED) {
       const card = document.getElementById('sent-' + SENT_FOCUS);
-      if (card) { SENT_SCROLLED = true; card.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      if (card) { SENT_SCROLLED = true; card.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     }
     // Shown now, so not "new" next time (the badge stays for this visit).
     markSentSeen(SENT_ITEMS.filter(it => it.dig && !it.dig.error).map(it => it.id));

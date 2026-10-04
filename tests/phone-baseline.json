@@ -202,5 +202,29 @@
   "take-action-state@iphone-16-pro-max": {
     "smallText": 10,
     "smallTap": 5
+  },
+  "take-action-inbox@iphone-se": {
+    "smallText": 8,
+    "smallTap": 3
+  },
+  "take-action-inbox@iphone-16": {
+    "smallText": 8,
+    "smallTap": 3
+  },
+  "take-action-inbox@iphone-16-pro-max": {
+    "smallText": 8,
+    "smallTap": 3
+  },
+  "take-action-inbox-push@iphone-se": {
+    "smallText": 7,
+    "smallTap": 2
+  },
+  "take-action-inbox-push@iphone-16": {
+    "smallText": 7,
+    "smallTap": 2
+  },
+  "take-action-inbox-push@iphone-16-pro-max": {
+    "smallText": 7,
+    "smallTap": 2
   }
 }

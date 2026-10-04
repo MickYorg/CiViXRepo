@@ -73,6 +73,32 @@ const SOURCE_MAP_SAMPLE = {
   'RT (Russia Today)': { x: 0.9, y: 0.1, placed: true }, 'The Epoch Times': { x: 0.85, y: 0.3, placed: false },
 };
 
+// Three things a citizen sent to CiViX, for the Take Action inbox: one dug
+// in (with steps, claims and sources), one still digging, one that failed.
+// The capture server is blocked during layout runs, so the page's own
+// request for them is answered with these (installed before the page loads).
+const INBOX_SAMPLE = `(() => {
+  const now = Date.now();
+  const items = [
+    { id: 'inbox1', source: 'ios-share', host: 'www.nytimes.com', at: now - 25 * 60000, title: 'Fed holds rates steady', dig_state: 'done',
+      note: 'Why it matters to me: my mortgage resets next year',
+      dig: { headline: 'The Fed held rates; a House bill would audit it', topic: 'Federal Reserve accountability', level: 'federal',
+        summary: 'The Federal Reserve kept its benchmark rate unchanged this week. A pending House bill would require a full audit of the Fed, which supporters say adds accountability and critics say threatens its independence.',
+        claims: [ { claim: 'Rates were held for the third straight meeting', assessment: 'accurate' },
+                  { claim: 'The audit bill would let Congress set interest rates', assessment: 'misleading', note: 'It requires a GAO audit; it does not give Congress rate-setting power.' } ],
+        moves: [ { title: 'Call your representative about the Fed audit bill', why: 'It is in committee now, when a few calls from constituents carry the most weight.', action: 'call', target: 'your representative' },
+                 { title: 'Email your senators', why: 'A Senate companion bill has been introduced; ask where they stand.', action: 'email', target: 'senators' },
+                 { title: 'Share what the bill actually does', why: 'The misleading claim above is spreading; a plain correction helps.', action: 'share', target: '' } ],
+        sources: [ { title: 'Federal Reserve statement', url: 'https://www.federalreserve.gov/' }, { title: 'Congress.gov bill text', url: 'https://www.congress.gov/' } ] } },
+    { id: 'inbox2', source: 'siri', host: '', at: now - 3 * 60000, title: 'School board vote on cell phone ban', dig_state: 'digging', dig: null },
+    { id: 'inbox3', source: 'mail', host: 'x.com', at: now - 26 * 3600000, title: 'Post about the transit levy', dig_state: 'failed', dig: { error: 'The post was deleted before CiViX could read it.' } },
+  ];
+  const real = window.fetch;
+  window.fetch = (u, o) => String(u).includes('/api/filings')
+    ? Promise.resolve(new Response(JSON.stringify({ items }), { headers: { 'content-type': 'application/json' } }))
+    : real(u, o);
+})()`;
+
 // state: 'new' = brand-new citizen (empty storage); otherwise a /dev/ persona.
 // wait: ms to let animations/fetches settle before the shot.
 const PAGES = [
@@ -90,6 +116,9 @@ const PAGES = [
     after: cannedDrafts("document.querySelector('[data-take-action]').click()") },
   { name: 'take-action-state', url: '/take-action.html', state: 'medium', wait: 5000,
     after: cannedDrafts("document.querySelector('[data-take-state-action]').click()") },
+  // The inbox as it normally opens (collapsed), and as it opens from a push.
+  { name: 'take-action-inbox', url: '/take-action.html', state: 'medium', wait: 5000, beforeLoad: INBOX_SAMPLE, storage: { 'civix.token': 'layout-check' } },
+  { name: 'take-action-inbox-push', url: '/take-action.html?sent=inbox1', state: 'medium', wait: 6000, beforeLoad: INBOX_SAMPLE, storage: { 'civix.token': 'layout-check' } },
   { name: 'calendar', url: '/calendar.html', state: 'medium', wait: 7000 },
   { name: 'dig', url: '/dig/index.html', state: 'medium', wait: 3000 },
   { name: 'send-to-civix', url: '/send-to-civix.html', state: 'medium', wait: 3000 },
@@ -285,8 +314,12 @@ async function shoot(cdp, page, phone, personas) {
       ${page.state !== 'new' ? `localStorage.setItem('civix-splash-seen', String(Date.now())); localStorage.setItem('civix-splash-visits', '3');` : ''}
       ${Object.entries(page.storage || {}).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(JSON.stringify(v))});`).join('\n')}`,
   });
+  // beforeLoad: a script that runs in the page before its own scripts
+  // (e.g. answering a request with sample data).
+  const pre = page.beforeLoad && await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: page.beforeLoad });
   await cdp.send('Page.navigate', { url: `http://localhost:${PORT}${page.url}` });
   await sleep(page.wait);
+  if (pre) await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: pre.identifier });
   if (profile) {
     const { result: seeded } = await cdp.send('Runtime.evaluate', {
       expression: "(JSON.parse(localStorage.getItem('civix-profile') || '{}').issues || []).length", returnByValue: true,
