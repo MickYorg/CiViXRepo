@@ -226,5 +226,17 @@
   "take-action-inbox-push@iphone-16-pro-max": {
     "smallText": 7,
     "smallTap": 2
+  },
+  "educators@iphone-se": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "educators@iphone-16": {
+    "smallText": 0,
+    "smallTap": 1
+  },
+  "educators@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 1
   }
 }

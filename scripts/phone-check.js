@@ -125,6 +125,7 @@ const PAGES = [
   { name: 'analytics', url: '/analytics.html', state: 'medium', wait: 3000 },
   { name: 'health', url: '/health.html', state: 'new', wait: 3000 },
   { name: 'civix101', url: '/civix101.html', state: 'new', wait: 1500 },
+  { name: 'educators', url: '/educators.html', state: 'new', wait: 1500 },
   { name: 'sources-map', url: '/sources-map.html', state: 'medium', wait: 2500, storage: { 'civix-sources-map': SOURCE_MAP_SAMPLE } },
   { name: 'sources-map-empty', url: '/sources-map.html', state: 'medium', wait: 2500 },
   { name: 'sources-map-fund', url: '/sources-map.html#fund', state: 'medium', wait: 2500, storage: { 'civix-sources-map': SOURCE_MAP_SAMPLE } },
