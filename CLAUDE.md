@@ -151,11 +151,17 @@ are gitignored — public repo — re-download from the Firebase console
   page with `python3 scripts/listen-page.py <file> "<name>"` (Copy all →
   paste into a note → Speak) and send a push. And always `notes/` (below).
 - **`notes/` is the one place for every listening text** (gitignored, never
-  shipped). Every summary/plan text file goes there, and the scheduled
-  briefs (published in the cloud as private pages) get copied into
-  `notes/briefs/` as plain text: at the start of each session, list the
-  user's artifacts titled "CiViX … brief", and save any not yet in
-  `notes/briefs/` as `YYYY-MM-DD-<daily|weekly|quarterly>-<frame>.txt`.
+  shipped). Every summary/plan text file goes there. Notes titles start
+  with YYYYMMDD and stack (nothing is replaced).
+- **Briefs and nightly reports reach Notes automatically** (since 5 Oct
+  2026): the brief routines commit each brief to the public repo
+  `MickYorg/civix-briefs` (cloned at `~/civix-briefs`), and the launchd job
+  `com.mycivix.morning-notes` (8:30am, or on wake) runs
+  `scripts/morning-notes.sh`. It pulls new briefs into `notes/briefs/` and
+  Notes, files the nightly report via a headless Claude session, retries
+  until 11:30, then files a "something is missing" note. Log:
+  `~/Library/Logs/civix/morning-notes.log`. If a brief is missing, check that
+  routine's latest run (RemoteTrigger list_runs / get_run_log).
 
 - Often on a boat, but with Starlink: connection speed is not a constraint
   (corrected 30 Sep 2026). This Intel Mac compiles slowly, so prefer
