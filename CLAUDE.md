@@ -140,8 +140,9 @@ are gitignored — public repo — re-download from the Firebase console
 - This Mac is Intel: Xcode 26.6 (last universal), Homebrew via the
   pre-arm64-check installer commit, CocoaPods on `ruby@3.3`, JDK 21 at
   `~/jdks/jdk-21.0.12.1+1` for Android builds. Details in history.
-- Push: Android verified end to end; iOS wired (APNs key in Firebase) but
-  delivery not yet verified on a device.
+- Push: verified end to end on Android and on the founder's iPhone (5 Oct
+  2026: share a screenshot → "CiViX dug in" arrived). On a locked iPhone it
+  lands at the bottom of the Lock Screen, which is easy to miss.
 
 ## Working with this user
 
