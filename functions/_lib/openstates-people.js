@@ -1,8 +1,8 @@
-// Shared OpenStates "who represents this location" resolver — used by
-// both /api/state-reps (the rep picker) and /api/send-state-email (which
-// re-derives the real recipient address server-side rather than trusting
-// whatever a client sends, so it can't become an open relay to arbitrary
-// addresses).
+// Shared OpenStates "who represents this location" resolver, used by
+// /api/state-reps (the rep picker, whose published emails Take Action puts
+// into the citizen's own mail app). Until 5 Oct 2026 it also backed
+// /api/send-state-email, CiViX's own sender, which was removed so CiViX
+// never sends to officials in its own name.
 //
 // OpenStates' /people.geo endpoint (v3) takes lat/lng and returns BOTH
 // state legislators and members of Congress for that point — filtered

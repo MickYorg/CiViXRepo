@@ -59,7 +59,8 @@ framework — deliberately, until there's real cross-page shared state):
   "Start over from scratch" resets the manifesto.
 - `take-action.html` — top 3 ("focus zone") + municipal/state/federal
   detail; take-action modals draft calls/emails; state legislators get a
-  real one-button email send (Resend); watchlist.
+  "Open in your mail app" (mailto: with their published address; CiViX
+  never sends in its own name since 5 Oct 2026); watchlist.
 - `calendar.html` — multi-year strategy (`/api/strategic-plan`) plus
   hand-written contingency playbooks.
 - `dig/index.html` — DIG: stance-by-source checker, DEBATE talking points.
@@ -110,7 +111,8 @@ stoplists in `digest.js` / `functions/_lib/bill-matching.js` /
 
 `ANTHROPIC_API_KEY` (create with **no expiration**, **scoped to the
 workspace**), `CONGRESS_API_KEY`, `FIVECALLS_API_TOKEN`,
-`OPENSTATES_API_KEY`, `RESEND_API_KEY` (mycivix.com verified in Resend),
+`OPENSTATES_API_KEY`, `RESEND_API_KEY` (unused since the state-email
+sender was removed 5 Oct 2026; mycivix.com still verified in Resend),
 `GNEWS_API_KEY`, `UNSPLASH_ACCESS_KEY`. Firebase client configs
 (`android/app/google-services.json`, `ios/App/App/GoogleService-Info.plist`)
 are gitignored — public repo — re-download from the Firebase console

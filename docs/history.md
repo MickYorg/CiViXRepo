@@ -2611,3 +2611,22 @@ they'd pay off, are:
   renamed to "manifesto"), and the two apps don't live-sync across tabs —
   last write wins if both are open at once, same latent limitation
   `builder.html` already had with itself.
+
+## CiViX stops sending email to officials — 5 Oct 2026
+
+Decided with the founder on 30 Sep 2026 ("get out of the business of sending
+on citizens' behalf"), built 5 Oct. The state Take Action modal used to relay
+email to state legislators through `functions/api/send-state-email.js`
+(Resend, from mycivix.com, 5/IP/day and 80/day limits). That let anyone send
+anything to a legislator in CiViX's name, with an unchecked name and address,
+and a script could drain the shared limit. The sender is deleted. The modal
+now offers **Open in your mail app** (a `mailto:` with the legislator's
+OpenStates address, the subject and the draft, built by `stateEmailParts`),
+**Copy email**, and the address as selectable text for web mail with no mail
+app. The email goes from the citizen's own account, so it's accountable and
+the office can reply. Name and mailing address are optional, signature only,
+and never leave the device except inside the citizen's own email (the
+optional reply-to email field is gone; their mail app already has it).
+Federal stays as it was: copy the draft and open the member's contact form.
+`RESEND_API_KEY` is now unused. Tests: `tests/unit/state-email.test.js`,
+including a guard that the sender endpoint doesn't come back.

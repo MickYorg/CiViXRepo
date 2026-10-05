@@ -767,7 +767,7 @@
     font-family: Newsreader, Georgia, serif; font-size: 14px; padding: 9px 12px; border-radius: 7px;
   }
   .identity-input:focus { outline: none; border-color: var(--amber); }
-  .identity-signed { font-size: 12.5px; color: var(--paper-dim); margin: 0 0 8px; }
+  .identity-signed { font-size: 14px; line-height: 1.5; color: var(--paper-dim); margin: 4px 0 12px; }
   .identity-signed strong { color: var(--paper); }
   .link-btn {
     appearance: none; background: none; border: none; padding: 0; cursor: pointer;
@@ -2178,20 +2178,20 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     }
   }
 
-  // ---- State action modal: the one real one-button send ----------------
+  // ---- State action modal: the citizen's own mail app ----------------
   // OpenStates gives a genuine, published email for most state
-  // legislators (see functions/_lib/openstates-people.js) — unlike
-  // federal, where 5calls has no recipient email and official contact
-  // forms are CAPTCHA-protected. That real recipient is what makes an
-  // actual send possible here instead of the honest copy+paste federal
-  // is stuck with.
+  // legislators (see functions/_lib/openstates-people.js), so the draft can
+  // go straight into the citizen's own mail app, addressed and filled in.
+  // CiViX itself sends nothing (5 Oct 2026): until then its server relayed
+  // these through Resend, which meant anyone could send anything to a
+  // legislator in mycivix.com's name. Now the email comes from the
+  // citizen's real address, so it's accountable and the office can reply.
+  // "Copy" and the visible To: address cover web mail with no mail app.
   //
-  // Identity (name + mailing address, optionally email) is collected
-  // once, inline, the first time a citizen is about to send — never
-  // upfront in the manifesto — and stored only in civix-profile.identity
-  // (localStorage). It leaves the browser exactly once per send, in the
-  // POST to /api/send-state-email, and that endpoint never persists it
-  // (see its own file comment). "Forget my info" clears it outright.
+  // Name and mailing address (offices use them to confirm a constituent)
+  // are optional, asked inline, kept only in civix-profile.identity
+  // (localStorage), and only ever leave the device inside the citizen's
+  // own email. "Forget my info" clears them.
   let STATE_ACTIVE = null;
 
   function loadIdentity() {
@@ -2210,8 +2210,7 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
       bill, hits,
       reps: null, repsError: null, noZip: false, selectedRepId: null,
       draft: { status: 'idle' },
-      editIdentity: false,
-      sendResult: null
+      editIdentity: false
     };
     document.getElementById('action-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -2256,7 +2255,6 @@ BODY: <the email body — a few short paragraphs, addressed to "Dear ${chamberWo
     const rep = active.reps.find(r => r.id === active.selectedRepId);
     if (!rep) return;
     active.draft = { status: 'loading' };
-    active.sendResult = null;
     renderStateActionCard();
 
     const bill = active.bill;
@@ -2303,47 +2301,27 @@ BODY: <the email body, a few short paragraphs>`;
     if (window.CivicsEngine) window.CivicsEngine.maybeShow();
   }
 
-  async function sendStateEmail() {
-    const active = STATE_ACTIVE;
-    const rep = active.reps.find(r => r.id === active.selectedRepId);
-    const identity = loadIdentity();
-    const profile = loadRawProfile();
-    const zip = profile && profile.place && profile.place.zip;
-    if (!rep || !identity || !zip) return;
-    active.sendResult = { status: 'sending' };
-    renderStateActionCard();
-    try {
-      const r = await fetch('/api/send-state-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zip, repId: rep.id,
-          subject: active.draft.subject, message: active.draft.body,
-          senderName: identity.name, senderAddress: identity.address, senderEmail: identity.email || ''
-        })
-      });
-      const data = await r.json();
-      if (!r.ok || data.error) throw new Error((data.error && data.error.message) || 'HTTP ' + r.status);
-      if (STATE_ACTIVE !== active) return;
-      active.sendResult = { status: 'sent', sentTo: data.sentTo || rep.name, at: new Date().toLocaleTimeString() };
-      renderStateActionCard();
-      reportAction('state', active.hits);
-    } catch (e) {
-      if (STATE_ACTIVE !== active) return;
-      active.sendResult = { status: 'error', error: e.message || 'request failed' };
-      renderStateActionCard();
-    }
+  // The finished email: the draft plus, if the citizen added them, their
+  // name and mailing address as a signature. Returns the text (for Copy)
+  // and a mailto: link that opens their own mail app ready to send.
+  function stateEmailParts(rep, draft, identity) {
+    const sig = identity && identity.name ? `\n\n${identity.name}${identity.address ? '\n' + identity.address : ''}` : '';
+    const body = (draft.body || '') + sig;
+    const subject = draft.subject || '';
+    const href = rep && rep.email
+      ? `mailto:${encodeURIComponent(rep.email).replace(/%40/g, '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      : '';
+    return { subject, body, text: subject + '\n\n' + body, href };
   }
 
   function renderIdentityForm(prefill) {
     const v = prefill || {};
     return `
       <div class="identity-form">
-        <p class="noise-hint">State legislative offices expect a name and mailing address to confirm you're a constituent. Stored only on this device, sent to CiViX's server only at the moment you send a message, never stored there afterward, never shared or sold.</p>
+        <p class="noise-hint">Offices use your name and mailing address to confirm you're a constituent, so CiViX can add them as a signature. Saved only on this device, never sent to CiViX, never shared or sold.</p>
         <input type="text" class="identity-input" id="identity-name" placeholder="Full name" value="${esc(v.name || '')}">
         <input type="text" class="identity-input" id="identity-address" placeholder="Mailing address (street, city, state, ZIP)" value="${esc(v.address || '')}">
-        <input type="email" class="identity-input" id="identity-email" placeholder="Email (optional — so the office can reply to you)" value="${esc(v.email || '')}">
-        <button type="button" class="btn btn-primary" data-save-identity>Save &amp; continue</button>
+        <div class="action-row"><button type="button" class="btn btn-primary" data-save-identity>Add to my email</button><button type="button" class="btn" data-skip-identity>Not now</button></div>
       </div>`;
   }
 
@@ -2409,24 +2387,24 @@ BODY: <the email body, a few short paragraphs>`;
 
       let sendSection = '';
       if (draft.status === 'done') {
-        if (!rep.email) {
-          sendSection = `<p class="action-empty">No email address on file for ${esc(rep.name)} — try Copy instead.</p>
-            <div class="action-row"><button type="button" class="btn" data-copy-state>Copy</button></div>`;
-        } else if (!identity || active.editIdentity) {
+        const parts = stateEmailParts(rep, draft, identity);
+        const signed = identity && identity.name
+          ? `<p class="identity-signed">Signed as <strong>${esc(identity.name)}</strong>${identity.address ? ', ' + esc(identity.address) : ''} &middot; <button type="button" class="link-btn" data-edit-identity>edit</button> &middot; <button type="button" class="link-btn" data-forget-identity>forget my info</button></p>`
+          : `<p class="identity-signed"><button type="button" class="link-btn" data-edit-identity>Add your name and address</button> so the office knows you're a constituent (optional).</p>`;
+        if (active.editIdentity) {
           sendSection = renderIdentityForm(identity);
-        } else if (active.sendResult && active.sendResult.status === 'sent') {
-          sendSection = `<p class="watch-note">&#10003; Sent to ${esc(active.sendResult.sentTo)}'s office${active.sendResult.at ? ' at ' + esc(active.sendResult.at) : ''}.</p>`;
+        } else if (!rep.email) {
+          sendSection = `<p class="action-empty">No email address on file for ${esc(rep.name)}. Copy the message and use their office's contact page.</p>
+            ${signed}
+            <div class="action-row"><button type="button" class="btn btn-primary" data-copy-state>Copy email</button></div>`;
         } else {
-          const sending = active.sendResult && active.sendResult.status === 'sending';
-          const sendError = active.sendResult && active.sendResult.status === 'error' ? active.sendResult.error : '';
           sendSection = `
-            <p class="identity-signed">Signed as <strong>${esc(identity.name)}</strong>, ${esc(identity.address)} — <button type="button" class="link-btn" data-edit-identity>edit</button> &middot; <button type="button" class="link-btn" data-forget-identity>forget my info</button></p>
+            ${signed}
             <div class="action-row">
-              <button type="button" class="btn btn-primary" data-send-state ${sending ? 'disabled' : ''}>${sending ? 'Sending…' : 'Send to ' + esc(rep.name) + ' →'}</button>
-              <button type="button" class="btn" data-copy-state>Copy instead</button>
+              <a class="btn btn-primary" href="${esc(parts.href)}" data-mail-state>Open in your mail app &#8594;</a>
+              <button type="button" class="btn" data-copy-state>Copy email</button>
             </div>
-            ${sendError ? `<p class="action-email-note">Couldn't send: ${esc(sendError)}</p>` : ''}
-            <p class="action-email-note">To: ${esc(rep.email)}. This really sends — CiViX's server relays it by email and doesn't keep a copy afterward.</p>`;
+            <p class="action-email-note">To: <span class="state-to">${esc(rep.email)}</span> <button type="button" class="link-btn" data-copy-state-to>copy address</button><br>It goes from your own email address, so the office can reply to you. CiViX never sends it and doesn't keep a copy.</p>`;
         }
       }
 
@@ -2640,22 +2618,35 @@ BODY: <the email body, a few short paragraphs>`;
     const stateRepChip = t.closest('[data-state-rep]');
     if (stateRepChip && STATE_ACTIVE) {
       STATE_ACTIVE.selectedRepId = stateRepChip.dataset.stateRep;
-      STATE_ACTIVE.sendResult = null;
       generateStateDraft();
       return;
     }
     if (t.closest('[data-copy-state]') && STATE_ACTIVE) {
-      const d = STATE_ACTIVE.draft;
-      copy((d.subject || '') + '\n\n' + (d.body || ''), t.closest('[data-copy-state]'));
+      const rep = STATE_ACTIVE.reps.find(r => r.id === STATE_ACTIVE.selectedRepId);
+      copy(stateEmailParts(rep, STATE_ACTIVE.draft, loadIdentity()).text, t.closest('[data-copy-state]'));
       reportAction('state', STATE_ACTIVE.hits);
+      return;
+    }
+    if (t.closest('[data-copy-state-to]') && STATE_ACTIVE) {
+      const rep = STATE_ACTIVE.reps.find(r => r.id === STATE_ACTIVE.selectedRepId);
+      if (rep && rep.email) copy(rep.email, t.closest('[data-copy-state-to]'));
+      return;
+    }
+    // The mailto: link opens the citizen's mail app on its own; just count it.
+    if (t.closest('[data-mail-state]') && STATE_ACTIVE) {
+      reportAction('state', STATE_ACTIVE.hits);
+      return;
+    }
+    if (t.closest('[data-skip-identity]') && STATE_ACTIVE) {
+      STATE_ACTIVE.editIdentity = false;
+      renderStateActionCard();
       return;
     }
     if (t.closest('[data-save-identity]') && STATE_ACTIVE) {
       const name = (document.getElementById('identity-name') || {}).value || '';
       const address = (document.getElementById('identity-address') || {}).value || '';
-      const email = (document.getElementById('identity-email') || {}).value || '';
-      if (!name.trim() || !address.trim()) return;
-      saveIdentity({ name: name.trim(), address: address.trim(), email: email.trim() });
+      if (!name.trim()) return;
+      saveIdentity({ name: name.trim(), address: address.trim() });
       STATE_ACTIVE.editIdentity = false;
       renderStateActionCard();
       return;
@@ -2668,10 +2659,6 @@ BODY: <the email body, a few short paragraphs>`;
     if (t.closest('[data-forget-identity]') && STATE_ACTIVE) {
       saveIdentity(null);
       renderStateActionCard();
-      return;
-    }
-    if (t.closest('[data-send-state]') && STATE_ACTIVE) {
-      sendStateEmail();
       return;
     }
 
