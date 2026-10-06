@@ -2630,3 +2630,24 @@ optional reply-to email field is gone; their mail app already has it).
 Federal stays as it was: copy the draft and open the member's contact form.
 `RESEND_API_KEY` is now unused. Tests: `tests/unit/state-email.test.js`,
 including a guard that the sender endpoint doesn't come back.
+
+## Nightly investigator: 5 Oct 2026 schedule run failed on a GitHub runner
+## outage, not our code — 6 Oct 2026
+
+The nightly `tests.yml` schedule run (id 37364720296, triggered for commit
+`cd94007`) came back red, but not from our tests: `unit` and `layout` both
+passed. The `live` job was cancelled with "The job was not acquired by
+Runner of type hosted even after multiple attempts" — GitHub couldn't hand
+the job a runner at all, so it never got as far as hitting mycivix.com.
+`npm test` run locally against the same commit passes (74/74), confirming
+there's nothing in our code to fix.
+
+Also worth watching: the cron is `17 11 * * *` (7:17am ET) specifically to
+dodge GitHub dropping top-of-hour schedules (see the comment in
+`tests.yml`, after the 11:00 UTC run was skipped on 25 Sep 2026), but the
+last two schedule runs still started hours late — Oct 4 at 15:49 UTC (+4.5h)
+and Oct 5 at 19:38 UTC (+8.3h). The off-hour cron isn't fully solving the
+delay; if `live` keeps getting cancelled this way, worth asking GitHub
+support or watching github.com/actions-images for an open incident. No
+code change made — the next scheduled or manual run should tell us if this
+was a one-off.
