@@ -2651,3 +2651,47 @@ delay; if `live` keeps getting cancelled this way, worth asking GitHub
 support or watching github.com/actions-images for an open incident. No
 code change made — the next scheduled or manual run should tell us if this
 was a one-off.
+
+**Same day, second finding — a real `layout` regression on this nightly's
+own PR, traced to live legislative data, not to any committed code.**
+The docs-only PR this investigation opened ([#1]) still failed `layout`:
+`take-action-inbox` and `take-action-inbox-push` each picked up one new
+kind of too-small text (`smallText` 8→9 and 7→8, on all three phone
+sizes), even though the PR touches nothing but `docs/history.md`, and the
+identical commit had passed `layout` cleanly hours earlier
+([run 37346224753](https://github.com/MickYorg/CiViXRepo/actions/runs/37346224753)).
+Re-running the job once reproduced the exact same two counts, ruling out
+a simple flake.
+
+Root cause, reasoned from the code (no Chrome/network access to confirm
+visually from here): both scenarios load `/take-action.html` with a real
+dev persona, and `boot()` (take-action.html:3461) always calls
+`/api/calendar` — which matches *live* congress.gov bill data against
+that persona's manifesto — regardless of whether the inbox panel is the
+thing being screenshotted. `functions/api/calendar.js` caches that result
+in KV for 1 hour (`CACHE_TTL_SECONDS`), which is consistent with both
+things observed: the two re-run attempts (minutes apart) landed in the
+same cache window and matched exactly, while yesterday's passing run and
+today's failing run are hours apart and could easily have landed in
+different cache populations as congress.gov itself changed. So a new bill
+card (longer title, different complexity flag, whatever today's live
+match surfaced) most likely introduced one new small-text CSS class that
+wasn't in yesterday's baseline capture — not a bug this PR introduced, and
+not something fixable by editing our CSS blind.
+
+Not fixed here: I didn't touch `tests/phone-baseline.json` (never loosen
+the ratchet without looking at the actual screenshots first) and didn't
+guess at a CSS change without being able to see which element it is.
+**What the owner should do**: open the `phone-screenshots` artifact on
+[run 37459705066](https://github.com/MickYorg/CiViXRepo/actions/runs/37459705066)
+(`take-action-inbox--iphone-se.png` etc.) and `phone-check-out/report.md`
+inside it, see which new element is under 11px, and either fix its CSS or
+run `--update-baseline` deliberately if it's an acceptable edge case. This
+also flags a standing fragility worth knowing: any phone-check scenario
+that loads `take-action.html` for a non-`'new'` persona inherits whatever
+congress.gov/OpenStates are currently returning, so its tiny-text/small-tap
+counts can drift day to day independent of any code change — the same
+general shape as the already-known 9-10px label gap on builder Pro/
+analytics this file's "Known gaps" section already calls out.
+
+[#1]: https://github.com/MickYorg/CiViXRepo/pull/1
