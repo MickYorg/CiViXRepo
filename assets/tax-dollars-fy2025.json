@@ -1,0 +1,2105 @@
+{
+ "fiscalYear": 2025,
+ "measure": "obligations",
+ "source": "USAspending.gov spending explorer (budget function, subfunction, federal account)",
+ "sourceUrl": "https://www.usaspending.gov/explorer/budget_function",
+ "fetched": "2026-10-07",
+ "total": 10127336980329,
+ "functions": [
+  {
+   "code": "570",
+   "name": "Medicare",
+   "amount": 1836688276390,
+   "subfunctions": [
+    {
+     "code": "571",
+     "name": "Medicare",
+     "amount": 1836688276390,
+     "accounts": [
+      {
+       "name": "Payments to Health Care Trust Funds, Centers for Medicare and Medicaid Services, Health and Human Services",
+       "amount": 588706721343
+      },
+      {
+       "name": "Federal Supplementary Medical Insurance Trust Fund-Treasury Managed, Health and Human Services",
+       "amount": 581002894472
+      },
+      {
+       "name": "Federal Hospital Insurance Trust Fund - Treasury Managed, Health and Human Services",
+       "amount": 445996552948
+      },
+      {
+       "name": "Medicare Prescription Drug Account, Centers for Medicare and Medicaid Services, Health and Human Services",
+       "amount": 176114948688
+      },
+      {
+       "name": "Taxation on OASDI Benefits, HI, Centers for Medicare and Medicaid Services, Health and Human Services",
+       "amount": 41054000000
+      },
+      {
+       "name": "Health Care Fraud and Abuse Control Account, Health and Human Services",
+       "amount": 2549632090
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "650",
+   "name": "Social Security",
+   "amount": 1667788719717,
+   "subfunctions": [
+    {
+     "code": "651",
+     "name": "Social security",
+     "amount": 1667788719717,
+     "accounts": [
+      {
+       "name": "Federal Old-Age and Survivors Insurance Trust Fund - Treasury Managed, Social Security Administration",
+       "amount": 1433955632447
+      },
+      {
+       "name": "Federal Disability Insurance Trust Fund - Treasury Managed, Social Security Administration",
+       "amount": 159531438102
+      },
+      {
+       "name": "Payments to Social Security Trust Funds, Social Security Administration",
+       "amount": 59767151887
+      },
+      {
+       "name": "Salaries and Expenses, Social Security Administration",
+       "amount": 14534493673
+      },
+      {
+       "name": "Payments for Credits Against Social Security Contributions, Social Security Administration",
+       "amount": 3608
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "050",
+   "name": "National Defense",
+   "amount": 1416466958305,
+   "subfunctions": [
+    {
+     "code": "051",
+     "name": "Department of Defense-Military",
+     "amount": 1188830457129,
+     "accounts": [
+      {
+       "name": "Defense Working Capital Fund, Defense",
+       "amount": 167536203854
+      },
+      {
+       "name": "Operation and Maintenance, Navy",
+       "amount": 87415383941
+      },
+      {
+       "name": "Operation and Maintenance, Army",
+       "amount": 77005673876
+      },
+      {
+       "name": "Operation and Maintenance, Air Force",
+       "amount": 72561927684
+      },
+      {
+       "name": "Operation and Maintenance, Defense-Wide, Defense",
+       "amount": 66461158649
+      },
+      {
+       "name": "Research, Development, Test, and Evaluation, Air Force",
+       "amount": 55871813661
+      }
+     ]
+    },
+    {
+     "code": "054",
+     "name": "Defense-related activities",
+     "amount": 182969144162,
+     "accounts": [
+      {
+       "name": "Payments to Military Retirement Fund, Defense",
+       "amount": 154000000000
+      },
+      {
+       "name": "Payment to Department of Defense Medicare-Eligible Retiree Health Care Fund",
+       "amount": 14569000000
+      },
+      {
+       "name": "Salaries and Expenses, Federal Bureau of Investigation, Justice",
+       "amount": 12086126015
+      },
+      {
+       "name": "Ready Reserve Force, Maritime Administration, Transportation",
+       "amount": 943428783
+      },
+      {
+       "name": "Procurement, Construction, and Improvements, Cybersecurity and Infrastructure Security Agency, Homeland Security",
+       "amount": 447347681
+      },
+      {
+       "name": "Payment to the Radiation Exposure Compensation Trust Fund, Justice",
+       "amount": 360000000
+      }
+     ]
+    },
+    {
+     "code": "053",
+     "name": "Atomic energy defense activities",
+     "amount": 44667357013,
+     "accounts": [
+      {
+       "name": "Weapons Activities, National Nuclear Security Administration, Energy",
+       "amount": 26255806226
+      },
+      {
+       "name": "Defense Environmental Cleanup, Environmental and Other Defense Activities, Energy",
+       "amount": 8206141718
+      },
+      {
+       "name": "Energy Employees Occupational Illness Compensation Fund, Labor",
+       "amount": 3126883618
+      },
+      {
+       "name": "Defense Nuclear Nonproliferation, National Nuclear Security Administration, Energy",
+       "amount": 2573383771
+      },
+      {
+       "name": "Naval Reactors, National Nuclear Security Administration, Energy",
+       "amount": 1853296003
+      },
+      {
+       "name": "Other Defense Activities, Environmental and Other Defense Activities, Energy",
+       "amount": 1615822872
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "900",
+   "name": "Net Interest",
+   "amount": 1250796514305,
+   "subfunctions": [
+    {
+     "code": "901",
+     "name": "Interest on Treasury debt securities (gross)",
+     "amount": 1215613829754,
+     "accounts": [
+      {
+       "name": "Interest on the Public Debt (Indefinite), Bureau of the Fiscal Service, Treasury",
+       "amount": 1215613829754
+      }
+     ]
+    },
+    {
+     "code": "908",
+     "name": "Other interest",
+     "amount": 35182684551,
+     "accounts": [
+      {
+       "name": "Refunding Internal Revenue Collections, Interest (Indefinite), Treasury",
+       "amount": 16818825873
+      },
+      {
+       "name": "Credit Reform:  Interest Paid on Uninvested Funds (Indefinite),  Bureau of the Fiscal Service, Treasury",
+       "amount": 12355544648
+      },
+      {
+       "name": "Restitution of Forgone Interest, Bureau of the Fiscal Service, Treasury",
+       "amount": 5048454016
+      },
+      {
+       "name": "Payment to the Resolution Funding Corporation, Bureau of the Fiscal Service, Treasury",
+       "amount": 919663271
+      },
+      {
+       "name": "Interest on Uninvested Funds (Indefinite),  Bureau of the Fiscal Service, Treasury",
+       "amount": 39536438
+      },
+      {
+       "name": "Federal Interest Liabilities to the States, Bureau of the Fiscal Service, Treasury",
+       "amount": 660305
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "550",
+   "name": "Health",
+   "amount": 1145485923480,
+   "subfunctions": [
+    {
+     "code": "551",
+     "name": "Health care services",
+     "amount": 1077382411925,
+     "accounts": [
+      {
+       "name": "Grants to States for Medicaid, Centers for Medicare and Medicaid Services, Health and Human Services",
+       "amount": 724384753766
+      },
+      {
+       "name": "Refundable Premium Assistance Tax Credit, Internal Revenue Service, Treasury",
+       "amount": 150838297699
+      },
+      {
+       "name": "Employees' Health Benefits Fund, Office of Personnel Management",
+       "amount": 73542024198
+      },
+      {
+       "name": "State Children's Health Insurance Fund, Centers for Medicare and Medicaid Services, Health and Human Services",
+       "amount": 21441131414
+      },
+      {
+       "name": "Government Payment for Annuitants, Employees' Health Benefits, Office of Personnel Management",
+       "amount": 16750394722
+      },
+      {
+       "name": "Department of Defense, Medicare-Eligible Retiree Health Care Fund",
+       "amount": 12974760679
+      }
+     ]
+    },
+    {
+     "code": "552",
+     "name": "Health research and training",
+     "amount": 57743478183,
+     "accounts": [
+      {
+       "name": "National Cancer Institute, National Institutes of Health, Health and Human Services",
+       "amount": 7423092042
+      },
+      {
+       "name": "National Institute of Allergy and Infectious Diseases, National Institutes of Health, Health and Human Services",
+       "amount": 6635074975
+      },
+      {
+       "name": "National Institute on Aging, National Institutes of Health, Health and Human Services",
+       "amount": 4567025465
+      },
+      {
+       "name": "National Heart, Lung, and Blood Institute, National Institutes of Health, Health and Human Services",
+       "amount": 4054523360
+      },
+      {
+       "name": "National Institute of General Medical Sciences, National Institutes of Health, Health and Human Services",
+       "amount": 3273475941
+      },
+      {
+       "name": "National Institute of Neurological Disorders and Stroke, National Institutes of Health, Health and Human Services",
+       "amount": 2762897415
+      }
+     ]
+    },
+    {
+     "code": "554",
+     "name": "Consumer and occupational health and safety",
+     "amount": 10360033371,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Food and Drug Administration, Health and Human Services",
+       "amount": 6755585511
+      },
+      {
+       "name": "Food Safety and Inspection Service, Agriculture",
+       "amount": 1452723735
+      },
+      {
+       "name": "FDA Working Capital Fund, Food and Drug Administration, Health and Human Services",
+       "amount": 815381700
+      },
+      {
+       "name": "Salaries and Expenses, Occupational Safety and Health Administration",
+       "amount": 637783431
+      },
+      {
+       "name": "Salaries and Expenses, Mine Safety and Health Administration",
+       "amount": 389572494
+      },
+      {
+       "name": "Salaries and Expenses, Consumer Product Safety Commission",
+       "amount": 152039605
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "600",
+   "name": "Income Security",
+   "amount": 759048551196,
+   "subfunctions": [
+    {
+     "code": "609",
+     "name": "Other income security",
+     "amount": 240694719782,
+     "accounts": [
+      {
+       "name": "Supplemental Security Income Program, Social Security Administration",
+       "amount": 72308236581
+      },
+      {
+       "name": "Payment Where Earned Income Credit Exceeds Liability for Tax, Internal Revenue Service, Treasury",
+       "amount": 66007446603
+      },
+      {
+       "name": "Payment Where Child Tax Credit Exceeds Liability for Tax, Internal Revenue Service, Treasury",
+       "amount": 26567380033
+      },
+      {
+       "name": "U.S. Coronavirus Refundable Credits, Internal Revenue Service, Treasury",
+       "amount": 18529904030
+      },
+      {
+       "name": "Temporary Assistance for Needy Families, Administration for Children and Families, Health and Human Services",
+       "amount": 16706418236
+      },
+      {
+       "name": "Payments for Foster Care and Permanency, Administration for Children and Families, Health and Human Services",
+       "amount": 10381866625
+      }
+     ]
+    },
+    {
+     "code": "602",
+     "name": "Federal employee retirement and disability",
+     "amount": 200303367626,
+     "accounts": [
+      {
+       "name": "Civil Service Retirement and Disability Fund, Office of Personnel Management",
+       "amount": 110316259822
+      },
+      {
+       "name": "Department of Defense Military Retirement Fund",
+       "amount": 80648469974
+      },
+      {
+       "name": "Special Benefits, Office of Workers Compensation Program, Labor",
+       "amount": 3984990184
+      },
+      {
+       "name": "Employees' Life Insurance Fund, Office of Personnel Management",
+       "amount": 3883136830
+      },
+      {
+       "name": "Foreign Service Retirement and Disability Fund, State",
+       "amount": 1229469853
+      },
+      {
+       "name": "Foreign Service National Defined Contributions Retirement Fund, State",
+       "amount": 112147280
+      }
+     ]
+    },
+    {
+     "code": "605",
+     "name": "Food and nutrition assistance",
+     "amount": 161711961199,
+     "accounts": [
+      {
+       "name": "Supplemental Nutrition Assistance Program, Food and Nutrition Service, Agriculture",
+       "amount": 115668421109
+      },
+      {
+       "name": "Child Nutrition Programs, Food and Nutrition Service",
+       "amount": 35574564104
+      },
+      {
+       "name": "Special Supplemental Nutrition Program for Women, Infants and Children (WIC), Food and Nutrition Service",
+       "amount": 8363759900
+      },
+      {
+       "name": "Funds for Strengthening Markets, Income, and Supply (Section 32), Agriculture",
+       "amount": 1425955173
+      },
+      {
+       "name": "Commodity Assistance Program, Food and Nutrition Service, Agriculture",
+       "amount": 504784890
+      },
+      {
+       "name": "Nutrition Programs Administration, Food and Nutrition Service, Agriculture",
+       "amount": 174476022
+      }
+     ]
+    },
+    {
+     "code": "604",
+     "name": "Housing assistance",
+     "amount": 76645340038,
+     "accounts": [
+      {
+       "name": "Tenant-Based Rental Assistance, Public and Indian Housing, Housing and Urban Development",
+       "amount": 38361909912
+      },
+      {
+       "name": "Project-Based Rental Assistance, Housing Programs, Housing and Urban Development",
+       "amount": 16883185366
+      },
+      {
+       "name": "Public Housing Fund, Public and Indian Housing, Housing and Urban Development",
+       "amount": 8620121285
+      },
+      {
+       "name": "Homeless Assistance Grants, Community Planning and Development, Housing and Urban Development",
+       "amount": 4062271669
+      },
+      {
+       "name": "Rental Assistance Program, Rural Housing Service, Agriculture",
+       "amount": 1642093331
+      },
+      {
+       "name": "Native American Programs, Public and Indian Housing, Housing and Urban Development",
+       "amount": 1348793187
+      }
+     ]
+    },
+    {
+     "code": "603",
+     "name": "Unemployment compensation",
+     "amount": 46567940260,
+     "accounts": [
+      {
+       "name": "Unemployment Trust Fund - Treasury Managed, Labor",
+       "amount": 46306097284
+      },
+      {
+       "name": "Railroad Unemployment Insurance Trust Fund, Benefit Payments, Railroad Retirement Board",
+       "amount": 128620920
+      },
+      {
+       "name": "Payments to the Unemployment Trust Fund, Employment and Training Administration, Labor",
+       "amount": 95265905
+      },
+      {
+       "name": "Federal Unemployment Compensation Program, Employment and Training Administration, Labor",
+       "amount": 36873675
+      },
+      {
+       "name": "Railroad Unemployment Insurance Waiver of 7 Day Period, Railroad Retirement Board",
+       "amount": 859621
+      },
+      {
+       "name": "Railroad Unemployment Insurance Extended Benefits Payments, Railroad Retirement Board",
+       "amount": 222722
+      }
+     ]
+    },
+    {
+     "code": "601",
+     "name": "General retirement and disability insurance (excluding social se",
+     "amount": 33125222291,
+     "accounts": [
+      {
+       "name": "Pension Benefit Guaranty Corporation Fund, Pension Benefit Guaranty Corporation, Labor",
+       "amount": 13294541942
+      },
+      {
+       "name": "Social Security Equivalent Benefit Account, Railroad Retirement Board",
+       "amount": 8976055341
+      },
+      {
+       "name": "Railroad Retirement Account, Railroad Retirement Board",
+       "amount": 5935182198
+      },
+      {
+       "name": "National Railroad Retirement Investment Trust, Railroad Retirement Board",
+       "amount": 1423643105
+      },
+      {
+       "name": "District of Columbia Federal Pension Fund, Treasury",
+       "amount": 983341044
+      },
+      {
+       "name": "Federal Payments to the Railroad Retirement Accounts, Railroad Retirement Board",
+       "amount": 863296085
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "800",
+   "name": "General Government",
+   "amount": 511427222163,
+   "subfunctions": [
+    {
+     "code": "803",
+     "name": "Central fiscal operations",
+     "amount": 398472543491,
+     "accounts": [
+      {
+       "name": "Refunding Internal Revenue Collections (Indefinite), Treasury",
+       "amount": 368873902799
+      },
+      {
+       "name": "Operations Support, Internal Revenue Service, Treasury",
+       "amount": 6642895584
+      },
+      {
+       "name": "Federal Financing Bank Revolving Fund, Treasury",
+       "amount": 6336957786
+      },
+      {
+       "name": "Taxpayer Services, Internal Revenue Service, Treasury",
+       "amount": 4447039049
+      },
+      {
+       "name": "United States Mint Public Enterprise Fund, Treasury",
+       "amount": 3279248661
+      },
+      {
+       "name": "Treasury Franchise Fund, Treasury",
+       "amount": 1846663398
+      }
+     ]
+    },
+    {
+     "code": "805",
+     "name": "Central personnel management",
+     "amount": 52934836383,
+     "accounts": [
+      {
+       "name": "Payment to Civil Service Retirement and Disability Fund, Office of Personnel Management",
+       "amount": 51630397285
+      },
+      {
+       "name": "Salaries and Expenses, Office of Personnel Management",
+       "amount": 626620217
+      },
+      {
+       "name": "Revolving Fund, Undistributed SIBAC Chargebacks for Washington, DC, Office of Personnel Management",
+       "amount": 473221592
+      },
+      {
+       "name": "Salaries and Expenses, Merit Systems Protection Board",
+       "amount": 51024006
+      },
+      {
+       "name": "Salaries and Expenses, Office of Inspector General, Office of Personnel Management",
+       "amount": 35949161
+      },
+      {
+       "name": "Salaries and Expenses, Office of Special Counsel",
+       "amount": 31510830
+      }
+     ]
+    },
+    {
+     "code": "804",
+     "name": "General property and records management",
+     "amount": 44515433739,
+     "accounts": [
+      {
+       "name": "Acquisition Services Fund, General Services Administration",
+       "amount": 28275171515
+      },
+      {
+       "name": "Federal Buildings Fund, General Services Administration",
+       "amount": 12378945611
+      },
+      {
+       "name": "Federal Protective Service, Management Directorate, Departmental Management, Intelligence, Situational Awareness, and Oversight, Homeland Security",
+       "amount": 2059562687
+      },
+      {
+       "name": "Working Capital Fund, General Services Administration",
+       "amount": 803625563
+      },
+      {
+       "name": "Operating Expenses, National Archives and Records Administration",
+       "amount": 447954502
+      },
+      {
+       "name": "Records Center Revolving Fund, National Archives and Records Administration",
+       "amount": 230593389
+      }
+     ]
+    },
+    {
+     "code": "806",
+     "name": "General purpose fiscal assistance",
+     "amount": 7958739788,
+     "accounts": [
+      {
+       "name": "Payments to States from Receipts Under Mineral Leasing, Public and Acquired Military Lands, Office of Natural Resources Revenue, Interior",
+       "amount": 3632649790
+      },
+      {
+       "name": "Build America Bond Payments - Recovery Act, Internal Revenue Service, Treasury",
+       "amount": 1664246363
+      },
+      {
+       "name": "Payments in Lieu of Taxes, Departmental Management",
+       "amount": 645201878
+      },
+      {
+       "name": "Internal Revenue, Collections for Puerto Rico, Treasury",
+       "amount": 394951458
+      },
+      {
+       "name": "Customs and Border Protection, Transfer and Expenses of Operation, Puerto Rico, USCS, Homeland Security",
+       "amount": 330556355
+      },
+      {
+       "name": "Payment to the United States Territories, Fiscal Assistance, Insular Affairs, Interior",
+       "amount": 305207896
+      }
+     ]
+    },
+    {
+     "code": "808",
+     "name": "Other general government",
+     "amount": 5824931257,
+     "accounts": [
+      {
+       "name": "Judgements, Court of Claims (Indefinite), Bureau of the Fiscal Service, Treasury",
+       "amount": 2397010314
+      },
+      {
+       "name": "Judgements, United States Courts (Indefinite), Bureau of the Fiscal Service, Treasury",
+       "amount": 1377153028
+      },
+      {
+       "name": "Compact of Free Association, Insular Affairs, Interior",
+       "amount": 807433948
+      },
+      {
+       "name": "Claims for Contract Disputes (Indefinite), Bureau of the Fiscal Service, Treasury",
+       "amount": 641350211
+      },
+      {
+       "name": "Cybersecurity Enhancement Account, Departmental Offices, Treasury",
+       "amount": 99412569
+      },
+      {
+       "name": "Assistance to Territories, Insular Affairs, Interior",
+       "amount": 93463270
+      }
+     ]
+    },
+    {
+     "code": "801",
+     "name": "Legislative functions",
+     "amount": 943770260,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Government Accountability Office",
+       "amount": 943770260
+      }
+     ]
+    },
+    {
+     "code": "802",
+     "name": "Executive direction and management",
+     "amount": 776967246,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Office of Management and Budget, Executive Office of the President",
+       "amount": 154051151
+      },
+      {
+       "name": "Salaries and Expenses, the White House, Executive Office of the President",
+       "amount": 145840871
+      },
+      {
+       "name": "Salaries and Expenses, Office of Administration, Executive",
+       "amount": 115152992
+      },
+      {
+       "name": "Other Federal Drug Control Programs, Executive Office of the President",
+       "amount": 98193127
+      },
+      {
+       "name": "Salaries and Expenses, Office of the United States Trade Representative, Executive Office of the President",
+       "amount": 67918794
+      },
+      {
+       "name": "Information Technology Oversight and Reform, Funds Appropriated to the President, Executive Office of the President",
+       "amount": 40759067
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "700",
+   "name": "Veterans Benefits and Services",
+   "amount": 413322282987,
+   "subfunctions": [
+    {
+     "code": "701",
+     "name": "Income security for veterans",
+     "amount": 204323493155,
+     "accounts": [
+      {
+       "name": "Compensation and Pensions, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 203144226697
+      },
+      {
+       "name": "Servicemen's Group Life Insurance Fund, Veterans Affairs",
+       "amount": 440236977
+      },
+      {
+       "name": "Service-Disabled Veterans Insurance Fund, Veterans Affairs",
+       "amount": 181605574
+      },
+      {
+       "name": "National Service Life Insurance Fund, Veterans Affairs",
+       "amount": 156668074
+      },
+      {
+       "name": "Veterans Insurance and Indemnities, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 137331306
+      },
+      {
+       "name": "Veterans Special Life Insurance Fund, Trust Revolving Fund, Veterans Affairs",
+       "amount": 114796171
+      }
+     ]
+    },
+    {
+     "code": "703",
+     "name": "Hospital and medical care for veterans",
+     "amount": 126153694249,
+     "accounts": [
+      {
+       "name": "Medical Services, Veterans Health Administration, Veterans Affairs",
+       "amount": 76267961778
+      },
+      {
+       "name": "Medical Community Care, Veterans Health Administration, Veterans Affairs",
+       "amount": 23218374652
+      },
+      {
+       "name": "Medical Support and Compliance, Veterans Health Administration, Veterans Affairs",
+       "amount": 11670464672
+      },
+      {
+       "name": "Expenses, Medical Facilities, Veterans Health Administration, Veterans Affairs",
+       "amount": 10228722781
+      },
+      {
+       "name": "Veterans Electronic Health Record, Departmental Administration, Veterans Affairs",
+       "amount": 1496147409
+      },
+      {
+       "name": "Medical and Prosthetic Research, Veterans Health Administration, Veterans Affairs",
+       "amount": 969995979
+      }
+     ]
+    },
+    {
+     "code": "705",
+     "name": "Other veterans benefits and services",
+     "amount": 59825169878,
+     "accounts": [
+      {
+       "name": "Cost of War Toxic Exposures Fund, Departmental Administration, Veterans Affairs",
+       "amount": 33204197122
+      },
+      {
+       "name": "General Operating Expenses, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 12780399224
+      },
+      {
+       "name": "Information Technology Systems, Departmental Administration, Veterans Affairs",
+       "amount": 6451907129
+      },
+      {
+       "name": "Supply Fund, Veterans Affairs",
+       "amount": 2135069221
+      },
+      {
+       "name": "Franchise Fund, Veterans Affairs",
+       "amount": 1921262102
+      },
+      {
+       "name": "General Administration, Departmental Administration, Veterans Affairs",
+       "amount": 1005482197
+      }
+     ]
+    },
+    {
+     "code": "702",
+     "name": "Veterans education, training, and rehabilitation",
+     "amount": 17197380182,
+     "accounts": [
+      {
+       "name": "Readjustment Benefits, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 16702964199
+      },
+      {
+       "name": "Veterans Employment and Training, Departmental Management, Labor",
+       "amount": 335450683
+      },
+      {
+       "name": "Department of Defense, Education Benefits Fund",
+       "amount": 158396638
+      },
+      {
+       "name": "Post-Vietnam Era, Veterans Education Account, Veterans Affairs",
+       "amount": 482661
+      },
+      {
+       "name": "HIRE Vets Medallion Award Fund, Departmental Management, Labor",
+       "amount": 86000
+      }
+     ]
+    },
+    {
+     "code": "704",
+     "name": "Veterans housing",
+     "amount": 5822545523,
+     "accounts": [
+      {
+       "name": "Veterans Housing Benefit Program Fund, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 5811516302
+      },
+      {
+       "name": "Native American Veteran Housing Loan Program Account, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 10428541
+      },
+      {
+       "name": "Vocational Rehabilitation Loans Program Account, Veterans Benefits Administration, Veterans Affairs",
+       "amount": 503533
+      },
+      {
+       "name": "Veterans Housing Benefit Program Fund Liquidating Account, Veterans Affairs",
+       "amount": 97147
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "500",
+   "name": "Education, Training, Employment, and Social Services",
+   "amount": 221514008215,
+   "subfunctions": [
+    {
+     "code": "502",
+     "name": "Higher education",
+     "amount": 129224056666,
+     "accounts": [
+      {
+       "name": "Federal Direct Student Loan Program, Education",
+       "amount": 67913621008
+      },
+      {
+       "name": "Student Financial Assistance, Education",
+       "amount": 50378634687
+      },
+      {
+       "name": "Higher Education, Department of Education",
+       "amount": 3233121343
+      },
+      {
+       "name": "Payment Where American Opportunity Credit Exceeds Liability for Tax - Recovery Act, Internal Revenue Service, Treasury",
+       "amount": 2549205732
+      },
+      {
+       "name": "Federal Family Education Loan Program Account, Education",
+       "amount": 2370205748
+      },
+      {
+       "name": "Student and Administration, Education",
+       "amount": 2079425796
+      }
+     ]
+    },
+    {
+     "code": "501",
+     "name": "Elementary, secondary, and vocational education",
+     "amount": 49490389523,
+     "accounts": [
+      {
+       "name": "Education for the Disadvantaged, Education",
+       "amount": 19161057720
+      },
+      {
+       "name": "Special Education, Education",
+       "amount": 15464001935
+      },
+      {
+       "name": "School Improvement Programs,  Education",
+       "amount": 5793832375
+      },
+      {
+       "name": "Career, Technical, and Adult Education, Education",
+       "amount": 2519314194
+      },
+      {
+       "name": "Impact Aid, Department of Education",
+       "amount": 1645225736
+      },
+      {
+       "name": "Operation of Indian Education Programs, Bureau of Indian Education, Interior",
+       "amount": 1358202399
+      }
+     ]
+    },
+    {
+     "code": "506",
+     "name": "Social services",
+     "amount": 25379482231,
+     "accounts": [
+      {
+       "name": "Children and Families Services Programs, Administration for Children and Families, Health and Human Services",
+       "amount": 14750963122
+      },
+      {
+       "name": "Rehabilitation Services, Education",
+       "amount": 4280941181
+      },
+      {
+       "name": "Aging and Disability Services Programs, Administration for Community Living, Health and Human Services",
+       "amount": 2574065614
+      },
+      {
+       "name": "Social Services Block Grant, Administration for Children and Families, Health and Human Services",
+       "amount": 1603227692
+      },
+      {
+       "name": "Operating Expenses, Corporation for National and Community Service",
+       "amount": 1135741820
+      },
+      {
+       "name": "Promoting Safe and Stable Families, Administration for Children and Families, Health and Human Services",
+       "amount": 540675708
+      }
+     ]
+    },
+    {
+     "code": "504",
+     "name": "Training and employment",
+     "amount": 12131005044,
+     "accounts": [
+      {
+       "name": "Training and Employment Service, Employment and Training Administration, Labor",
+       "amount": 5984729551
+      },
+      {
+       "name": "State Unemployment Insurance and Employment Service Operations, Employment and Training Administration, Labor",
+       "amount": 4198082655
+      },
+      {
+       "name": "Office of Job Corps, Employment and Training Administration, Labor",
+       "amount": 1584204628
+      },
+      {
+       "name": "Program Administration, Employment and Training Administration, Labor",
+       "amount": 202670081
+      },
+      {
+       "name": "Community Service Employment for Older Americans, Employment and Training Administration, Labor",
+       "amount": 90255140
+      },
+      {
+       "name": "Salaries and Expenses, H-1B Funded, Training and Employment Services, Employment and Training Administration, Labor",
+       "amount": 37011954
+      }
+     ]
+    },
+    {
+     "code": "505",
+     "name": "Other labor services",
+     "amount": 3005449962,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Bureau of Labor Statistics",
+       "amount": 742157865
+      },
+      {
+       "name": "Working Capital Fund, Labor",
+       "amount": 658032171
+      },
+      {
+       "name": "Salaries and Expenses, Departmental Management, Labor",
+       "amount": 408708895
+      },
+      {
+       "name": "Salaries and Expenses, National Labor Relations Board",
+       "amount": 306857241
+      },
+      {
+       "name": "Salaries and Expenses, Wage and Hour Division, Labor",
+       "amount": 263071791
+      },
+      {
+       "name": "Salaries and Expenses, Office  of Workers' Compensation Programs, Labor",
+       "amount": 170644739
+      }
+     ]
+    },
+    {
+     "code": "503",
+     "name": "Research and general education aids",
+     "amount": 2283624788,
+     "accounts": [
+      {
+       "name": "Public Broadcasting Fund, Corporation for Public Broadcasting, Treasury",
+       "amount": 595000000
+      },
+      {
+       "name": "Institute of Education Sciences, Department of Education",
+       "amount": 516984825
+      },
+      {
+       "name": "Program Administration, Departmental Management,  Education",
+       "amount": 431372994
+      },
+      {
+       "name": "Office of Museum and Library Services: Grants and Administration, Institute of Museum and Library Services",
+       "amount": 294913565
+      },
+      {
+       "name": "Grants and Administration, National Endowment for the Arts",
+       "amount": 175741051
+      },
+      {
+       "name": "Department of Education Nonrecurring Expenses Fund",
+       "amount": 152709050
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "400",
+   "name": "Transportation",
+   "amount": 197806022690,
+   "subfunctions": [
+    {
+     "code": "401",
+     "name": "Ground transportation",
+     "amount": 123349437223,
+     "accounts": [
+      {
+       "name": "Federal-Aid Highways, Liquidation of Contract Authorization, Federal Highway Administration, Transportation",
+       "amount": 58878771872
+      },
+      {
+       "name": "Formula and Bus Grants, Liquidation of Contract Authorization, Federal Transit Administration, Transportation",
+       "amount": 16683526329
+      },
+      {
+       "name": "Federal-State Partnership for Intercity Passenger Rail Grants, Federal Railroad Administration, Transportation",
+       "amount": 12385050976
+      },
+      {
+       "name": "Highway Infrastructure Programs, Federal Highway Administration, Transportation",
+       "amount": 11127830670
+      },
+      {
+       "name": "National Network Grants to the National Railroad Passenger Corporation, Transportation",
+       "amount": 4461622453
+      },
+      {
+       "name": "Capital Investments Grants, Federal Transit Administration, Transportation",
+       "amount": 4022636814
+      }
+     ]
+    },
+    {
+     "code": "402",
+     "name": "Air transportation",
+     "amount": 53591290336,
+     "accounts": [
+      {
+       "name": "Operations, Federal Aviation Administration, Transportation",
+       "amount": 13709082153
+      },
+      {
+       "name": "Operations, Airport and Airway Trust Fund, Federal Aviation Administration, Transportation",
+       "amount": 12093150000
+      },
+      {
+       "name": "Operations and Support, Transportation Security Administration, Homeland Security",
+       "amount": 10940011154
+      },
+      {
+       "name": "Grants-In-Aid for Airports, Liquidation of Contract Authorization, Airport and Airway Trust Fund, Federal Aviation Administration, Transportation",
+       "amount": 4149479719
+      },
+      {
+       "name": "Facilities and Equipment, Airport and Airway Trust Fund, Federal Aviation Administration, Transportation",
+       "amount": 3763165761
+      },
+      {
+       "name": "Airport Infrastructure Grants, Federal Aviation Administration, Transportation",
+       "amount": 3655647133
+      }
+     ]
+    },
+    {
+     "code": "403",
+     "name": "Water transportation",
+     "amount": 18096687436,
+     "accounts": [
+      {
+       "name": "Operations and Support, Coast Guard, Homeland Security",
+       "amount": 11184987766
+      },
+      {
+       "name": "Procurement, Construction, and Improvements, Coast Guard, Homeland Security",
+       "amount": 4135588162
+      },
+      {
+       "name": "Retired Pay, Coast Guard, Homeland Security",
+       "amount": 1091294095
+      },
+      {
+       "name": "Medicare-Eligible Retiree Health Fund Contribution, United States Coast Guard, Homeland Security",
+       "amount": 290093265
+      },
+      {
+       "name": "Operations and Training, Maritime Administration, Transportation",
+       "amount": 276607006
+      },
+      {
+       "name": "Port Infrastructure Development Program, Maritime Administration, Transportation",
+       "amount": 255229981
+      }
+     ]
+    },
+    {
+     "code": "407",
+     "name": "Other transportation",
+     "amount": 2730607694,
+     "accounts": [
+      {
+       "name": "Natural Gas Distribution Infrastructure Safety and Modernization Grant Program, Pipeline and Hazardous Materials Safety Administration, Transportation",
+       "amount": 591159646
+      },
+      {
+       "name": "Working Capital Fund, Office of the Secretary,Transportation",
+       "amount": 590431549
+      },
+      {
+       "name": "Working Capital Fund, Transportation Systems Center, Transportation",
+       "amount": 277686197
+      },
+      {
+       "name": "Pipeline Safety, Pipeline and Hazardous Materials Safety Administration, Transportation",
+       "amount": 216382080
+      },
+      {
+       "name": "Salaries and Expenses, Office of the Secretary, Transportation",
+       "amount": 212190256
+      },
+      {
+       "name": "Salaries and Expenses, National Transportation Safety Board",
+       "amount": 154274106
+      }
+     ]
+    },
+    {
+     "code": "400",
+     "name": "Transportation",
+     "amount": 38000000,
+     "accounts": [
+      {
+       "name": "Transportation Demonstration Program, Office of the Secretary, Transportation",
+       "amount": 38000000
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "300",
+   "name": "Natural Resources and Environment",
+   "amount": 133406050476,
+   "subfunctions": [
+    {
+     "code": "301",
+     "name": "Water resources",
+     "amount": 43136773223,
+     "accounts": [
+      {
+       "name": "Revolving Fund, Corps of Engineers, Civil",
+       "amount": 12782184030
+      },
+      {
+       "name": "Operation and Maintenance, Corps of Engineers-Civil",
+       "amount": 5942615118
+      },
+      {
+       "name": "Construction, Corps of Engineers - Civil",
+       "amount": 5705397173
+      },
+      {
+       "name": "Flood Control and Coastal Emergencies, Corps of Engineers, Civil",
+       "amount": 5447762898
+      },
+      {
+       "name": "Water and Related Resources, Bureau of Reclamation, Interior",
+       "amount": 4117711187
+      },
+      {
+       "name": "Harbor Maintenance Trust Fund - Treasury Managed, Corps of Engineers - Civil",
+       "amount": 2826091073
+      }
+     ]
+    },
+    {
+     "code": "304",
+     "name": "Pollution control and abatement",
+     "amount": 34756510333,
+     "accounts": [
+      {
+       "name": "State and Tribal Assistance Grants, Environmental Protection Agency",
+       "amount": 23437235629
+      },
+      {
+       "name": "Environmental Programs and Management, Environmental Protection Agency",
+       "amount": 5730437825
+      },
+      {
+       "name": "Hazardous Substance Superfund, Environmental Protection Agency",
+       "amount": 2298879034
+      },
+      {
+       "name": "Wildland Fire Management, Department-Wide Programs, Interior",
+       "amount": 1395189998
+      },
+      {
+       "name": "Science and Technology, Environmental Protection Agency",
+       "amount": 751138012
+      },
+      {
+       "name": "Working Capital Fund, Environmental Protection Agency",
+       "amount": 455465545
+      }
+     ]
+    },
+    {
+     "code": "302",
+     "name": "Conservation and land management",
+     "amount": 30637745812,
+     "accounts": [
+      {
+       "name": "Wildland Fire Management, Forest Service, Agriculture",
+       "amount": 6414547054
+      },
+      {
+       "name": "Farm Security and Rural Investment Programs, Natural Resources Conservation Service, Agriculture",
+       "amount": 5295701548
+      },
+      {
+       "name": "National Forest System, Forest Service, Agriculture",
+       "amount": 2979296974
+      },
+      {
+       "name": "Resource Management, United States Fish and Wildlife Service, Interior",
+       "amount": 2044863127
+      },
+      {
+       "name": "State and Private Forestry, Forest Service, Agriculture",
+       "amount": 1612295110
+      },
+      {
+       "name": "Management of Lands and Resources, Bureau of Land Management, Interior",
+       "amount": 1471615408
+      }
+     ]
+    },
+    {
+     "code": "306",
+     "name": "Other natural resources",
+     "amount": 17416380780,
+     "accounts": [
+      {
+       "name": "Operations, Research and Facilities, National Oceanic and Atmospheric Administration, Commerce",
+       "amount": 7498931109
+      },
+      {
+       "name": "Procurement, Acquisition and Construction, National Oceanic and Atmospheric Administration, Commerce",
+       "amount": 2615955075
+      },
+      {
+       "name": "Interior Franchise Fund, Departmental Management",
+       "amount": 2595882418
+      },
+      {
+       "name": "Surveys, Investigations and Research, U.S. Geological Survey",
+       "amount": 1996416768
+      },
+      {
+       "name": "Working Capital Fund, Departmental Management",
+       "amount": 1706927241
+      },
+      {
+       "name": "Departmental Operations, Office of the Secretary, Interior",
+       "amount": 291253247
+      }
+     ]
+    },
+    {
+     "code": "303",
+     "name": "Recreational resources",
+     "amount": 7458640328,
+     "accounts": [
+      {
+       "name": "Operation of the National Park System, National Park Service, Interior",
+       "amount": 3058591019
+      },
+      {
+       "name": "Federal Aid to Wildlife Restoration, United States Fish and Wildlife Service",
+       "amount": 1103325636
+      },
+      {
+       "name": "Land Acquisition and State Assistance, National Park Service",
+       "amount": 653451042
+      },
+      {
+       "name": "Construction, National Park Service, Interior",
+       "amount": 567640773
+      },
+      {
+       "name": "Sport Fish Restoration Account, United States Fish and Wildlife Service",
+       "amount": 512027149
+      },
+      {
+       "name": "Recreation Enhancement Fee Program, National Park Service",
+       "amount": 387532151
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "750",
+   "name": "Administration of Justice",
+   "amount": 115354127604,
+   "subfunctions": [
+    {
+     "code": "751",
+     "name": "Federal law enforcement activities",
+     "amount": 85288044835,
+     "accounts": [
+      {
+       "name": "Operations and Support, U.S. Customs and Border Protection, Homeland Security",
+       "amount": 21135977845
+      },
+      {
+       "name": "Operations and Support, U.S. Immigration and Customs Enforcement, Homeland Security",
+       "amount": 11823472511
+      },
+      {
+       "name": "Refunds and Drawbacks, United States Customs Service (Indefinite), Treasury",
+       "amount": 8211569176
+      },
+      {
+       "name": "Enforcement, Internal Revenue Service",
+       "amount": 7207486306
+      },
+      {
+       "name": "Procurement, Construction, and Improvements, U.S. Customs and Border Protection, Homeland Security",
+       "amount": 7036293510
+      },
+      {
+       "name": "Immigration Examination Fees, Immigration Services, Homeland Security",
+       "amount": 6161476929
+      }
+     ]
+    },
+    {
+     "code": "752",
+     "name": "Federal litigative and judicial activities",
+     "amount": 12542145670,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, United States Attorneys, Justice",
+       "amount": 2727178598
+      },
+      {
+       "name": "Federal Prisoner Detention, United States Marshals Service, Justice",
+       "amount": 2198733059
+      },
+      {
+       "name": "Salaries and Expenses, United States Marshals Service, Justice",
+       "amount": 1800156263
+      },
+      {
+       "name": "Assets Forfeiture Fund, Justice",
+       "amount": 1741460573
+      },
+      {
+       "name": "Salaries and Expenses, General Legal Activities, Justice",
+       "amount": 1555480630
+      },
+      {
+       "name": "Court Security, Court of Appeals, District Courts, and Other Judicial Services, The Judiciary",
+       "amount": 662344994
+      }
+     ]
+    },
+    {
+     "code": "753",
+     "name": "Federal correctional activities",
+     "amount": 8790135969,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Federal Prison System, Justice",
+       "amount": 8717962869
+      },
+      {
+       "name": "Commissary Funds, Federal Prisons, Justice",
+       "amount": 445645844
+      },
+      {
+       "name": "Buildings and Facilities, Federal Prison System, Justice",
+       "amount": 137764847
+      }
+     ]
+    },
+    {
+     "code": "754",
+     "name": "Criminal justice assistance",
+     "amount": 8733801130,
+     "accounts": [
+      {
+       "name": "Victims Compensation Fund, General Legal Activities, Justice",
+       "amount": 2043713053
+      },
+      {
+       "name": "Crime Victims Fund, Justice",
+       "amount": 1837926728
+      },
+      {
+       "name": "United States Victims of State Sponsored Terrorism Fund, General Legal Activities, Justice",
+       "amount": 1767864977
+      },
+      {
+       "name": "State and Local Law Enforcement Assistance, Office of Justice Programs, Justice",
+       "amount": 1028897202
+      },
+      {
+       "name": "Violence Against Women Prevention and Prosecution Programs, Office of Justice Programs, Justice",
+       "amount": 517718760
+      },
+      {
+       "name": "Community Oriented Policing Services, Office of Justice Programs, Justice",
+       "amount": 447121213
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "450",
+   "name": "Community and Regional Development",
+   "amount": 106470038439,
+   "subfunctions": [
+    {
+     "code": "453",
+     "name": "Disaster relief and insurance",
+     "amount": 84098184021,
+     "accounts": [
+      {
+       "name": "Disaster Relief Fund, Federal Emergency Management Agency, Homeland Security",
+       "amount": 52883549738
+      },
+      {
+       "name": "Disaster Loans Program Account, Small Business Administration",
+       "amount": 9919789007
+      },
+      {
+       "name": "National Flood Insurance Fund, Federal Emergency Management Agency, Homeland Security",
+       "amount": 6881865633
+      },
+      {
+       "name": "Federal Assistance, Federal Emergency Management Agency, Homeland Security",
+       "amount": 4425876157
+      },
+      {
+       "name": "National Flood Insurance Reserve Fund, Homeland Security",
+       "amount": 3638817659
+      },
+      {
+       "name": "Operations and Support, Cybersecurity and Infrastructure Security Agency, Homeland Security",
+       "amount": 2158545821
+      }
+     ]
+    },
+    {
+     "code": "451",
+     "name": "Community development",
+     "amount": 14023552568,
+     "accounts": [
+      {
+       "name": "Community Development Fund, Community Planning and Development, Housing and Urban Development",
+       "amount": 12028369711
+      },
+      {
+       "name": "Rural Energy for America Program, Rural Business-Cooperative Service, Agriculture",
+       "amount": 437644218
+      },
+      {
+       "name": "Lead Hazard Reduction, Office of Lead Hazard Control and Healthy Homes, Housing and Urban Development",
+       "amount": 405404346
+      },
+      {
+       "name": "Information Technology Fund, Management and Administration, Housing and Urban Development",
+       "amount": 328309902
+      },
+      {
+       "name": "Capital Magnet Fund, Community Development Financial Institutions, Departmental Offices, Treasury",
+       "amount": 248846391
+      },
+      {
+       "name": "Office of Inspector General, Management and Administration, Housing and Urban Development",
+       "amount": 156505742
+      }
+     ]
+    },
+    {
+     "code": "452",
+     "name": "Area and regional development",
+     "amount": 8348301850,
+     "accounts": [
+      {
+       "name": "Operation of Indian Programs, Bureau of Indian Affairs and Bureau of Indian Education, Interior",
+       "amount": 2271825164
+      },
+      {
+       "name": "Rural Water and Waste Disposal Program Account, Rural Utilities Service, Agriculture",
+       "amount": 980737701
+      },
+      {
+       "name": "Salaries and Expenses, Rural Development, Agriculture",
+       "amount": 881637130
+      },
+      {
+       "name": "Distance Learning, Telemedicine and Broadband Program, Rural Utilities Service, Agriculture",
+       "amount": 674750035
+      },
+      {
+       "name": "Rural Community Facilities Program Account, Rural Housing Service, Agriculture",
+       "amount": 550778275
+      },
+      {
+       "name": "Economic Development Assistance Programs, Economic Development Administration, Commerce",
+       "amount": 384546658
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "370",
+   "name": "Commerce and Housing Credit",
+   "amount": 95854563163,
+   "subfunctions": [
+    {
+     "code": "376",
+     "name": "Other advancement of commerce",
+     "amount": 84921056063,
+     "accounts": [
+      {
+       "name": "Creating Helpful Incentives to Produce Semiconductors (CHIPS) for America Fund, NIST, Commerce",
+       "amount": 29988660462
+      },
+      {
+       "name": "Broadband Equity, Access, and Deployment Program, National Telecommunications and Information Administration, Commerce",
+       "amount": 17000457882
+      },
+      {
+       "name": "Universal Service Fund, Federal Communications Commission",
+       "amount": 6913034706
+      },
+      {
+       "name": "Salaries and Expenses, United States Patent and Trademark Office, Commerce",
+       "amount": 4334569989
+      },
+      {
+       "name": "Secure and Trusted Communications Networks Reimbursement Program, Federal Communications Commission",
+       "amount": 2853866758
+      },
+      {
+       "name": "Advanced Manufacturing Investment Credit, Internal Revenue Service, Treasury",
+       "amount": 2239979554
+      }
+     ]
+    },
+    {
+     "code": "373",
+     "name": "Deposit insurance",
+     "amount": 6414400787,
+     "accounts": [
+      {
+       "name": "Deposit Insurance Fund, Federal Deposit Insurance Corporation",
+       "amount": 5062361045
+      },
+      {
+       "name": "Assessment Funds, Office of the Comptroller of the Currency, Treasury",
+       "amount": 1301871221
+      },
+      {
+       "name": "Office of Inspector General, Federal Deposit Insurance Corporation",
+       "amount": 47500000
+      },
+      {
+       "name": "Community Development Revolving Loan Fund, National Credit Union",
+       "amount": 1956489
+      },
+      {
+       "name": "Operating Account, Federal Deposit Insurance Corporation",
+       "amount": 634373
+      },
+      {
+       "name": "The FSLIC Resolution Fund",
+       "amount": 77659
+      }
+     ]
+    },
+    {
+     "code": "371",
+     "name": "Mortgage credit",
+     "amount": 4519106313,
+     "accounts": [
+      {
+       "name": "Rural Housing Insurance Fund Program Account, Rural Housing Service, Agriculture",
+       "amount": 1958526247
+      },
+      {
+       "name": "Mutual Mortgage Insurance Program Account, Federal Housing Administration, Housing and Urban Development",
+       "amount": 1655195898
+      },
+      {
+       "name": "Guarantees of Mortgage-Backed Securities Loan Guarantees, Program Account, Government National Mortgage Association, Housing and Urban Development",
+       "amount": 461749302
+      },
+      {
+       "name": "General and Special Risk Program Account, Federal Housing Administration, Housing and Urban Development",
+       "amount": 393291766
+      },
+      {
+       "name": "Rural Housing Insurance Fund, Liquidating Account, Rural Housing Service, Agriculture",
+       "amount": 27474501
+      },
+      {
+       "name": "FHA-General and Special Risk Insurance Fund Liquidating Account, Housing and Urban Development",
+       "amount": 12467562
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "350",
+   "name": "Agriculture",
+   "amount": 73447290509,
+   "subfunctions": [
+    {
+     "code": "352",
+     "name": "Agricultural research and services",
+     "amount": 46986770942,
+     "accounts": [
+      {
+       "name": "Processing, Research and Marketing, Office of the Secretary, Agriculture",
+       "amount": 36562160116
+      },
+      {
+       "name": "Salaries and Expenses, Animal and Plant Health Inspection Service, Agriculture",
+       "amount": 2641321355
+      },
+      {
+       "name": "Salaries and Expenses, Agricultural Research Service, Agriculture",
+       "amount": 1967244389
+      },
+      {
+       "name": "Working Capital Fund, Agriculture",
+       "amount": 1679748254
+      },
+      {
+       "name": "Research and Education Activities, National Institute of Food and Agriculture, Agriculture",
+       "amount": 797376964
+      },
+      {
+       "name": "Extension Activities, National Institute of Food and Agriculture, Agriculture",
+       "amount": 671861287
+      }
+     ]
+    },
+    {
+     "code": "351",
+     "name": "Farm income stabilization",
+     "amount": 26460519567,
+     "accounts": [
+      {
+       "name": "Federal Crop Insurance Corporation Fund, Risk Management Agency, Agriculture",
+       "amount": 21119931346
+      },
+      {
+       "name": "Assistance for Farmers and Ranchers Account, Farm Service Agency, Agriculture",
+       "amount": 2270937461
+      },
+      {
+       "name": "Salaries and Expenses, Farm Service Agency, Agriculture",
+       "amount": 1575988144
+      },
+      {
+       "name": "Agricultural Credit Insurance Fund Program Account,  Farm Service Agency, Agriculture",
+       "amount": 877528342
+      },
+      {
+       "name": "Farm Production and Conservation Business Center, Farm Production and Conservation Programs, Agriculture",
+       "amount": 330149694
+      },
+      {
+       "name": "Farm Credit Insurance Fund, Capital Corporation Investment Fund, Farm Credit Administration",
+       "amount": 82011374
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "150",
+   "name": "International Affairs",
+   "amount": 71578245634,
+   "subfunctions": [
+    {
+     "code": "153",
+     "name": "Conduct of foreign affairs",
+     "amount": 27959752022,
+     "accounts": [
+      {
+       "name": "Diplomatic and Consular Programs, State",
+       "amount": 11159912527
+      },
+      {
+       "name": "Working Capital Fund, State",
+       "amount": 5877565196
+      },
+      {
+       "name": "Consular and Border Security Programs, Administration of Foreign Affairs, State",
+       "amount": 5394003621
+      },
+      {
+       "name": "Embassy Security, Construction, and Maintenance, State",
+       "amount": 3165502827
+      },
+      {
+       "name": "Contributions to International Organizations, State",
+       "amount": 758283374
+      },
+      {
+       "name": "Payment to the Foreign Service Retirement and Disability Fund, State",
+       "amount": 655700000
+      }
+     ]
+    },
+    {
+     "code": "151",
+     "name": "International development and humanitarian assistance",
+     "amount": 26888101576,
+     "accounts": [
+      {
+       "name": "Global Health Programs, State",
+       "amount": 7655029122
+      },
+      {
+       "name": "Migration and Refugee Assistance, State",
+       "amount": 2903418166
+      },
+      {
+       "name": "International Disaster Assistance, Funds Appropriated to the President, US Agency for International Development",
+       "amount": 2527506307
+      },
+      {
+       "name": "Assistance for Europe, Eurasia, and Central Asia, Funds Appropriated to the President, US Agency for International Development",
+       "amount": 1877019388
+      },
+      {
+       "name": "Operating Expenses of the United States Agency for International Development, Funds Appropriated to the President",
+       "amount": 1565986441
+      },
+      {
+       "name": "International Narcotics Control and Law Enforcement, International Security Assistance, State",
+       "amount": 1437955594
+      }
+     ]
+    },
+    {
+     "code": "152",
+     "name": "International security assistance",
+     "amount": 8277497296,
+     "accounts": [
+      {
+       "name": "Economic Support Fund, Funds Appropriated to the President",
+       "amount": 7226343058
+      },
+      {
+       "name": "Non-Proliferation, Anti-Terrorism, Demining and Related Programs, International Security Assistance, State",
+       "amount": 881447924
+      },
+      {
+       "name": "Peacekeeping Operations, Funds Appropriated to the President",
+       "amount": 164242655
+      },
+      {
+       "name": "Foreign Military Financing Program, Funds, Appropriated to the President",
+       "amount": 5438425
+      },
+      {
+       "name": "Demobilization and Transition Fund, Funds Appropriated to the President",
+       "amount": 25234
+      }
+     ]
+    },
+    {
+     "code": "155",
+     "name": "International financial programs",
+     "amount": 6726466748,
+     "accounts": [
+      {
+       "name": "Exchange Stabilization Fund, Office of the Secretary, Treasury",
+       "amount": 6451305135
+      },
+      {
+       "name": "Administration Expenses, Export-Import Bank of the United States",
+       "amount": 252734085
+      },
+      {
+       "name": "Contributions to the International Monetary Fund Facilities and Trust Funds, Treasury",
+       "amount": 13921890
+      },
+      {
+       "name": "Inspector General, Export-Import Bank of the United States",
+       "amount": 8505638
+      }
+     ]
+    },
+    {
+     "code": "154",
+     "name": "Foreign information and exchange activities",
+     "amount": 1726427992,
+     "accounts": [
+      {
+       "name": "International Broadcasting Operations, United States Agency for Global Media",
+       "amount": 743617972
+      },
+      {
+       "name": "Educational and Cultural Exchange Programs, State",
+       "amount": 609686273
+      },
+      {
+       "name": "National Endowment for Democracy, State",
+       "amount": 315860780
+      },
+      {
+       "name": "East-West Center, State",
+       "amount": 22000000
+      },
+      {
+       "name": "Payment to the Asia Foundation, State",
+       "amount": 16500000
+      },
+      {
+       "name": "Broadcasting Capital Improvements, Broadcasting Board of Governors",
+       "amount": 15508708
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "270",
+   "name": "Energy",
+   "amount": 63239998706,
+   "subfunctions": [
+    {
+     "code": "272",
+     "name": "Energy conservation",
+     "amount": 30018116252,
+     "accounts": [
+      {
+       "name": "Energy Efficiency and Renewable Energy, Energy Programs, Energy",
+       "amount": 17130353998
+      },
+      {
+       "name": "Clean Energy Demonstrations, Energy Programs, Energy",
+       "amount": 8441017998
+      },
+      {
+       "name": "Clean Vehicle Credit, Internal Revenue Service, Treasury",
+       "amount": 2863837812
+      },
+      {
+       "name": "Advanced Technology Vehicles Manufacturing Loan Program, Energy Programs, Energy",
+       "amount": 973414543
+      },
+      {
+       "name": "Credit for Previously-Owned Clean Vehicles, Internal Revenue Service, Treasury",
+       "amount": 581446185
+      },
+      {
+       "name": "Payment to Issuer of Qualified Energy Conservation Bonds, Internal Revenue Service, Treasury",
+       "amount": 28045715
+      }
+     ]
+    },
+    {
+     "code": "271",
+     "name": "Energy supply",
+     "amount": 29913621395,
+     "accounts": [
+      {
+       "name": "Rural Electrification and Telecommunications Loans Program Account, Rural Utilities Service, Agriculture",
+       "amount": 8544263425
+      },
+      {
+       "name": "Electricity, Energy Programs, Energy",
+       "amount": 5358128248
+      },
+      {
+       "name": "Bonneville Power Administration Fund, Power Marketing Administration, Energy",
+       "amount": 4387760419
+      },
+      {
+       "name": "Elective Payment for Energy Property and Electricity Produced from Certain Renewable Resources, Etc., Internal Revenue Service, Treasury",
+       "amount": 2619037483
+      },
+      {
+       "name": "Nuclear Energy, Energy Programs, Energy",
+       "amount": 2146531714
+      },
+      {
+       "name": "Fossil Energy, Energy Programs, Energy",
+       "amount": 1560001408
+      }
+     ]
+    },
+    {
+     "code": "276",
+     "name": "Energy information, policy, and regulation",
+     "amount": 2474883874,
+     "accounts": [
+      {
+       "name": "Salaries and Expenses, Nuclear Regulatory Commission",
+       "amount": 973726148
+      },
+      {
+       "name": "Salaries and Expenses, Federal Energy Regulatory Commission, Energy",
+       "amount": 533998628
+      },
+      {
+       "name": "Departmental Administration, Energy Programs, Energy",
+       "amount": 405152782
+      },
+      {
+       "name": "Working Capital Fund, Departmental Administration, Energy",
+       "amount": 254397334
+      },
+      {
+       "name": "Energy Information Administration, Energy Programs, Energy",
+       "amount": 136036001
+      },
+      {
+       "name": "Office of the Inspector General, Energy Programs, Energy",
+       "amount": 104286160
+      }
+     ]
+    },
+    {
+     "code": "274",
+     "name": "Emergency energy preparedness",
+     "amount": 833377185,
+     "accounts": [
+      {
+       "name": "SPR Petroleum Account, Energy Programs, Energy",
+       "amount": 590536837
+      },
+      {
+       "name": "Strategic Petroleum Reserve, Energy Programs, Energy",
+       "amount": 225582614
+      },
+      {
+       "name": "Energy Security and Infrastructure Modernization Fund",
+       "amount": 10424596
+      },
+      {
+       "name": "Northeast Home Heating Oil Reserve, Energy Programs, Energy",
+       "amount": 6833138
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "code": "250",
+   "name": "General Science, Space, and Technology",
+   "amount": 47642186350,
+   "subfunctions": [
+    {
+     "code": "252",
+     "name": "Space flight, research, and supporting activities",
+     "amount": 27805846912,
+     "accounts": [
+      {
+       "name": "Exploration, National Aeronautics and Space Administration",
+       "amount": 7923866974
+      },
+      {
+       "name": "Science, National Aeronautics and Space Administration",
+       "amount": 7602831572
+      },
+      {
+       "name": "Space Operations, National Aeronautics and Space Administration",
+       "amount": 4987619275
+      },
+      {
+       "name": "Safety, Security and Mission Services, National Aeronautics and Space Administration",
+       "amount": 4910282779
+      },
+      {
+       "name": "Construction and Environmental Compliance and Restoration, National Aeronautics and Space Administration",
+       "amount": 993612802
+      },
+      {
+       "name": "Space Technology, National Aeronautics Space Administration",
+       "amount": 965938993
+      }
+     ]
+    },
+    {
+     "code": "251",
+     "name": "General science and basic research",
+     "amount": 19836339438,
+     "accounts": [
+      {
+       "name": "Science, Energy Programs, Energy",
+       "amount": 9951260200
+      },
+      {
+       "name": "Research and Related Activities, National Science Foundation",
+       "amount": 7462577641
+      },
+      {
+       "name": "STEM Education, National Science Foundation",
+       "amount": 1285679196
+      },
+      {
+       "name": "Agency Operations and Award Management, National Science Foundation",
+       "amount": 453460041
+      },
+      {
+       "name": "Major Research Equipment and Facilities Construction, National Science Foundation",
+       "amount": 336773365
+      },
+      {
+       "name": "Salaries and Expenses, H-1B Funded, Education  and Human Resources, National Science Foundation",
+       "amount": 218296428
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

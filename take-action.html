@@ -3541,12 +3541,18 @@ BODY: <the email body, a few short paragraphs>`;
   // opens the topic-only advocacy modal directly instead of leaving the
   // citizen to find it themselves.
   (function handleGeneralParam() {
-    let topic = '';
-    try { topic = new URLSearchParams(window.location.search).get('general') || ''; } catch (e) {}
+    // &stance= carries the citizen's own words when the topic isn't in the
+    // manifesto (e.g. an objection from tax-dollars.html).
+    let topic = '', urlStance = '';
+    try {
+      const q = new URLSearchParams(window.location.search);
+      topic = q.get('general') || '';
+      urlStance = (q.get('stance') || '').slice(0, 600);
+    } catch (e) {}
     if (!topic) return;
     const profile = loadRawProfile();
     const issue = profile && profile.issues && profile.issues.find(i => i.name === topic);
-    openGeneralAdvocacyModal(topic, issue && issue.stance, [topic]);
+    openGeneralAdvocacyModal(topic, (issue && issue.stance) || urlStance, [topic]);
   })();
 })();
 </script>

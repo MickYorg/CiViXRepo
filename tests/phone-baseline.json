@@ -238,5 +238,29 @@
   "educators@iphone-16-pro-max": {
     "smallText": 0,
     "smallTap": 1
+  },
+  "tax-dollars@iphone-se": {
+    "smallText": 0,
+    "smallTap": 3
+  },
+  "tax-dollars@iphone-16": {
+    "smallText": 0,
+    "smallTap": 3
+  },
+  "tax-dollars@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 3
+  },
+  "tax-dollars-objected@iphone-se": {
+    "smallText": 0,
+    "smallTap": 3
+  },
+  "tax-dollars-objected@iphone-16": {
+    "smallText": 0,
+    "smallTap": 3
+  },
+  "tax-dollars-objected@iphone-16-pro-max": {
+    "smallText": 0,
+    "smallTap": 3
   }
 }

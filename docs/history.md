@@ -2630,3 +2630,25 @@ optional reply-to email field is gone; their mail app already has it).
 Federal stays as it was: copy the draft and open the member's contact form.
 `RESEND_API_KEY` is now unused. Tests: `tests/unit/state-email.test.js`,
 including a guard that the sender endpoint doesn't come back.
+
+## "Not with my tax dollars" — experiment, 6 Oct 2026
+
+The founder's idea: a citizen's line-item veto, or conscientious objection,
+for their tax dollars. Framed as a statement, not a veto: no one can
+withhold taxes (illegal), and even the presidential line-item veto was
+struck down in 1998 (*Clinton v. City of New York*), but citizens can tell
+Congress, which writes every spending bill, what they won't stand behind.
+Built as an experiment off to the side, like the Source Map:
+`tax-dollars.html`, not linked from the app. Shows FY2025 federal
+obligations by budget function → subfunction → the six largest federal
+accounts in each (USAspending.gov's spending explorer, snapshotted by
+`scripts/fetch-tax-dollars.js`; obligations exceed cash outlays, so lines
+are shown as shares). Optional tax amount shows the citizen's own dollars
+per line, stored only on the device. "Not with my tax dollars" on any line,
+with an optional why kept as it's typed; each objection links to Take
+Action's general advocacy modal (`?general=` plus a new `&stance=` carrying
+their words) and to DIG. Objections live in `civix-tax-objections`
+(localStorage), not the manifesto. Roadmap if it earns its place: objections
+into the manifesto, matching to appropriations bills and the Appropriations
+Committee members, an anonymous public tally (5+ minimum, per-device and
+per-network limits), state budgets later.

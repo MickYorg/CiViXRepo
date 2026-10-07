@@ -211,6 +211,15 @@ are gitignored — public repo — re-download from the Firebase console
 4. **Roadmap, not started:** DIG-light inside the Citizen flow,
    Citizen → Activist graduation, CiViX Coin spending, donations /
    sponsorships, Pro/Org mockup, "Hey CiViX" voice (on-device only),
-   more beyond-legislative sources (Federal Register, regulations.gov).
+   more beyond-legislative sources (Federal Register, regulations.gov),
+   **"Not with my tax dollars"** (a citizen's line-item objection: see where
+   federal money goes, object line by line in their own words, turn it into
+   a message to Congress; a public anonymous tally later, 5+ minimum like
+   DIG). Experiment page `tax-dollars.html` (6 Oct 2026, unlinked, like
+   `sources-map.html`): FY2025 obligations by function → subfunction → top
+   accounts from USAspending (`scripts/fetch-tax-dollars.js` →
+   `assets/tax-dollars-fy2025.json`); objections and the optional tax amount
+   stay in localStorage, not the manifesto yet. Never imply taxes can be
+   withheld.
    International decided against for now (if revisited: Canada first,
    via a jurisdiction-adapter interface).
