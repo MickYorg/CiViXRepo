@@ -52,6 +52,10 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Ordered to be Reported (Amended) by the Yeas and Nays: 28 - 21.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on the Union Calendar, Calendar No. 412.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
+  // Found by the live checks, 10 Oct 2026: named (non-House/Senate)
+  // committees fell through to 'Introduced'.
+  assert.equal(deriveStatus('Read twice and referred to the Select Committee on Intelligence.'), 'In Committee');
+  assert.equal(deriveStatus('Referred to the Permanent Select Committee on Intelligence.'), 'In Committee');
 });
 
 test('election facts come from fixed rules, not guesses', async () => {
