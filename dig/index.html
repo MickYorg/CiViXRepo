@@ -2360,12 +2360,14 @@
     `;
   }
 
-  function updateCard(name, { stance, summary, error, timestamp, cached }) {
+  function updateCard(name, { stance, summary, error, timestamp, cached, savedAt }) {
     resultsState[name] = { stance, summary, error, timestamp, cached };
 
     const card = grid.querySelector(`.wd-card[data-source="${cssEscape(name)}"]`);
     if (card) {
-      const timeLabel = cached ? `${timestamp} · cached` : timestamp;
+      // A clock time alone ("2:14 PM") can't say whether a cached result is
+      // from this morning or yesterday, so cached cards show their age.
+      const timeLabel = cached ? cachedAgeLabel(savedAt, timestamp) : timestamp;
       if (error) {
         card.innerHTML = `
           <div class="wd-card-head">
@@ -2861,7 +2863,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     sources.forEach(src => {
       const cached = getCachedResult(currentTopic, src.name);
       if (cached) {
-        updateCard(src.name, { stance: cached.stance, summary: cached.summary, timestamp: cached.timestamp, cached: true });
+        updateCard(src.name, { stance: cached.stance, summary: cached.summary, timestamp: cached.timestamp, cached: true, savedAt: cached.savedAt });
       } else {
         toFetch.push(src);
       }
@@ -2979,6 +2981,10 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     saveTopicHistory();
     renderProfilePanel();
     renderRecentTopics();
+  }
+
+  function cachedAgeLabel(savedAt, timestamp) {
+    return savedAt ? `saved ${relativeTime(savedAt)}` : `${timestamp} · saved`;
   }
 
   function relativeTime(ts) {
