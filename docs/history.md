@@ -2652,3 +2652,53 @@ their words) and to DIG. Objections live in `civix-tax-objections`
 into the manifesto, matching to appropriations bills and the Appropriations
 Committee members, an anonymous public tally (5+ minimum, per-device and
 per-network limits), state budgets later.
+
+## Nightly investigator: 19 Oct schedule run — empty headline batch, likely
+## GNews quota, not a code bug — 20 Oct 2026
+
+Today's own 7:17am ET `tests.yml` schedule run never showed up at all —
+checked at 11:47 UTC (30 min past due), nothing completed, in-progress, or
+queued newer than the 19 Oct run. Same dropped/late-schedule pattern first
+logged 6 Oct 2026, so this investigation fell back to the most recent
+completed run instead, per its own instructions.
+
+[Run 39295008901](https://github.com/MickYorg/CiViXRepo/actions/runs/39295008901)
+(19 Oct, commit `49bffa0714`): `unit` and `layout` both passed; `live`
+failed one test — `the pre-warmed headline deck has cards`
+(`tests/live/production.test.js:59`), assertion `headline batch is empty`.
+`npm test` run locally against the same commit passes clean (74/74).
+
+Root cause, reasoned from the code (no network access from here to
+mycivix.com, Cloudflare function logs, or gnews.io to confirm directly):
+`/api/headlines-batch` (`functions/api/headlines-batch.js`) builds its deck
+by calling `fetchGNews()` (`functions/_lib/gnews.js`) and then boiling each
+article down via `/api/dig-check`. The function already treats a failed
+build as an intentional soft-degrade — it swallows the error, serves
+`cards: []` instead of a 500, and never caches an empty result (the
+`if (kv && cards.length)` guard), so an empty response always means that
+request's own build genuinely failed, not a stale or corrupted cache entry.
+The failing test came back in 234ms — far faster than a real build (GNews
+fetch plus 5 parallel AI boildowns plus image lookups), and far faster than
+the other live checks that round-trip through similar AI/Function calls
+(e.g. "municipal data" 1989ms, "federal reps" 1243ms in the same run). That
+timing fits `fetchGNews()` failing immediately — a rejected API key or a
+non-2xx response from GNews — much better than 5 independent AI boildown
+calls all failing after a full round trip each.
+
+Likeliest culprit, per this file's own note that `GNEWS_API_KEY` is "free
+tier, 100 req/day": the batch refreshes on its own every hour it's
+accessed (`FRESH_SECONDS`), on top of any direct `/api/headlines` traffic
+from citizens who land on a stale/cold batch, so the shared daily quota can
+plausibly run dry before the next reset. Not confirmed — I can't see
+GNews's dashboard or Cloudflare's function logs from this sandbox to read
+the actual status code or article count GNews returned that moment.
+
+No code change made. The function is already doing the right thing on a
+degrade (empty, not 500; no cache poisoning); what's unconfirmed is
+operational. **What the owner should do:** `wrangler pages deployment tail
+<id> --project-name mycivix` (or the Cloudflare dashboard) around
+`2026-10-19T17:32Z` to see `/api/headlines-batch`'s actual error, and check
+the GNews account's quota usage for that day. If the free tier is routinely
+running out, the fix is either a paid GNews tier or spacing out the hourly
+pre-warm refresh — a product call for the owner, not something to guess at
+here.
