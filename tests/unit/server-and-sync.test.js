@@ -54,6 +54,18 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
 });
 
+test("a sponsor-transfer request isn't flagged as a mislabeled 'Introduced' bill", async () => {
+  const { isMislabeledIntroduced } = await lib('congress-bill.js');
+  // Found live 20 Oct 2026 (H.R. 1510): the smoke check's old plain
+  // "agreed to" regex flagged this as a mislabel, but reassigning
+  // sponsorship isn't bill progress — 'Introduced' is correct.
+  assert.equal(isMislabeledIntroduced('Introduced', 'ASSUMING FIRST SPONSORSHIP - Ms. Dexter asked unanimous consent that she may hereafter be considered as the first sponsor of H.R. 1510, a bill originally introduced by Representative Turner (TX), for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), false);
+  assert.equal(isMislabeledIntroduced('Introduced', 'Mr. Smith asked unanimous consent that he may hereafter be considered as the new sponsor of S. 42. Agreed to without objection.'), false);
+  // A genuine mislabel (progress language with no exclusion) must still be caught.
+  assert.equal(isMislabeledIntroduced('Introduced', 'Referred to the House Committee on the Judiciary.'), true);
+  assert.equal(isMislabeledIntroduced('In Committee', 'Referred to the House Committee on the Judiciary.'), false);
+});
+
 test('election facts come from fixed rules, not guesses', async () => {
   const e = await lib('election-dates.js');
   assert.equal(e.generalElectionDateForYear(2026).toISOString().slice(0, 10), '2026-11-03');
