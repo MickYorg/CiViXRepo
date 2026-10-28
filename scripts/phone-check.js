@@ -155,6 +155,16 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4',
 };
 
+// The upstream connection to mycivix.com can error after its response
+// already started streaming back (a mid-stream reset arrives on the
+// request's socket, not the response) — calling res.writeHead() again at
+// that point throws ERR_HTTP_HEADERS_SENT and kills the whole run (27 Oct
+// 2026). Guard both ends of that race.
+function handleProxyError(res) {
+  if (!res.headersSent) res.writeHead(500);
+  if (!res.writableEnded) res.end('{}');
+}
+
 function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -162,8 +172,8 @@ function serve() {
         const up = https.request('https://mycivix.com' + req.url, {
           method: req.method,
           headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
-        }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
+        }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.on('error', () => handleProxyError(res)); r.pipe(res); });
+        up.on('error', () => handleProxyError(res));
         req.pipe(up);
         return;
       }
@@ -347,7 +357,7 @@ async function shoot(cdp, page, phone, personas) {
   return result.value;
 }
 
-(async () => {
+if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const filter = args.find((a) => !a.startsWith('--'));
   const phones = args.includes('--laptop') ? [...PHONES, LAPTOP] : PHONES;
@@ -432,3 +442,5 @@ async function shoot(cdp, page, phone, personas) {
   if (process.env.GITHUB_ACTIONS) console.log(`::error title=Phone layout check crashed::${String(e && e.message || e).replace(/\r?\n/g, ' ')}`);
   process.exit(2);
 });
+
+module.exports = { handleProxyError };
