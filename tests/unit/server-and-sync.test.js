@@ -52,6 +52,11 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Ordered to be Reported (Amended) by the Yeas and Nays: 28 - 21.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on the Union Calendar, Calendar No. 412.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
+  // Found by the live checks, 29 Oct 2026: a sponsorship-reassignment
+  // notice ends "Agreed to without objection" (the unanimous-consent
+  // request was granted) but says nothing about the bill's own progress
+  // — stays 'Introduced' rather than being read as a passage vote.
+  assert.equal(deriveStatus('ASSUMING FIRST SPONSORSHIP - Mr. Jackson (IL) asked unanimous consent that he may hereafter be considered as the first sponsor of H.R. 1114, a bill originally introduced by Representative Cherfilus-McCormick, for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), 'Introduced');
 });
 
 test('election facts come from fixed rules, not guesses', async () => {

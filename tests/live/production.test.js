@@ -22,7 +22,10 @@ test('federal bills load, with a real status on every bill', async () => {
   const { status, body } = await getJSON('/api/calendar');
   assert.equal(status, 200, JSON.stringify(body).slice(0, 200));
   assert.ok(body.bills.length >= 20, `only ${body.bills.length} bills`);
-  const introduced = body.bills.filter((b) => b.status === 'Introduced' && /referred to|placed on|agreed to/i.test((b.latestAction || {}).text || ''));
+  // 'Agreed to without objection' also ends sponsorship-reassignment and
+  // other administrative unanimous-consent notices (29 Oct 2026, H.R. 1114)
+  // that say nothing about the bill's own progress — not a real match.
+  const introduced = body.bills.filter((b) => b.status === 'Introduced' && /referred to|placed on|agreed to/i.test((b.latestAction || {}).text || '') && !/assuming first sponsorship/i.test((b.latestAction || {}).text || ''));
   assert.equal(introduced.length, 0, `mislabeled 'Introduced': ${introduced.map((b) => b.latestAction.text).slice(0, 3).join(' | ')}`);
 });
 
