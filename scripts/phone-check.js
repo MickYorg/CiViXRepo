@@ -155,6 +155,14 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4',
 };
 
+// The upstream socket can error mid-stream, after the response callback
+// below already wrote headers (e.g. mycivix.com resets the connection while
+// piping). Calling writeHead again then throws ERR_HTTP_HEADERS_SENT, which
+// is uncaught here and kills the whole phone-check run partway through.
+function apiProxyErrorHandler(res) {
+  return () => { if (res.headersSent) { res.destroy(); return; } res.writeHead(500); res.end('{}'); };
+}
+
 function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -163,7 +171,7 @@ function serve() {
           method: req.method,
           headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
         }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
+        up.on('error', apiProxyErrorHandler(res));
         req.pipe(up);
         return;
       }
@@ -347,7 +355,9 @@ async function shoot(cdp, page, phone, personas) {
   return result.value;
 }
 
-(async () => {
+module.exports = { serve, apiProxyErrorHandler, PORT };
+
+if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const filter = args.find((a) => !a.startsWith('--'));
   const phones = args.includes('--laptop') ? [...PHONES, LAPTOP] : PHONES;
