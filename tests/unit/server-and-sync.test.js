@@ -54,6 +54,17 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
 });
 
+test("administrative actions (reassigning sponsorship) carry no status signal, even though they're 'agreed to'", async () => {
+  const { isAdministrativeAction } = await lib('congress-bill.js');
+  // Found by the live checks, 3 Nov 2026 (H.R. 1522): deriveStatus() correctly
+  // left this 'Introduced', but the live test's looser mislabeling check
+  // didn't know to ignore it, since it's "agreed to" without being any kind
+  // of progress on the bill itself.
+  assert.equal(isAdministrativeAction("ASSUMING FIRST SPONSORSHIP - Ms. Randall asked unanimous consent that she may hereafter be considered as the first sponsor of H.R. 1522, a bill originally introduced by Representative Connolly, for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection."), true);
+  assert.equal(isAdministrativeAction('Referred to the House Committee on the Judiciary.'), false);
+  assert.equal(isAdministrativeAction(''), false);
+});
+
 test('election facts come from fixed rules, not guesses', async () => {
   const e = await lib('election-dates.js');
   assert.equal(e.generalElectionDateForYear(2026).toISOString().slice(0, 10), '2026-11-03');
