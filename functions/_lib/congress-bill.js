@@ -56,7 +56,15 @@ const STATUS_PATTERNS = [
   // 24 Sep 2026: this used to require "referred to the committee", so the
   // House's standard "Referred to the House Committee on …" (and hearings /
   // markups) fell through to 'Introduced' — ~40% of live bills mislabeled.
-  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
+  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i },
+  // 5 Nov 2026: "ASSUMING FIRST SPONSORSHIP" is a member taking over as
+  // lead sponsor (plus a cosponsor/reprint request) — purely administrative,
+  // tells us nothing about floor progress, but its own text says the bill
+  // was "originally introduced" by someone else, so it's long past fresh
+  // introduction. Without this it fell through to the 'Introduced' default
+  // even though the trailing "Agreed to without objection" made it look
+  // like real progress to the live smoke check.
+  { status: 'In Committee', re: /assuming first sponsorship/i }
 ];
 function deriveStatus(latestActionText) {
   const text = latestActionText || '';
