@@ -2652,3 +2652,35 @@ their words) and to DIG. Objections live in `civix-tax-objections`
 into the manifesto, matching to appropriations bills and the Appropriations
 Committee members, an anonymous public tally (5+ minimum, per-device and
 per-network limits), state budgets later.
+
+## Nightly investigator, 7 Nov 2026: "first sponsor" mislabeling + CI Chrome breakage
+
+Two independent failures in the 6 Nov 2026 scheduled `tests.yml` run.
+
+**`live` (real bug, recurring since at least 29 Oct):** a House member
+reassigning themselves as a bill's first sponsor ("asked unanimous consent
+that she may hereafter be considered as the first sponsor of H.R. ___ ... for
+the purpose of adding cosponsors and requesting reprintings pursuant to
+clause 7 of rule XII. Agreed to without objection.") is routine cosponsor
+bookkeeping, not a real status change — but `deriveStatus()` in
+`congress-bill.js` didn't recognize it, so it fell through to the
+'Introduced' default. Misleading: this reassignment only happens well after
+a bill exists, and every House bill is referred to committee the moment
+it's introduced, so 'In Committee' is the honest fallback. Seen on
+H.R. 1114, 1522, 4213, 5658 across the 29 Oct/3 Nov/4 Nov/6 Nov runs. Fixed
+by extending the existing 'In Committee' pattern to also match this
+phrasing; `calendar.js`'s cache key bumped to v5 (per the rule above).
+
+**`layout` (CI infra, not our code):** `scripts/phone-check.js` couldn't
+launch Chrome on the 6 Nov run — the process spawned (and a
+`chrome_crashpad_handler` appeared) but never opened a CDP port, timing out
+after 30s. The run's own job log shows `ubuntu-latest` had just rolled to
+Ubuntu 26.04 (image `20261101.186.1`) on this run; GitHub's own deprecation
+notice on the same run confirms the "`ubuntu-latest` migrates to Ubuntu 26"
+rollout that started 19 Oct 2026. Most likely the preinstalled
+`/usr/bin/google-chrome` on the new image doesn't run cleanly yet. Pinned
+the `layout` job to `ubuntu-24.04` (the environment it worked on before)
+rather than guessing a Chrome dependency fix blind — nightly CI will confirm
+on main, and `npm run test:layout` still can't be run from this sandbox to
+verify locally either way. Unpin once Ubuntu 26.04 + Chrome is confirmed
+working.

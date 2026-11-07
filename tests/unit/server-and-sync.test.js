@@ -52,6 +52,10 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Ordered to be Reported (Amended) by the Yeas and Nays: 28 - 21.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on the Union Calendar, Calendar No. 412.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
+  // Found by the live checks, 7 Nov 2026: a first-sponsor reassignment is
+  // cosponsor bookkeeping, not a status change, but it fell through to
+  // 'Introduced' — misleading, since it only happens well after introduction.
+  assert.equal(deriveStatus('Ms. Ocasio-Cortez asked unanimous consent that she may hereafter be considered as the first sponsor of H.R. 5658, a bill originally introduced by Representative Sherrill, for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), 'In Committee');
 });
 
 test('election facts come from fixed rules, not guesses', async () => {
