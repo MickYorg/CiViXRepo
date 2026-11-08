@@ -18,11 +18,28 @@ async function getJSON(path, init) {
   return { status: r.status, body, headers: r.headers };
 }
 
+// Independent of congress-bill.js's own STATUS_PATTERNS on purpose (so a
+// regression there still gets caught here). "referred to" and "placed on"
+// are left as bare substring checks — a referral to an oddly-named panel
+// (e.g. a Select Committee) is still a real committee referral that
+// deriveStatus's own 'In Committee' pattern can miss, and this independent
+// check should still flag that. "agreed to" alone is scoped to contexts
+// that mean chamber passage, though: a floor action can agree to something
+// procedural (e.g. a unanimous-consent sponsorship change) without the
+// bill itself advancing. 14 Oct 2026: H.R.2433's "Mr. Murphy asked
+// unanimous consent that he may hereafter be considered as the first
+// sponsor... Agreed to without objection." was a false positive on the
+// old bare-word "agreed to".
+function looksPastIntroduced(text) {
+  const t = text || '';
+  return /referred to|placed on/i.test(t) || /agreed to in (the )?(house|senate)|(house|senate) agreed to|considered,? and agreed to/i.test(t);
+}
+
 test('federal bills load, with a real status on every bill', async () => {
   const { status, body } = await getJSON('/api/calendar');
   assert.equal(status, 200, JSON.stringify(body).slice(0, 200));
   assert.ok(body.bills.length >= 20, `only ${body.bills.length} bills`);
-  const introduced = body.bills.filter((b) => b.status === 'Introduced' && /referred to|placed on|agreed to/i.test((b.latestAction || {}).text || ''));
+  const introduced = body.bills.filter((b) => b.status === 'Introduced' && looksPastIntroduced((b.latestAction || {}).text));
   assert.equal(introduced.length, 0, `mislabeled 'Introduced': ${introduced.map((b) => b.latestAction.text).slice(0, 3).join(' | ')}`);
 });
 

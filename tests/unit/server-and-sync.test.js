@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { read, ROOT } = require('../helpers/load');
+const { read, ROOT, extractFunction } = require('../helpers/load');
 
 const lib = (f) => import(path.join(ROOT, 'functions/_lib', f));
 
@@ -52,6 +52,21 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Ordered to be Reported (Amended) by the Yeas and Nays: 28 - 21.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on the Union Calendar, Calendar No. 412.'), 'Reported by Committee');
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
+});
+
+test('live smoke check does not flag a procedural "agreed to" as a mislabeled bill', async () => {
+  const looksPastIntroduced = extractFunction('tests/live/production.test.js', 'looksPastIntroduced');
+  // Found live 14 Oct 2026 (H.R.2433): a unanimous-consent sponsorship
+  // change is "Agreed to without objection" but doesn't move the bill
+  // itself past Introduced.
+  assert.equal(looksPastIntroduced('Mr. Murphy asked unanimous consent that he may hereafter be considered as the first sponsor of H.R. 2433, a bill originally introduced by Representative Green (TN), for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), false);
+  // Still catches real advancement, including the oddly-named-panel case
+  // (found live 9 Oct 2026) that deriveStatus's own 'In Committee' pattern
+  // misses because "committee" isn't the word right after "referred to the".
+  assert.equal(looksPastIntroduced('Referred to the House Committee on the Judiciary.'), true);
+  assert.equal(looksPastIntroduced('Read twice and referred to the Select Committee on Intelligence.'), true);
+  assert.equal(looksPastIntroduced('Placed on the Union Calendar, Calendar No. 412.'), true);
+  assert.equal(looksPastIntroduced('Resolution agreed to in Senate without amendment by Unanimous Consent.'), true);
 });
 
 test('election facts come from fixed rules, not guesses', async () => {
