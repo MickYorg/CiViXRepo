@@ -19,10 +19,11 @@ async function getJSON(path, init) {
 }
 
 test('federal bills load, with a real status on every bill', async () => {
+  const { isMislabeledIntroduced } = await import('../../functions/_lib/congress-bill.js');
   const { status, body } = await getJSON('/api/calendar');
   assert.equal(status, 200, JSON.stringify(body).slice(0, 200));
   assert.ok(body.bills.length >= 20, `only ${body.bills.length} bills`);
-  const introduced = body.bills.filter((b) => b.status === 'Introduced' && /referred to|placed on|agreed to/i.test((b.latestAction || {}).text || ''));
+  const introduced = body.bills.filter((b) => isMislabeledIntroduced(b.status, (b.latestAction || {}).text));
   assert.equal(introduced.length, 0, `mislabeled 'Introduced': ${introduced.map((b) => b.latestAction.text).slice(0, 3).join(' | ')}`);
 });
 

@@ -66,6 +66,20 @@ function deriveStatus(latestActionText) {
   return 'Introduced';
 }
 
+// A latest action can contain "agreed to"/"referred to"/"placed on" without
+// being real progress on the bill itself — e.g. a sponsor-transfer request
+// ("Ms. X asked unanimous consent that she may hereafter be considered as
+// the first sponsor of H.R. ... Agreed to without objection.", seen live on
+// H.R. 1510, 20 Oct 2026) touches none of STATUS_PATTERNS' stages, so
+// 'Introduced' is correct. Used by the production smoke check
+// (tests/live/production.test.js) to tell a real mislabel from this kind
+// of administrative noise.
+const NON_PROGRESS_ACTION_RE = /assuming (first|new) sponsorship|hereafter be considered as the (first|new) sponsor/i;
+function isMislabeledIntroduced(status, latestActionText) {
+  const text = latestActionText || '';
+  return status === 'Introduced' && /referred to|placed on|agreed to/i.test(text) && !NON_PROGRESS_ACTION_RE.test(text);
+}
+
 function slim(bill) {
   return {
     congress: bill.congress,
@@ -79,4 +93,4 @@ function slim(bill) {
   };
 }
 
-export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, slim };
+export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, isMislabeledIntroduced, slim };
