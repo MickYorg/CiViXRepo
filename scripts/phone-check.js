@@ -155,6 +155,16 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4',
 };
 
+// The upstream request can error after its response already arrived (headers
+// written, body piping, via the success callback below) — writing headers a
+// second time throws ERR_HTTP_HEADERS_SENT and crashes the whole process,
+// which is what killed the civix101 run partway through in CI on 14 Nov 2026.
+function proxyApiError(res) {
+  if (res.headersSent) { res.destroy(); return; }
+  res.writeHead(500);
+  res.end('{}');
+}
+
 function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -163,7 +173,7 @@ function serve() {
           method: req.method,
           headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
         }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
+        up.on('error', () => proxyApiError(res));
         req.pipe(up);
         return;
       }
@@ -347,7 +357,9 @@ async function shoot(cdp, page, phone, personas) {
   return result.value;
 }
 
-(async () => {
+module.exports = { proxyApiError };
+
+if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const filter = args.find((a) => !a.startsWith('--'));
   const phones = args.includes('--laptop') ? [...PHONES, LAPTOP] : PHONES;
