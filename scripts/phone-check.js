@@ -155,6 +155,14 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4',
 };
 
+// A dropped connection to production can error out after the response has
+// already started (headers sent, piping in progress) — writing headers
+// again there crashes the whole process. Found in CI, 14 & 16 Nov 2026.
+function proxyUpstreamError(res) {
+  if (res.headersSent) { res.destroy(); return; }
+  res.writeHead(500); res.end('{}');
+}
+
 function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -163,7 +171,7 @@ function serve() {
           method: req.method,
           headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
         }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
+        up.on('error', () => proxyUpstreamError(res));
         req.pipe(up);
         return;
       }
@@ -347,7 +355,9 @@ async function shoot(cdp, page, phone, personas) {
   return result.value;
 }
 
-(async () => {
+module.exports = { proxyUpstreamError };
+
+if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const filter = args.find((a) => !a.startsWith('--'));
   const phones = args.includes('--laptop') ? [...PHONES, LAPTOP] : PHONES;

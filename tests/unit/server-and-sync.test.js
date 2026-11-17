@@ -54,6 +54,18 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
 });
 
+test('the live cross-check for mislabeled bills ignores sponsor-reassignment housekeeping', async () => {
+  const { looksMislabeledIntroduced } = await lib('congress-bill.js');
+  // Found live, 17 Nov 2026: this mentions "agreed to" but isn't a status
+  // change, so 'Introduced' here is correct, not a mislabel.
+  assert.equal(looksMislabeledIntroduced('Introduced', 'Mr. Magaziner asked unanimous consent that he may hereafter be considered as the first sponsor of H.R. 537, a bill originally introduced by Representative Sherrill, for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), false);
+  assert.equal(looksMislabeledIntroduced('Introduced', 'Mr. Pfluger asked unanimous consent that he may hereafter be considered as the first sponsor of H.R. 4006, a bill originally introduced by Representative Johnson (OH), for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), false);
+  // Still catches a genuine mismatch (a real status change the specific
+  // STATUS_PATTERNS missed).
+  assert.equal(looksMislabeledIntroduced('Introduced', 'Referred to the House Committee on the Judiciary.'), true);
+  assert.equal(looksMislabeledIntroduced('In Committee', 'Referred to the House Committee on the Judiciary.'), false);
+});
+
 test('election facts come from fixed rules, not guesses', async () => {
   const e = await lib('election-dates.js');
   assert.equal(e.generalElectionDateForYear(2026).toISOString().slice(0, 10), '2026-11-03');
