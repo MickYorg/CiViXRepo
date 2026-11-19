@@ -54,6 +54,18 @@ test('bill status is read from the latest action text', async () => {
   assert.equal(deriveStatus('Placed on Senate Legislative Calendar under General Orders. Calendar No. 501.'), 'On Floor Calendar');
 });
 
+test('the live-check second opinion ignores sponsorship housekeeping, 7 Nov 2026', async () => {
+  const { looksPastIntroduction } = await lib('congress-bill.js');
+  // Found mislabeling H.R.4006: unanimous-consent sponsorship reassignment
+  // ends "Agreed to without objection." just like real passage text does,
+  // but says nothing about the bill's stage.
+  assert.equal(looksPastIntroduction('ASSUMING FIRST SPONSORSHIP - Mr. Pfluger asked unanimous consent that he may hereafter be considered as the first sponsor of H.R. 4006, a bill originally introduced by Representative Johnson (OH), for the purpose of adding cosponsors and requesting reprintings pursuant to clause 7 of rule XII. Agreed to without objection.'), false);
+  // Still catches a real stage change that STATUS_PATTERNS might miss.
+  assert.equal(looksPastIntroduction('Referred to the Committee on the Judiciary.'), true);
+  assert.equal(looksPastIntroduction('Placed on the Union Calendar.'), true);
+  assert.equal(looksPastIntroduction('Introduced in House'), false);
+});
+
 test('election facts come from fixed rules, not guesses', async () => {
   const e = await lib('election-dates.js');
   assert.equal(e.generalElectionDateForYear(2026).toISOString().slice(0, 10), '2026-11-03');

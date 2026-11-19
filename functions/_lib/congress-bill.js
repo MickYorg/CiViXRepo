@@ -66,6 +66,22 @@ function deriveStatus(latestActionText) {
   return 'Introduced';
 }
 
+// A second, deliberately looser opinion the live smoke test uses to catch
+// any real stage-progression phrasing that slips past STATUS_PATTERNS
+// above. Sponsorship-reassignment housekeeping ("ASSUMING FIRST
+// SPONSORSHIP - Mr. X asked unanimous consent that he may hereafter be
+// considered as the first sponsor of ...") is unanimous-consent text too,
+// and routinely ends "Agreed to without objection.", but it says nothing
+// about the bill's actual stage — found mislabeling H.R.4006, 7 Nov 2026 —
+// so it's excluded by name rather than narrowing the regex and losing real
+// catches.
+const NON_SUBSTANTIVE_ACTION = /^assuming (first|original) sponsorship/i;
+function looksPastIntroduction(latestActionText) {
+  const text = latestActionText || '';
+  if (NON_SUBSTANTIVE_ACTION.test(text)) return false;
+  return /referred to|placed on|agreed to/i.test(text);
+}
+
 function slim(bill) {
   return {
     congress: bill.congress,
@@ -79,4 +95,4 @@ function slim(bill) {
   };
 }
 
-export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, slim };
+export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, looksPastIntroduction, slim };
