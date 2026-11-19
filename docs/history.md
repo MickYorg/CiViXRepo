@@ -2684,3 +2684,33 @@ rather than guessing a Chrome dependency fix blind — nightly CI will confirm
 on main, and `npm run test:layout` still can't be run from this sandbox to
 verify locally either way. Unpin once Ubuntu 26.04 + Chrome is confirmed
 working.
+
+## DIG fast track: where it stands, what changed, Follow — 19 Nov 2026
+
+The founder asked for a fast track: revisit topics raised before, do a quick
+dig on something, see where it stands, and prioritize and follow it, without
+a manifesto build. And in DIG: how old is a cached result, and a way to
+refresh the summary or the whole stance-by-source check, ideally showing
+where sources changed their take.
+
+- Cached cards say their age ("saved 5h ago"); before, only the clock time
+  ("2:14 PM · cached"), which couldn't tell this morning from yesterday.
+- "Where it stands": one AI call per topic (`dig_status`, via
+  /api/dig-check with web search): NOW / LATEST / NEXT plus up to three
+  source links, strictly neutral, labeled as an AI summary to check. Saved
+  per topic on the device (`dig-status-cache`), shown with its age and a
+  Refresh; refreshed automatically when over a day old, and the previous
+  status is passed back so it can say what changed since.
+- Change tracking: the 24h result cache forgets, so `dig-stance-history`
+  keeps each source's last result per topic for a year. A fresh check sends
+  it along and asks for CHANGE: SAME or SHIFTED: <what changed>; the model
+  judges, because comparing stance tags as strings would call every
+  rewording a change. Unparseable answers show nothing rather than a guess.
+- REFRESH ALL ignores the 24h cache for every source and the status.
+- Follow: one tap adds the topic to the manifesto (or raises it a notch)
+  and to Take Action's watchlist as a topic watch (`general:<topic>`, same
+  key as take-action's own). Stop following undoes exactly what Follow did
+  (`manifesto.digFollowed`). Followed topics are chips above RECENT; Take
+  Action's watch card shows the saved status with its age.
+- Layout check: new `dig-topic` page with sample answers (no AI spend);
+  DIG's 10–10.5px labels, timestamps and stance tags raised to 11.5px.

@@ -253,14 +253,14 @@
 
   .wd-timestamp {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 11.5px;
     color: var(--paper-dim);
   }
 
   .wd-stance-tag {
     display: inline-block;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px;
+    font-size: 11.5px;
     letter-spacing: 0.05em;
     color: var(--rust);
     border: 1px solid var(--rust);
@@ -710,6 +710,57 @@
   }
   .wd-delete-btn:hover { background: var(--rust); color: var(--paper); }
 
+  /* "Where it stands": a neutral status of the topic itself, above the
+     per-source cards, with its age, sources, Refresh and Follow. */
+  .wd-status {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    display: grid;
+    gap: 10px;
+  }
+  .wd-status-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+  .wd-status-label, .wd-status-age, .wd-status-row b {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+  }
+  .wd-status-label { color: var(--amber); }
+  .wd-status-age { color: var(--paper-dim); }
+  .wd-status-now { font-size: 15px; line-height: 1.55; margin: 0; }
+  .wd-status-row { font-size: 14px; line-height: 1.5; margin: 0; }
+  .wd-status-row b { display: block; color: var(--paper-dim); font-weight: 500; margin-bottom: 2px; }
+  .wd-status-changed { border-left: 2px solid var(--amber); padding-left: 10px; }
+  .wd-status-sources { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; }
+  .wd-status-sources a { color: var(--teal); display: inline-flex; align-items: center; min-height: 40px; overflow-wrap: anywhere; }
+  .wd-status-note { font-size: 12.5px; color: var(--paper-dim); margin: 0; }
+  .wd-status-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .wd-small-btn {
+    background: none;
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    border-radius: 3px;
+    padding: 0 14px;
+    min-height: 40px;
+    cursor: pointer;
+  }
+  .wd-small-btn:disabled { opacity: 0.5; cursor: default; }
+  .wd-small-btn.wd-primary { background: var(--teal); color: var(--bg); }
+  .wd-follow-note { font-size: 13.5px; line-height: 1.5; color: var(--paper-dim); margin: 0; }
+  .wd-follow-note strong { color: var(--paper); font-weight: 600; }
+
+  /* How a source's take compares with the last time it was checked */
+  .wd-change { font-size: 13.5px; line-height: 1.45; color: var(--paper-dim); margin: 2px 0 10px; }
+  .wd-change-shifted { color: var(--paper); border-left: 2px solid var(--amber); padding-left: 8px; }
+  .wd-change b { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: 0.05em; color: var(--amber); font-weight: 500; margin-right: 6px; }
+  .wd-change-before { display: block; color: var(--paper-dim); margin-top: 2px; }
+  .wd-toolbar-right { display: flex; flex-wrap: wrap; gap: 8px; }
+
   /* Recent-topics quick-repeat chips */
   .wd-recent-topics {
     display: flex;
@@ -719,7 +770,7 @@
   }
   .wd-recent-topics-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 11.5px;
     color: var(--paper-dim);
     letter-spacing: 0.04em;
     align-self: center;
@@ -1324,6 +1375,7 @@
     .wd-view-btn { flex: 1; text-align: center; }
     .wd-table-sortbar { justify-content: space-between; }
     .wd-focus-btn { width: 100%; text-align: center; }
+    .wd-toolbar-right { flex-direction: column; }
 
     .wd-table { font-size: 12px; }
     .wd-table th, .wd-table td { padding: 8px 10px; }
@@ -1468,10 +1520,12 @@
       </div>
       <span class="wd-cursor"></span>
     </div>
+    <div class="wd-recent-topics" id="wd-following-topics" style="display:none;"></div>
     <div class="wd-recent-topics" id="wd-recent-topics" style="display:none;"></div>
     <button class="wd-run-btn" id="wd-run-btn">CHECK STANCE ACROSS SOURCES</button>
 
     <div id="wd-flag-area"></div>
+    <div class="wd-status" id="wd-status" style="display:none;" aria-live="polite"></div>
     <div class="wd-wait-splash" id="wd-wait-splash" style="display:none;"></div>
 
     <div class="wd-results-toolbar" id="wd-results-toolbar" style="display:none;">
@@ -1488,7 +1542,10 @@
           </div>
         </div>
       </div>
-      <button class="wd-focus-btn" id="wd-focus-btn">⛶ FOCUS MODE</button>
+      <div class="wd-toolbar-right">
+        <button class="wd-focus-btn" id="wd-refresh-all-btn" title="Check every source again, and where it stands, and compare with what was saved">↻ REFRESH ALL</button>
+        <button class="wd-focus-btn" id="wd-focus-btn">⛶ FOCUS MODE</button>
+      </div>
     </div>
 
     <div class="wd-grid" id="wd-grid"></div>
@@ -1807,6 +1864,9 @@
   const clearHistoryBtn = document.getElementById('wd-clear-history-btn');
   const deleteEverythingBtn = document.getElementById('wd-delete-everything-btn');
   const recentTopicsEl = document.getElementById('wd-recent-topics');
+  const followingTopicsEl = document.getElementById('wd-following-topics');
+  const statusEl = document.getElementById('wd-status');
+  const refreshAllBtn = document.getElementById('wd-refresh-all-btn');
   const statsBody = document.getElementById('wd-stats-body');
   const onboardEl = document.getElementById('wd-onboard');
   const appEl = document.getElementById('wd-app');
@@ -1982,6 +2042,7 @@
     renderSourceEditor();
     renderEmptyGrid();
     renderRecentTopics();
+    renderFollowingTopics();
 
     // A caller (e.g. the inbox's "Send to DIG") can hand off a topic via
     // ?topic=..., landing here whether a profile already existed or this
@@ -1989,6 +2050,8 @@
     // auto-runs the check, since that spends real API budget.
     if (pendingTopicFromQuery) {
       topicInput.value = pendingTopicFromQuery;
+      // A saved "where it stands" shows right away (no new AI call).
+      if (getStatus(pendingTopicFromQuery)) showStatusFor(pendingTopicFromQuery);
       pendingTopicFromQuery = '';
       topicInput.focus();
     }
@@ -2360,8 +2423,8 @@
     `;
   }
 
-  function updateCard(name, { stance, summary, error, timestamp, cached, savedAt }) {
-    resultsState[name] = { stance, summary, error, timestamp, cached };
+  function updateCard(name, { stance, summary, error, timestamp, cached, savedAt, change }) {
+    resultsState[name] = { stance, summary, error, timestamp, cached, change };
 
     const card = grid.querySelector(`.wd-card[data-source="${cssEscape(name)}"]`);
     if (card) {
@@ -2387,6 +2450,7 @@
             <span class="wd-timestamp">${timeLabel}</span>
           </div>
           ${stance ? `<div class="wd-stance-tag">${escapeHtml(stance)}</div>` : ''}
+          ${changeHtml(change)}
           <div class="wd-summary wd-summary-brief">${escapeHtml(preview)}</div>
           ${truncated ? `
             <div class="wd-summary wd-summary-full">${escapeHtml(summary)}</div>
@@ -2645,14 +2709,67 @@
     return String(s).replace(/(["\\])/g, '\\$1');
   }
 
+  // CHANGE (19 Nov 2026) is only asked for when there's an earlier result
+  // to compare with; it comes last, so the summary stops where it starts.
   function parseResponseText(text) {
     let stance = '';
-    let summary = text.trim();
+    let summary = text.replace(/\n\s*CHANGE:[\s\S]*$/i, '').trim();
+    let change = '';
     const stanceMatch = text.match(/STANCE:\s*(.+)/i);
-    const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
+    const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+?)(?=\n\s*CHANGE:|$)/i);
+    const changeMatch = text.match(/(?:^|\n)\s*CHANGE:\s*([\s\S]+)/i);
     if (stanceMatch) stance = stanceMatch[1].split('\n')[0].trim();
     if (summaryMatch) summary = summaryMatch[1].trim();
-    return { stance, summary };
+    if (changeMatch) change = changeMatch[1].replace(/\s+/g, ' ').trim();
+    return { stance, summary, change };
+  }
+
+  // "SAME" or "SHIFTED: <what changed>" -> what the card shows, with the
+  // date and stance it was compared against. Anything else is dropped
+  // rather than guessed at.
+  function describeChange(change, prior) {
+    if (!change || !prior) return null;
+    const base = { since: prior.savedAt, before: prior.stance || '' };
+    if (/^same\b/i.test(change)) return { kind: 'same', text: '', ...base };
+    const m = /^shifted\b[\s:.,\u2014-]*(.*)$/i.exec(change);
+    if (m) return { kind: 'shifted', text: m[1].trim(), ...base };
+    return null;
+  }
+
+  function shortDate(ts) {
+    const d = new Date(ts);
+    if (d.toDateString() === new Date().toDateString()) return 'earlier today';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  function changeHtml(c) {
+    if (!c) return '';
+    const when = shortDate(c.since);
+    if (c.kind === 'same') return `<div class="wd-change">Same take as ${escapeHtml(when)}</div>`;
+    return `<div class="wd-change wd-change-shifted"><b>SHIFTED SINCE ${escapeHtml(when.toUpperCase())}</b>${escapeHtml(c.text || '')}${c.before ? `<span class="wd-change-before">Before: ${escapeHtml(c.before)}</span>` : ''}</div>`;
+  }
+
+  // Pulls "NAME: value" fields out of a plain-text reply; a value runs
+  // until the next listed field or the end, with whitespace collapsed.
+  function parseFields(text, names) {
+    const alt = names.join('|');
+    const re = new RegExp(`^[ \\t]*(${alt}):[ \\t]*([\\s\\S]*?)(?=^[ \\t]*(?:${alt}):|(?![\\s\\S]))`, 'gim');
+    const out = {};
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const k = m[1].toUpperCase();
+      if (!(k in out)) out[k] = m[2].replace(/\s+/g, ' ').trim();
+    }
+    return out;
+  }
+
+  function parseStatusText(text) {
+    const f = parseFields(text, ['NOW', 'LATEST', 'NEXT', 'CHANGED', 'SOURCE']);
+    const sources = parsePointList(text, 'SOURCE')
+      .map(u => u.replace(/[<>()\[\]]/g, '').split(/\s+/)[0])
+      .filter(u => /^https?:\/\/[^\s]+$/i.test(u))
+      .slice(0, 3);
+    return { now: f.NOW || '', latest: f.LATEST || '', next: f.NEXT || '', changed: f.CHANGED || '', sources };
   }
 
   // Extracts a "PREFIX: <item>" list from freeform model text — used for
@@ -2688,11 +2805,15 @@
   // Wraps the raw API call with retry + backoff for rate limits and
   // transient/network errors, and turns opaque low-level errors into
   // something a person can actually read.
-  async function checkSourceWithRetry(src, topic, maxAttempts = 4) {
+  async function checkSourceWithRetry(src, topic, prior) {
+    return withRetry(() => checkSource(src, topic, prior));
+  }
+
+  async function withRetry(fn, maxAttempts = 4) {
     let lastErr;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await checkSource(src, topic);
+        return await fn();
       } catch (e) {
         lastErr = e;
         const isRateLimit = e.status === 429;
@@ -2706,8 +2827,8 @@
     throw lastErr;
   }
 
-  async function checkSource(src, topic) {
-    const prompt = `You are tracking how a specific independent commentator or outlet is covering a news topic, for a media-monitoring tool.
+  async function checkSource(src, topic, prior) {
+    let prompt = `You are tracking how a specific independent commentator or outlet is covering a news topic, for a media-monitoring tool.
 
 Source: ${src.name}${src.hint ? ` (find via: ${src.hint})` : ''}
 Topic: ${topic}
@@ -2720,7 +2841,22 @@ STANCE: <a short tag of 8 words or fewer capturing their core framing or positio
 SUMMARY: <2-3 sentences, in your own words, on how they've covered it and what they emphasize — mention a specific piece, episode, or interview if you found one>
 
 Only use STANCE: "no coverage found" if you've genuinely searched multiple angles (their own outlet AND guest appearances elsewhere) and still found nothing — not just because the first search came up empty.`;
+    if (prior) prompt += `
 
+Earlier (${new Date(prior.savedAt).toDateString()}) this tool recorded for this source and topic:
+STANCE: ${prior.stance || 'none'}
+SUMMARY: ${prior.summary || 'none'}
+
+After your two lines, add a third line comparing their position now with that earlier record:
+CHANGE: SAME   (their core position and framing are essentially unchanged; different wording doesn't count)
+or
+CHANGE: SHIFTED: <one sentence on how their take has changed, or what new coverage changes the picture>`;
+    return parseResponseText(await callDig(prompt, 'dig_check'));
+  }
+
+  // The shared call to /api/dig-check (server holds the key, adds web
+  // search, enforces the daily caps); returns the reply's text.
+  async function callDig(prompt, feature) {
     let response;
     try {
       // Self-hosted build: calls our own Netlify function, which holds the
@@ -2728,7 +2864,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       response = await fetch("/api/dig-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, feature: 'dig_check' })
+        body: JSON.stringify({ prompt, feature })
       });
     } catch (networkErr) {
       const err = new Error('network hiccup — retrying');
@@ -2785,7 +2921,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
       .trim();
 
     if (!text) throw new Error('empty response');
-    return parseResponseText(text);
+    return text;
   }
 
   // Runs work with a concurrency cap so a big source list doesn't fire
@@ -2805,10 +2941,14 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
 
   async function runOne(src) {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const topic = currentTopic;
+    const prior = getPriorStance(topic, src.name);
     try {
-      const { stance, summary } = await checkSourceWithRetry(src, currentTopic);
-      setCachedResult(currentTopic, src.name, { stance, summary, timestamp });
-      updateCard(src.name, { stance, summary, timestamp });
+      const { stance, summary, change: changeText } = await checkSourceWithRetry(src, topic, prior);
+      const change = describeChange(changeText, prior);
+      setCachedResult(topic, src.name, { stance, summary, timestamp, change });
+      recordStance(topic, src.name, { stance, summary });
+      updateCard(src.name, { stance, summary, timestamp, change });
       postFunctionStat('dig_check');
     } catch (e) {
       updateCard(src.name, { error: e.message || 'request failed', timestamp });
@@ -2829,7 +2969,10 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     await runOne(src);
   }
 
-  async function runCheck() {
+  // opts.force (REFRESH ALL): ignore the 24h cache and check every source,
+  // and where it stands, again.
+  async function runCheck(opts) {
+    const force = !!(opts && opts.force === true);
     // If the box is empty, fall back to whatever trending topic is
     // currently showing as ghost text — "hit enter and go" should work
     // even if nothing was typed.
@@ -2837,6 +2980,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (!topic) { topicInput.focus(); return; }
     if (!topicInput.value.trim()) topicInput.value = topic;
     trendingGhostEl.classList.remove('wd-ghost-visible');
+    refreshStatus(topic, force);
     if (!sources.length) {
       grid.innerHTML = `<div class="wd-empty">Add at least one source first.</div>`;
       return;
@@ -2861,9 +3005,9 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     // need one.
     const toFetch = [];
     sources.forEach(src => {
-      const cached = getCachedResult(currentTopic, src.name);
+      const cached = force ? null : getCachedResult(currentTopic, src.name);
       if (cached) {
-        updateCard(src.name, { stance: cached.stance, summary: cached.summary, timestamp: cached.timestamp, cached: true, savedAt: cached.savedAt });
+        updateCard(src.name, { stance: cached.stance, summary: cached.summary, timestamp: cached.timestamp, cached: true, savedAt: cached.savedAt, change: cached.change });
       } else {
         toFetch.push(src);
       }
@@ -2885,7 +3029,12 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (digMode() === 'citizen') openFocus(0);
   }
 
-  runBtn.addEventListener('click', runCheck);
+  runBtn.addEventListener('click', () => runCheck());
+  refreshAllBtn.addEventListener('click', () => {
+    if (!currentTopic || runBtn.disabled) return;
+    topicInput.value = currentTopic;
+    runCheck({ force: true });
+  });
   topicInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') runCheck();
   });
@@ -2949,6 +3098,264 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
     if (!resultsCache[topic]) resultsCache[topic] = {};
     resultsCache[topic][name] = { ...result, savedAt: Date.now() };
     saveResultsCache();
+  }
+
+  function topicKey(t) { return String(t || '').trim().toLowerCase(); }
+
+  // ---- Stance history: what changed since last time (19 Nov 2026) ----
+  // The 24h result cache forgets; this keeps the last result per source
+  // and topic (on this device, for a year) so the next check can be asked
+  // to compare, and a card can say "Same take as Oct 3" or "Shifted".
+  const STANCE_HISTORY_KEY = 'dig-stance-history';
+  const STANCE_HISTORY_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+  const STANCE_HISTORY_MAX_TOPICS = 80;
+  function loadStanceHistory() {
+    try { return JSON.parse(localStorage.getItem(STANCE_HISTORY_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function getPriorStance(topic, name) {
+    const bucket = loadStanceHistory()[topicKey(topic)];
+    const entry = bucket && bucket[name];
+    if (!entry || (Date.now() - (entry.savedAt || 0)) > STANCE_HISTORY_MAX_AGE_MS) return null;
+    return entry;
+  }
+  function recordStance(topic, name, { stance, summary }) {
+    const all = loadStanceHistory();
+    const k = topicKey(topic);
+    all[k] = all[k] || {};
+    all[k][name] = { stance, summary, savedAt: Date.now() };
+    const newest = b => Math.max(0, ...Object.values(b).map(e => e.savedAt || 0));
+    const keys = Object.keys(all).sort((a, b) => newest(all[b]) - newest(all[a]));
+    keys.slice(STANCE_HISTORY_MAX_TOPICS).forEach(x => delete all[x]);
+    try { localStorage.setItem(STANCE_HISTORY_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+
+  // ---- "Where it stands" (19 Nov 2026) ----
+  // Source cards say how commentators frame a topic; this says where the
+  // topic itself stands (the bill, rule or case at its center, what just
+  // happened, what's next), with sources, its age and its own Refresh.
+  // Saved per topic on this device; refreshed when over a day old, and
+  // the previous one is passed back so it can say what changed since.
+  // Take Action reads the same key to show it on a followed topic.
+  const STATUS_KEY = 'dig-status-cache';
+  const STATUS_FRESH_MS = 24 * 60 * 60 * 1000;
+  const STATUS_MAX_TOPICS = 60;
+  let statusTopic = '';
+  let statusLoading = false;
+  let statusError = '';
+  let statusRun = 0;
+  let followNote = '';
+
+  function loadStatusCache() {
+    try { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function getStatus(topic) {
+    return loadStatusCache()[topicKey(topic)] || null;
+  }
+  function saveStatus(topic, entry) {
+    const all = loadStatusCache();
+    all[topicKey(topic)] = entry;
+    const keys = Object.keys(all).filter(k => !isFollowing(k));
+    if (Object.keys(all).length > STATUS_MAX_TOPICS) {
+      keys.sort((a, b) => (all[a].savedAt || 0) - (all[b].savedAt || 0))
+        .slice(0, Object.keys(all).length - STATUS_MAX_TOPICS)
+        .forEach(k => delete all[k]);
+    }
+    try { localStorage.setItem(STATUS_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+
+  function statusPrompt(topic, prev) {
+    return `You are writing a short, neutral status check on a public-policy topic for a civic engagement app. A citizen wants to know where things stand right now. Today is ${new Date().toDateString()}.
+
+Topic: ${topic}
+
+Search the web for the most recent factual developments. Work out whether a specific bill, regulation, court case, ballot measure or executive action is at the center of it, and what stage it is at. Stay strictly factual and nonpartisan: describe what is happening and who decides next, not who is right. Plain words, no jargon.
+
+Respond in exactly this plain-text format, no markdown:
+
+NOW: <two or three sentences on where it stands right now: name the specific measure or case if there is one, its stage, and who acts next>
+LATEST: <the most recent concrete development, with its date>
+NEXT: <the next scheduled or expected step and when, or "Nothing scheduled yet">
+${prev ? `CHANGED: <compared with this earlier status from ${new Date(prev.savedAt).toDateString()}: "${prev.now}" — one sentence on what has changed since, or "Nothing significant">
+` : ''}SOURCE: <the URL of a page you relied on>
+SOURCE: <another URL, up to three in all>`;
+  }
+
+  async function refreshStatus(topic, force) {
+    const run = ++statusRun;
+    statusTopic = topic;
+    statusError = '';
+    followNote = '';
+    const prev = getStatus(topic);
+    if (prev && !force && (Date.now() - (prev.savedAt || 0)) < STATUS_FRESH_MS) {
+      statusLoading = false;
+      renderStatus();
+      return;
+    }
+    statusLoading = true;
+    renderStatus();
+    try {
+      const parsed = parseStatusText(await withRetry(() => callDig(statusPrompt(topic, prev), 'dig_status')));
+      if (!parsed.now) throw new Error('no summary came back');
+      saveStatus(topic, { topic, ...parsed, changed: prev ? parsed.changed : '', prevSavedAt: prev ? prev.savedAt : null, savedAt: Date.now() });
+      postFunctionStat('dig_status');
+    } catch (e) {
+      if (run === statusRun) statusError = e.message || 'request failed';
+    }
+    if (run !== statusRun) return; // a newer topic took over meanwhile
+    statusLoading = false;
+    renderStatus();
+  }
+
+  function showStatusFor(topic) {
+    statusTopic = topic;
+    statusLoading = false;
+    statusError = '';
+    renderStatus();
+  }
+
+  function renderStatus() {
+    if (!statusTopic) { statusEl.style.display = 'none'; statusEl.innerHTML = ''; return; }
+    const st = getStatus(statusTopic);
+    const following = isFollowing(statusTopic);
+    const age = statusLoading ? (st ? 'refreshing…' : 'checking…') : (st ? cachedAgeLabel(st.savedAt) : '');
+    let body = '';
+    if (st) {
+      const changed = st.changed && !/^nothing significant/i.test(st.changed) && st.prevSavedAt
+        ? `<p class="wd-status-row wd-status-changed"><b>SINCE ${escapeHtml(shortDate(st.prevSavedAt).toUpperCase())}</b>${escapeHtml(st.changed)}</p>` : '';
+      body = `<p class="wd-status-now">${escapeHtml(st.now)}</p>
+        ${changed}
+        ${st.latest ? `<p class="wd-status-row"><b>LATEST</b>${escapeHtml(st.latest)}</p>` : ''}
+        ${st.next ? `<p class="wd-status-row"><b>NEXT</b>${escapeHtml(st.next)}</p>` : ''}
+        ${(st.sources || []).length ? `<div class="wd-status-sources">${st.sources.map(u => `<a href="${escapeAttr(u)}" target="_blank" rel="noopener">${escapeHtml(hostOf(u))} ↗</a>`).join('')}</div>` : ''}
+        <p class="wd-status-note">An AI summary of a web search. Check the sources before you act on it.</p>`;
+    } else if (statusLoading) {
+      body = `<p class="wd-status-row wd-dim">Checking where this stands…</p>`;
+    }
+    if (statusError) body += `<p class="wd-status-row wd-dim">Couldn't ${st ? 'refresh' : 'check'} where this stands: ${escapeHtml(statusError)}</p>`;
+    const followBtn = following
+      ? `<button type="button" class="wd-small-btn" data-status-unfollow>Stop following</button>`
+      : `<button type="button" class="wd-small-btn wd-primary" data-status-follow>Follow this</button>`;
+    const note = followNote || (following ? `Following. It's on your Take Action watchlist.` : '');
+    statusEl.innerHTML = `
+      <div class="wd-status-head"><span class="wd-status-label">WHERE IT STANDS</span><span class="wd-status-age">${escapeHtml(age)}</span></div>
+      ${body}
+      <div class="wd-status-actions">
+        ${followBtn}
+        <button type="button" class="wd-small-btn" data-status-refresh ${statusLoading ? 'disabled' : ''}>↻ Refresh</button>
+      </div>
+      ${note ? `<p class="wd-follow-note">${note}</p>` : ''}`;
+    statusEl.style.display = 'grid';
+  }
+
+  function hostOf(u) {
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return 'source'; }
+  }
+
+  statusEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-status-refresh]')) { refreshStatus(statusTopic, true); return; }
+    if (e.target.closest('[data-status-follow]')) {
+      const rec = followTopic(statusTopic);
+      followNote = rec.added
+        ? `Following. Added to your manifesto and your Take Action watchlist: <strong>${escapeHtml(statusTopic)}</strong>.`
+        : `Following. Raised in your manifesto and added to your Take Action watchlist: <strong>${escapeHtml(statusTopic)}</strong>.`;
+      renderStatus();
+      renderFollowingTopics();
+      return;
+    }
+    if (e.target.closest('[data-status-unfollow]')) {
+      unfollowTopic(statusTopic);
+      followNote = `Not following. It's off your watchlist, and anything Follow changed in your manifesto is undone.`;
+      renderStatus();
+      renderFollowingTopics();
+    }
+  });
+
+  // ---- Follow: the fast track (19 Nov 2026) ----
+  // "I have something in mind" to tracking it, without a manifesto build.
+  // One tap adds the topic to the manifesto (or raises it a notch if it's
+  // already there) and to Take Action's watchlist as a topic watch. Stop
+  // following undoes exactly what Follow did, recorded per topic in
+  // manifesto.digFollowed. The watch key matches take-action.html's
+  // watchKeyForGeneral().
+  function saveManifesto(m) {
+    m.rev = (m.rev || 0) + 1;
+    m.updated = Date.now();
+    try { localStorage.setItem(MANIFESTO_KEY, JSON.stringify(m)); } catch (e) {}
+    if (window.CivixPush && window.CivixPush.resync) window.CivixPush.resync();
+  }
+  function slug(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+  function followedWatches() {
+    const m = loadManifesto();
+    return ((m && m.watching) || []).filter(w => w.kind === 'general' && w.title);
+  }
+  function isFollowing(topic) {
+    const k = topicKey(topic);
+    return followedWatches().some(w => topicKey(w.title) === k);
+  }
+  function followTopic(topic) {
+    const m = loadManifesto() || {};
+    m.issues = m.issues || [];
+    m.watching = m.watching || [];
+    m.digFollowed = m.digFollowed || {};
+    const k = topicKey(topic);
+    const id = slug(topic);
+    const existing = m.issues.find(i => i.id === id || topicKey(i.name) === k);
+    let rec;
+    if (existing) {
+      rec = { id: existing.id, added: false, prevWeight: existing.weight || 1 };
+      existing.weight = Math.min(3, (existing.weight || 1) + 1);
+    } else {
+      m.issues.push({ id, name: topic, weight: 2, stance: '' });
+      rec = { id, added: true };
+    }
+    if (!m.watching.some(w => w.kind === 'general' && topicKey(w.title) === k)) {
+      m.watching.push({ key: 'general:' + topic, kind: 'general', title: topic, addedAt: Date.now(), from: 'dig' });
+    }
+    m.digFollowed[k] = rec;
+    m.log = m.log || [];
+    m.log.unshift({ at: Date.now(), kind: 'add', text: topic + ' (followed in DIG)' });
+    m.log.length = Math.min(m.log.length, 40);
+    saveManifesto(m);
+    return rec;
+  }
+  function unfollowTopic(topic) {
+    const m = loadManifesto();
+    if (!m) return;
+    const k = topicKey(topic);
+    m.watching = (m.watching || []).filter(w => !(w.kind === 'general' && topicKey(w.title) === k));
+    const rec = m.digFollowed && m.digFollowed[k];
+    if (rec) {
+      const iss = (m.issues || []).find(i => i.id === rec.id);
+      if (iss) {
+        if (rec.added) m.issues = m.issues.filter(i => i.id !== rec.id);
+        else iss.weight = rec.prevWeight;
+      }
+      delete m.digFollowed[k];
+    }
+    saveManifesto(m);
+  }
+
+  // Followed topics as chips above RECENT: tap to revisit. Sources checked
+  // in the last day answer from cache; anything older is checked again and
+  // compared with what was saved.
+  function renderFollowingTopics() {
+    const list = followedWatches();
+    if (!list.length) {
+      followingTopicsEl.style.display = 'none';
+      followingTopicsEl.innerHTML = '';
+      return;
+    }
+    followingTopicsEl.innerHTML = `<span class="wd-recent-topics-label">FOLLOWING:</span>` +
+      list.map(w => `<button class="wd-recent-topic-chip" data-topic="${escapeAttr(w.title)}">${escapeHtml(w.title)}</button>`).join('');
+    followingTopicsEl.style.display = 'flex';
+    followingTopicsEl.querySelectorAll('[data-topic]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        topicInput.value = chip.dataset.topic;
+        runCheck();
+      });
+    });
   }
 
   // ---- Topic history (recent-topic chips + PROFILE panel) ----
@@ -3214,6 +3621,7 @@ Only use STANCE: "no coverage found" if you've genuinely searched multiple angle
         </div>
         ${trustHtml}
         ${stanceHtml}
+        ${r && !r.error ? changeHtml(r.change) : ''}
         ${summaryHtml}
         ${stanceCompareHtml}
         <div class="wd-debate-points" id="wd-debate-points" style="display:none;"></div>
