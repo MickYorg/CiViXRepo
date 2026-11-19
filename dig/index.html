@@ -2758,7 +2758,8 @@
     let m;
     while ((m = re.exec(text)) !== null) {
       const k = m[1].toUpperCase();
-      if (!(k in out)) out[k] = m[2].replace(/\s+/g, ' ').trim();
+      // Web-search citations are stripped from the text, leaving "weeks ."
+      if (!(k in out)) out[k] = m[2].replace(/\s+/g, ' ').replace(/ ([.,;:])/g, '$1').trim();
     }
     return out;
   }

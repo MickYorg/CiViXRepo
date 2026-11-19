@@ -42,7 +42,7 @@ test('where it stands: fields, multi-line values, and only real URLs as sources 
     'NOW: The House passed H.R. 8800.',
     'The Senate returns Nov 9.',
     'LATEST: Jul 22: House vote, 216-212.',
-    'NEXT: Lame-duck session.',
+    'NEXT: Lame-duck session .',
     'CHANGED: Nothing significant',
     'SOURCE: https://www.congress.gov/bill/119th-congress/house-bill/8800',
     'SOURCE: not a url',
