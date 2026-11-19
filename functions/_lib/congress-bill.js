@@ -56,7 +56,15 @@ const STATUS_PATTERNS = [
   // 24 Sep 2026: this used to require "referred to the committee", so the
   // House's standard "Referred to the House Committee on …" (and hearings /
   // markups) fell through to 'Introduced' — ~40% of live bills mislabeled.
-  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
+  // 18 Nov 2026: a sponsorship-reassignment housekeeping motion ("Mr. Fong
+  // asked unanimous consent that he may hereafter be considered as the
+  // first sponsor of H.R. 5617 … for the purpose of adding cosponsors and
+  // requesting reprintings") says nothing about stage and matched no
+  // pattern above, so it also fell through to 'Introduced' even though its
+  // "Agreed to without objection" made that look like passage. A bill is
+  // referred to committee the same day it's introduced, so 'In Committee'
+  // is the honest floor for this housekeeping text, not 'Introduced'.
+  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration|asked unanimous consent.*(first sponsor|requesting reprinting)/i }
 ];
 function deriveStatus(latestActionText) {
   const text = latestActionText || '';
