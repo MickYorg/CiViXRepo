@@ -66,6 +66,18 @@ function deriveStatus(latestActionText) {
   return 'Introduced';
 }
 
+// Some latestAction text is purely administrative — who gets credited as
+// sponsor, a clerical reprint request — and says nothing about the bill's
+// own stage, even though it contains words ("agreed to") that look like
+// progress to the live smoke test's looser checker. Found 3 Nov 2026:
+// H.R. 1522's latest action was congress.gov reassigning first sponsorship,
+// correctly left as 'Introduced' by deriveStatus() above but flagged as a
+// false positive by the live test until it started excluding this.
+const ADMINISTRATIVE_ACTION_RE = /^ASSUMING FIRST SPONSORSHIP\b/i;
+function isAdministrativeAction(latestActionText) {
+  return ADMINISTRATIVE_ACTION_RE.test(latestActionText || '');
+}
+
 function slim(bill) {
   return {
     congress: bill.congress,
@@ -79,4 +91,4 @@ function slim(bill) {
   };
 }
 
-export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, slim };
+export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, isAdministrativeAction, slim };
