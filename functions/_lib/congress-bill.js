@@ -66,6 +66,19 @@ function deriveStatus(latestActionText) {
   return 'Introduced';
 }
 
+// A looser cross-check than STATUS_PATTERNS, used by the live smoke test:
+// did deriveStatus's specific patterns miss a real status change the latest
+// action's text describes? Excludes sponsor-reassignment housekeeping
+// ("...asked unanimous consent that he may hereafter be considered as the
+// first sponsor... Agreed to without objection"), which mentions "agreed to"
+// but isn't a status change — found live, 17 Nov 2026.
+function looksMislabeledIntroduced(status, latestActionText) {
+  const text = latestActionText || '';
+  if (status !== 'Introduced') return false;
+  if (/first sponsor/i.test(text)) return false;
+  return /referred to|placed on|agreed to/i.test(text);
+}
+
 function slim(bill) {
   return {
     congress: bill.congress,
@@ -79,4 +92,4 @@ function slim(bill) {
   };
 }
 
-export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, slim };
+export { TYPE_SLUG, ordinal, publicUrl, STATUS_PATTERNS, deriveStatus, looksMislabeledIntroduced, slim };
