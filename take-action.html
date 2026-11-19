@@ -744,6 +744,9 @@
   }
   .watch-toggle:hover { border-color: var(--paper-dim); }
   .watch-toggle.is-on { background: var(--amber-wash); border-color: var(--amber); color: var(--amber-ink); }
+  .watch-status { font-size: 14px; line-height: 1.5; color: var(--paper); margin: 6px 0 10px; }
+  .watch-status-label { display: block; font-size: 11.5px; letter-spacing: 0.04em; color: var(--paper-dim); margin-bottom: 2px; }
+  .watch-status-next { display: block; color: var(--paper-dim); margin-top: 4px; }
   .watch-note { font-size: 11.5px; color: var(--paper-dim); line-height: 1.5; margin-top: 8px; }
   .watch-test { border: 1px dashed var(--amber); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
   .watch-test-msg { margin-top: 8px; color: var(--paper); }
@@ -1407,16 +1410,35 @@
         </div>`;
     }
 
+    const st = w.kind === 'general' ? digStatusFor(w.title) : null;
     return `
       <div class="card${w.won ? ' watch-win' : ''}">
         ${winBanner}
         <div class="card-top"><span class="card-synopsis">${esc(w.title)}</span></div>
+        ${st ? `<p class="watch-status"><span class="watch-status-label">Where it stands &middot; checked ${esc(agoText(st.savedAt))}</span>${esc(st.now)}${st.next ? ` <span class="watch-status-next">Next: ${esc(st.next)}</span>` : ''}</p>` : ''}
         ${updatedBadge}
         <div class="card-cta-row">
           ${w.url ? `<a class="btn" href="${esc(w.url)}" target="_blank" rel="noopener">View &#8599;</a>` : ''}
           ${digBtn}${unwatchBtn}
         </div>
       </div>`;
+  }
+
+  // A followed topic (a 'general' watch) shows DIG's saved "where it
+  // stands" for it (dig/index.html, same-origin localStorage), with its age.
+  // DIG refreshes it; this only reads.
+  function digStatusFor(topic) {
+    try {
+      const all = JSON.parse(localStorage.getItem('dig-status-cache')) || {};
+      const st = all[String(topic || '').trim().toLowerCase()];
+      return st && st.now ? st : null;
+    } catch (e) { return null; }
+  }
+  function agoText(ts) {
+    const mins = Math.round((Date.now() - (ts || 0)) / 60000);
+    if (mins < 60) return mins < 1 ? 'just now' : mins + 'm ago';
+    const hours = Math.round(mins / 60);
+    return hours < 24 ? hours + 'h ago' : Math.round(hours / 24) + 'd ago';
   }
 
   // The push opt-in lives here, not on page load — asked for only when a

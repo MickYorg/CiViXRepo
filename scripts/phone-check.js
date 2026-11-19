@@ -99,6 +99,40 @@ const INBOX_SAMPLE = `(() => {
     : real(u, o);
 })()`;
 
+// DIG with a topic checked: "Where it stands", one followed topic, and
+// each source compared with an earlier check (every other one shifted). The
+// AI endpoint is answered with these, so no real spend.
+const DIG_SAMPLE = `(() => {
+  const topic = 'Child care costs';
+  try {
+    const p = JSON.parse(localStorage.getItem('civix-profile') || '{}');
+    p.watching = (p.watching || []).concat([{ key: 'general:' + topic, kind: 'general', title: topic, addedAt: Date.now() }]);
+    localStorage.setItem('civix-profile', JSON.stringify(p));
+    const hist = {}; hist[topic.toLowerCase()] = {};
+    (p.sources || []).forEach(s => { hist[topic.toLowerCase()][s.name] = { stance: 'Wants federal subsidies expanded', summary: 'Earlier coverage.', savedAt: Date.now() - 12 * 86400000 }; });
+    localStorage.setItem('dig-stance-history', JSON.stringify(hist));
+  } catch (e) {}
+  let n = 0;
+  const reply = (text) => Promise.resolve(new Response(JSON.stringify({ content: [{ type: 'text', text }] }), { headers: { 'content-type': 'application/json' } }));
+  const real = window.fetch;
+  window.fetch = (u, o) => {
+    if (String(u).includes('/api/platform-stats')) return Promise.resolve(new Response('{}'));
+    if (!String(u).includes('/api/dig-check')) return real(u, o);
+    const body = JSON.parse((o && o.body) || '{}');
+    if (body.feature === 'dig_status') return reply([
+      'NOW: The Child Care Affordability Act (H.R. 4120) is in the House Education and Workforce Committee, which has not scheduled a markup. Several states are expanding their own subsidy programs in the meantime.',
+      'LATEST: Oct 30: the committee held a hearing on provider shortages.',
+      'NEXT: No markup scheduled yet; the House returns in December.',
+      'SOURCE: https://www.congress.gov/bill/119th-congress/house-bill/4120',
+      'SOURCE: https://edworkforce.house.gov/',
+    ].join('\\n'));
+    // Alternate, so the screenshot shows both a shifted and an unchanged card.
+    const shifted = n++ % 2 === 0;
+    return reply('STANCE: Backs targeted tax credits, not subsidies\\nSUMMARY: Argued in a recent column that refundable credits reach more working parents than direct subsidies, citing a new state study.' +
+      (body.prompt.includes('Earlier (') ? (shifted ? '\\nCHANGE: SHIFTED: Now favors tax credits over the subsidy expansion she backed before.' : '\\nCHANGE: SAME') : ''));
+  };
+})()`;
+
 // state: 'new' = brand-new citizen (empty storage); otherwise a /dev/ persona.
 // wait: ms to let animations/fetches settle before the shot.
 const PAGES = [
@@ -121,6 +155,8 @@ const PAGES = [
   { name: 'take-action-inbox-push', url: '/take-action.html?sent=inbox1', state: 'medium', wait: 6000, beforeLoad: INBOX_SAMPLE, storage: { 'civix.token': 'layout-check' } },
   { name: 'calendar', url: '/calendar.html', state: 'medium', wait: 7000 },
   { name: 'dig', url: '/dig/index.html', state: 'medium', wait: 3000 },
+  { name: 'dig-topic', url: '/dig/index.html', state: 'medium', wait: 3000, beforeLoad: DIG_SAMPLE,
+    after: "document.getElementById('wd-topic-input').value = 'Child care costs'; document.getElementById('wd-run-btn').click()", afterWait: 2500 },
   { name: 'send-to-civix', url: '/send-to-civix.html', state: 'medium', wait: 3000 },
   { name: 'analytics', url: '/analytics.html', state: 'medium', wait: 3000 },
   { name: 'health', url: '/health.html', state: 'new', wait: 3000 },

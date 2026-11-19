@@ -262,5 +262,17 @@
   "tax-dollars-objected@iphone-16-pro-max": {
     "smallText": 0,
     "smallTap": 3
+  },
+  "dig-topic@iphone-se": {
+    "smallText": 4,
+    "smallTap": 0
+  },
+  "dig-topic@iphone-16": {
+    "smallText": 4,
+    "smallTap": 0
+  },
+  "dig-topic@iphone-16-pro-max": {
+    "smallText": 4,
+    "smallTap": 0
   }
 }

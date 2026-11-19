@@ -64,6 +64,13 @@ framework — deliberately, until there's real cross-page shared state):
 - `calendar.html` — multi-year strategy (`/api/strategic-plan`) plus
   hand-written contingency playbooks.
 - `dig/index.html` — DIG: stance-by-source checker, DEBATE talking points.
+  Also the fast track (19 Nov 2026): "Where it stands" per topic
+  (`dig_status`, saved in `dig-status-cache`, age + Refresh, says what
+  changed since the last one), each source compared with its last check
+  (`dig-stance-history`, a year: "Same take" / "Shifted since"), REFRESH
+  ALL, and Follow (topic into the manifesto + a Take Action topic watch,
+  undone exactly by Stop following; followed topics show as chips, and
+  Take Action shows their saved status).
 - `send-to-civix.html` — Send to CiViX how-to: iPhone share/Siri, a laptop
   bookmark button, paste box, email address; files incoming shares
   (Android / installed web app); a `#token` link makes another device
