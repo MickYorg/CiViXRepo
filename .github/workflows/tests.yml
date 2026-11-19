@@ -23,7 +23,11 @@ jobs:
       - run: node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./tests/helpers/gh-reporter.mjs --test-reporter-destination=stdout 'tests/unit/*.test.js'
 
   layout:
-    runs-on: ubuntu-latest
+    # Pinned off ubuntu-latest (6 Nov 2026: it rolled to ubuntu-26.04 and
+    # Chrome stopped starting there — spawns, then times out with no CDP
+    # port; evidence in docs/history.md). Unpin once that's confirmed fixed
+    # upstream.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

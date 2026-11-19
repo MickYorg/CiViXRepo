@@ -56,7 +56,15 @@ const STATUS_PATTERNS = [
   // 24 Sep 2026: this used to require "referred to the committee", so the
   // House's standard "Referred to the House Committee on …" (and hearings /
   // markups) fell through to 'Introduced' — ~40% of live bills mislabeled.
-  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
+  // 7 Nov 2026: a member reassigning themself as first sponsor ("asked
+  // unanimous consent that she may hereafter be considered as the first
+  // sponsor of H.R. ___ ... Agreed to without objection") is routine
+  // cosponsor bookkeeping, not a status change — but it only happens well
+  // after introduction, so it fell through to 'Introduced' too (recurring
+  // live-check failure, seen on H.R. 1114/1522/4213/5658). Every House bill
+  // is referred to committee the moment it's introduced, so 'In Committee'
+  // is the honest default here, not 'Introduced'.
+  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration|considered as the first sponsor|requesting reprintings pursuant to/i }
 ];
 function deriveStatus(latestActionText) {
   const text = latestActionText || '';
