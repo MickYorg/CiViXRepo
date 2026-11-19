@@ -18,11 +18,23 @@ async function getJSON(path, init) {
   return { status: r.status, body, headers: r.headers };
 }
 
+// A bill tagged 'Introduced' whose latest action text also says "agreed
+// to" etc. is a sign deriveStatus() missed real progress — except
+// "Assuming First Sponsorship" notices (one member taking over as a
+// bill's sponsor, for cosponsor/reprint bookkeeping) end in "Agreed to
+// without objection." too, and that's not the bill moving at all.
+// (13 Nov 2026: H.R.537 false-positived nightly CI on exactly this.)
+function looksMislabeledIntroduced(latestActionText) {
+  const text = latestActionText || '';
+  if (/first sponsor/i.test(text)) return false;
+  return /referred to|placed on|agreed to/i.test(text);
+}
+
 test('federal bills load, with a real status on every bill', async () => {
   const { status, body } = await getJSON('/api/calendar');
   assert.equal(status, 200, JSON.stringify(body).slice(0, 200));
   assert.ok(body.bills.length >= 20, `only ${body.bills.length} bills`);
-  const introduced = body.bills.filter((b) => b.status === 'Introduced' && /referred to|placed on|agreed to/i.test((b.latestAction || {}).text || ''));
+  const introduced = body.bills.filter((b) => b.status === 'Introduced' && looksMislabeledIntroduced((b.latestAction || {}).text));
   assert.equal(introduced.length, 0, `mislabeled 'Introduced': ${introduced.map((b) => b.latestAction.text).slice(0, 3).join(' | ')}`);
 });
 
