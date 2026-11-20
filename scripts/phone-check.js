@@ -191,18 +191,24 @@ const TYPES = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp4': 'video/mp4',
 };
 
+// Proxies /api/* to production so pages fill with real data. The upstream
+// request can error after its response already started piping into `res`
+// (a mid-stream network blip) — crashed the whole layout check on 19 Nov
+// 2026 when writeHead ran a second time after headers were already sent.
+function proxyApi(req, res, request = https.request) {
+  const up = request('https://mycivix.com' + req.url, {
+    method: req.method,
+    headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
+  }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
+  up.on('error', () => { if (res.headersSent) res.end(); else { res.writeHead(500); res.end('{}'); } });
+  req.pipe(up);
+  return up;
+}
+
 function serve() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
-      if (req.url.startsWith('/api/')) {
-        const up = https.request('https://mycivix.com' + req.url, {
-          method: req.method,
-          headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
-        }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
-        req.pipe(up);
-        return;
-      }
+      if (req.url.startsWith('/api/')) { proxyApi(req, res); return; }
       let p = decodeURIComponent(req.url.split('?')[0]);
       // An empty page on this origin to seed localStorage from (an empty
       // 404 would become Chrome's own error page, on a different origin).
@@ -383,6 +389,9 @@ async function shoot(cdp, page, phone, personas) {
   return result.value;
 }
 
+module.exports = { proxyApi };
+
+if (require.main === module)
 (async () => {
   const args = process.argv.slice(2);
   const filter = args.find((a) => !a.startsWith('--'));
