@@ -40,6 +40,7 @@ test('bill status is read from the latest action text', async () => {
   // Real latestAction phrasings from congress.gov that were mislabeled
   // 'Introduced' until 24 Sep 2026:
   assert.equal(deriveStatus('Referred to the House Committee on Oversight and Government Reform.'), 'In Committee');
+  assert.equal(deriveStatus('Read twice and referred to the Select Committee on Intelligence.'), 'In Committee');
   assert.equal(deriveStatus('Subcommittee Hearings Held'), 'In Committee');
   assert.equal(deriveStatus('Submitted in the Senate, considered, and agreed to without amendment and with a preamble by Unanimous Consent.'), 'Passed Senate');
   assert.equal(deriveStatus('Resolution agreed to in Senate without amendment by Unanimous Consent.'), 'Passed Senate');
