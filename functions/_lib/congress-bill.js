@@ -56,7 +56,10 @@ const STATUS_PATTERNS = [
   // 24 Sep 2026: this used to require "referred to the committee", so the
   // House's standard "Referred to the House Committee on …" (and hearings /
   // markups) fell through to 'Introduced' — ~40% of live bills mislabeled.
-  { status: 'In Committee', re: /referred to (the )?((house|senate) )?(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
+  // 21 Nov 2026: select/joint/special/permanent-select committees (e.g.
+  // "referred to the Select Committee on Intelligence") fell through too,
+  // since the qualifier wasn't "house"/"senate".
+  { status: 'In Committee', re: /referred to (the )?((house|senate|select|joint|special|permanent select) )*(committee|subcommittee)|hearings? held|mark-?up session held|committee consideration/i }
 ];
 function deriveStatus(latestActionText) {
   const text = latestActionText || '';
