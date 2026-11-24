@@ -199,7 +199,11 @@ function serve() {
           method: req.method,
           headers: { 'content-type': req.headers['content-type'] || 'application/json', 'user-agent': 'civix-phone-check' },
         }, (r) => { res.writeHead(r.statusCode, { 'content-type': r.headers['content-type'] || '' }); r.pipe(res); });
-        up.on('error', () => { res.writeHead(500); res.end('{}'); });
+        // A connection error can arrive after the upstream response already
+        // started (headers written, body piping) — e.g. a late reset. Writing
+        // headers again then throws ERR_HTTP_HEADERS_SENT and crashes the
+        // whole check (seen in CI 23 Nov 2026, killing every page after it).
+        up.on('error', () => { if (res.headersSent) res.end(); else { res.writeHead(500); res.end('{}'); } });
         req.pipe(up);
         return;
       }
